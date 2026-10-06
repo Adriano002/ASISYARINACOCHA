@@ -1,31 +1,107 @@
-"""Sincronizacion con Cloudflare R2."""
+# sync.py
 import logging
 import streamlit as st
+from pathlib import Path
 
-from db import subir_bd_a_r2, info_ultimo_backup
+log = logging.getLogger("sync")
 
-log = logging.getLogger("asistencia.sync")
+
+def _client():
+    """Crea cliente boto3 apuntando a Cloudflare R2."""
+    import boto3
+    from botocore.config import Config
+
+    cfg = Config(
+        signature_version="s3v4",
+        retries={"max_attempts": 3, "mode": "standard"},
+    )
+    return boto3.client(
+        "s3",
+        endpoint_url=st.secrets["r2"]["endpoint"],
+        aws_access_key_id=st.secrets["r2"]["access_key"],
+        aws_secret_access_key=st.secrets["r2"]["secret_key"],
+        region_name="auto",
+        config=cfg,
+    )
+
+
+def descargar_bd(destino: Path):
+    """Descarga asistencia.db desde R2 al path local."""
+    try:
+        cliente = _client()
+        bucket = st.secrets["r2"]["bucket"]
+        key = st.secrets["r2"].get("key", "asistencia.db")
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        cliente.download_file(bucket, key, str(destino))
+        log.info(f"BD descargada: {destino} ({destino.stat().st_size} bytes)")
+        return True
+    except Exception as e:
+        log.warning(f"descargar_bd: {e}")
+        return False
+
+
+def subir_bd(origen: Path):
+    """Sube la BD local a R2."""
+    try:
+        if not origen.exists():
+            log.warning("No existe BD local para subir")
+            return False
+        cliente = _client()
+        bucket = st.secrets["r2"]["bucket"]
+        key = st.secrets["r2"].get("key", "asistencia.db")
+        cliente.upload_file(str(origen), bucket, key)
+        log.info(f"BD subida a R2: {origen.stat().st_size} bytes")
+        return True
+    except Exception as e:
+        log.error(f"subir_bd: {e}")
+        return False
 
 
 def boton_backup():
-    """UI para backup manual a R2."""
-    st.markdown("### Guardar backup en la nube")
-    st.caption("Sube la base de datos actual a Cloudflare R2. "
-               "Se recomienda hacerlo al final del día.")
+    """Widget de Streamlit para subir/descargar BD manualmente."""
+    import streamlit as st
+    from db import DB_PATH, reset_pool
 
-    if st.button("Guardar backup ahora", type="primary"):
-        with st.spinner("Subiendo a R2..."):
-            ok, msg = subir_bd_a_r2()
-        if ok:
-            st.success(f"✅ {msg}")
-        else:
-            st.error(f"❌ Error: {msg}")
+    st.markdown("### Backup manual")
+
+    if DB_PATH.exists():
+        tam = DB_PATH.stat().st_size / 1024
+        st.success(f"BD local: {DB_PATH} ({tam:.1f} KB)")
+    else:
+        st.error("No hay BD local.")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        if st.button("⬆️ Subir BD a R2", type="primary", width="stretch"):
+            with st.spinner("Subiendo..."):
+                if subir_bd(DB_PATH):
+                    st.success("BD subida a R2 correctamente.")
+                else:
+                    st.error("Error al subir. Revisa los logs.")
+
+    with c2:
+        if st.button("⬇️ Descargar BD desde R2", width="stretch"):
+            with st.spinner("Descargando..."):
+                reset_pool()
+                if descargar_bd(DB_PATH):
+                    reset_pool()
+                    st.success("BD descargada. Recarga la página.")
+                else:
+                    st.error("Error al descargar.")
 
     st.markdown("---")
-    st.markdown("### Ultimo backup en la nube")
-    info = info_ultimo_backup()
-    if info:
-        st.write(f"**Fecha**: {info['fecha']}")
-        st.write(f"**Tamaño**: {info['tamano']:,} bytes")
-    else:
-        st.info("No hay backups previos en R2.")
+    st.caption(
+        "⚠️ En Streamlit Cloud el filesystem es efímero. "
+        "Haz backup periódicamente o al terminar la jornada."
+    )
+
+    if DB_PATH.exists():
+        with open(DB_PATH, "rb") as f:
+            st.download_button(
+                "📥 Descargar BD local (.db)",
+                f.read(),
+                file_name="asistencia_backup.db",
+                mime="application/octet-stream",
+                width="stretch",
+            )
