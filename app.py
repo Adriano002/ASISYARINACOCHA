@@ -733,7 +733,7 @@ def insertar_alumnos_validos(val):
     ins = 0; reac = 0; errs = []
 
     with cursor() as (con, cur):
-        # ─── Cargar catalogos en memoria ───
+        # ─── Cargar catalogos en memoria (una sola vez) ───
         cur.execute("SELECT id, nombre FROM turnos")
         mapa_turnos = {r["nombre"]: r["id"] for r in cur.fetchall()}
 
@@ -756,15 +756,13 @@ def insertar_alumnos_validos(val):
             key = (r["nombre"], r["tel"])
             mapa_apoderados[key] = r["id"]
 
-        # ─── Procesar cada alumno ───
+        # ─── Procesar cada alumno (en memoria, sin ir a Neon por catalogo) ───
         for i, d in enumerate(val):
             try:
-                # Grado
                 grado_id = mapa_grados.get(d["grado"])
                 if not grado_id:
                     errs.append(f"Fila {i+1}: grado no encontrado"); continue
 
-                # Turno
                 turno_id = mapa_turnos.get(d["turno"])
                 if not turno_id:
                     errs.append(f"Fila {i+1}: turno no encontrado"); continue
