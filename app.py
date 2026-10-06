@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# SISTEMA DE ASISTENCIA - I.E. YARINACOCHA
-# Version PostgreSQL (Neon)
-# ═══════════════════════════════════════════════════════════════════════════
 import hashlib
 import logging
 import re
@@ -11,9 +7,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
-
 import pandas as pd
-import psycopg2
 import qrcode
 import streamlit as st
 from reportlab.lib import colors
@@ -96,10 +90,12 @@ def verificar_password_critica(password):
 
 
 # ─── INICIALIZAR BD ────────────────────────────────────────────────────────
+@st.cache_resource
 def inicializar_bd():
     aplicar_schema()
     _seed()
-    log.info("bd lista (Neon)")
+    log.info("bd lista (Turso)")
+    return True
 
 
 def _seed():
@@ -166,17 +162,19 @@ def modo_mantenimiento():
 
 
 def activar_mantenimiento(usuario, mensaje=""):
-    escribir("INSERT INTO config(clave,valor) VALUES('mantenimiento','1') "
-             "ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor")
-    escribir("INSERT INTO config(clave,valor) VALUES('mantenimiento_msg',%s) "
-             "ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor",
-             (mensaje or "",))
+    escribir("INSERT INTO config(clave,valor) VALUES(%s,%s) "
+             "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor",
+             ("mantenimiento", "1"))
+    escribir("INSERT INTO config(clave,valor) VALUES(%s,%s) "
+             "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor",
+             ("mantenimiento_msg", mensaje or ""))
     auditar(usuario["usuario"], "Activo modo mantenimiento")
 
 
 def desactivar_mantenimiento(usuario):
-    escribir("INSERT INTO config(clave,valor) VALUES('mantenimiento','0') "
-             "ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor")
+    escribir("INSERT INTO config(clave,valor) VALUES(%s,%s) "
+             "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor",
+             ("mantenimiento", "0"))
     auditar(usuario["usuario"], "Desactivo modo mantenimiento")
 
 
@@ -245,7 +243,7 @@ def autenticar(nombre_usuario, password):
 
         if _bloqueado(u):
             lim = datetime.strptime(u["bloqueado_hasta"], "%Y-%m-%d %H:%M:%S")
-            min_rest = int((lim - ahora()).total_seconds() / 60) + 1
+            min_rest = int((lim - ahora().replace(tzinfo=None)).total_seconds() / 60) + 1
             return None, f"Cuenta bloqueada. Intenta en {min_rest} min"
 
         if not verificar_password(password, u["password"]):
@@ -254,7 +252,7 @@ def autenticar(nombre_usuario, password):
                 return None, "Credenciales incorrectas."
             it = (u.get("intentos_fallidos") or 0) + 1
             if it >= MAX_INTENTOS:
-                bh = ahora() + timedelta(minutes=MIN_BLOQUEO)
+                bh = to_ts(ahora() + timedelta(minutes=MIN_BLOQUEO))
                 cur.execute("UPDATE usuarios SET intentos_fallidos=0,"
                             "bloqueado_hasta=%s WHERE id=%s",
                             (bh, u["id"]))
@@ -265,17 +263,16 @@ def autenticar(nombre_usuario, password):
 
         cur.execute("UPDATE usuarios SET intentos_fallidos=0,bloqueado_hasta=NULL,"
                     "ultimo_login=%s,ultimo_ip=%s WHERE id=%s",
-                    (ahora(), _ip(), u["id"]))
+                    (timestamp_str(), _ip(), u["id"]))
         u["ultimo_login"] = timestamp_str()
         return u, ""
-
 
 def auditar(usuario, accion, va=None, vn=None, tb=None, rid=None):
     try:
         escribir("INSERT INTO auditoria(usuario,accion,fecha,valor_anterior,"
                  "valor_nuevo,tabla_afectada,registro_id,ip) "
                  "VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",
-                 (usuario, accion, ahora(), va, vn, tb, rid, _ip()))
+                 (usuario, accion, timestamp_str(), va, vn, tb, rid, _ip()))
     except Exception as e:
         log.warning("audit: %s", e)
 
@@ -342,9 +339,10 @@ def crear_periodo(nombre, fi, ff, usuario):
         with cursor() as (con, cur):
             cur.execute(
                 "INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) "
-                "VALUES(%s,%s,%s,1,0) RETURNING id",
-                (nombre, to_date(fi), to_date(ff)))
-            idn = cur.fetchone()["id"]
+                "VALUES(%s,%s,%s,1,0)",
+                (nombre, to_date(fi), to_date(ff))
+            )
+            idn = cur.lastrowid
             cur.execute("UPDATE periodos SET activo=0 WHERE id!=%s", (idn,))
         auditar(usuario["usuario"], "Creo periodo " + nombre,
                 tb="periodos", rid=idn)
@@ -352,7 +350,6 @@ def crear_periodo(nombre, fi, ff, usuario):
     except Exception as e:
         log.error("crear_periodo: %s", e)
         return False, f"Error: {e}"
-
 
 def activar_periodo(idp, usuario):
     with cursor() as (con, cur):
@@ -528,8 +525,8 @@ def buscar_alumnos(texto, idg=None, idsec=None, limite=200):
     p = []
     if texto:
         for w in [x.strip() for x in texto.split() if x.strip()]:
-            q += (" AND (a.nombres ILIKE %s OR a.apellido_paterno ILIKE %s "
-                  "OR a.apellido_materno ILIKE %s)")
+            q += (" AND (a.nombres LIKE %s OR a.apellido_paterno LIKE %s "
+                  "OR a.apellido_materno LIKE %s)")
             pat = f"%{w}%"
             p += [pat, pat, pat]
     if idg:
@@ -577,9 +574,9 @@ def crear_alumno(dni, nombres, ap, am, idsec, apo_n, apo_t, usuario):
                     ida = f["id"]
                 else:
                     cur.execute("INSERT INTO apoderados(nombre,telefono) "
-                                "VALUES(%s,%s) RETURNING id",
+                                "VALUES(%s,%s)",
                                 (apo_n, apo_t or None))
-                    ida = cur.fetchone()["id"]
+                    ida = cur.lastrowid
             cur.execute("""
                 INSERT INTO alumnos(dni,nombres,apellido_paterno,apellido_materno,
                                     seccion_id,apoderado_id,nombre_apoderado,
@@ -594,7 +591,6 @@ def crear_alumno(dni, nombres, ap, am, idsec, apo_n, apo_t, usuario):
             return False, "Ya existe un alumno con DNI " + dni
         log.error("crear_alumno: %s", e)
         return False, "Error al crear el alumno."
-
 
 def editar_alumno(idal, apo_n, apo_t, idsec, dni, usuario):
     with cursor() as (con, cur):
@@ -617,8 +613,8 @@ def editar_alumno(idal, apo_n, apo_t, idsec, dni, usuario):
                 ida = f["id"]
             else:
                 cur.execute("INSERT INTO apoderados(nombre,telefono) "
-                            "VALUES(%s,%s) RETURNING id", (apo_n, apo_t or None))
-                ida = cur.fetchone()["id"]
+                            "VALUES(%s,%s)", (apo_n, apo_t or None))
+                ida = cur.lastrowid
         cur.execute("UPDATE alumnos SET apoderado_id=%s,nombre_apoderado=%s,"
                     "telefono_apoderado=%s,seccion_id=%s WHERE id=%s",
                     (ida, apo_n or None, apo_t or None, idsec, idal))
@@ -638,14 +634,12 @@ def editar_alumno(idal, apo_n, apo_t, idsec, dni, usuario):
     auditar(usuario["usuario"], accion, tb="alumnos", rid=idal)
     return True, "Alumno editado."
 
-
 def retirar_alumno(idal, dni, usuario):
     escribir("UPDATE alumnos SET activo=0,retirado_en=%s WHERE id=%s",
-             (ahora(), idal))
+             (timestamp_str(), idal))
     auditar(usuario["usuario"], "Desactivo alumno DNI " + dni,
             tb="alumnos", rid=idal)
     return True, "Alumno desactivado."
-
 
 def reactivar_alumno(idal, dni, usuario):
     escribir("UPDATE alumnos SET activo=1,retirado_en=NULL WHERE id=%s", (idal,))
@@ -679,9 +673,9 @@ def validar_importacion(df, mapeo):
         if s.lower() == "nan": return ""
         return s
 
-    # ─── Cargar catalogos UNA VEZ ───
+    # ─── Cargar catalogo de grados UNA VEZ ───
     with cursor() as (con, cur):
-        cur.execute("SELECT id, nombre FROM grados")
+        cur.execute("SELECT nombre FROM grados")
         grados_set = {r["nombre"] for r in cur.fetchall()}
 
     for idx, fila in df.iterrows():
@@ -725,15 +719,17 @@ def validar_importacion(df, mapeo):
 
 
 def insertar_alumnos_validos(val):
-    """Inserta cargando catalogos en memoria. 1 query por operacion, no por fila."""
+    """Inserta alumnos con SQLite (sin execute_values, sin ANY)."""
     per = obtener_periodo_activo()
     if not per:
         return 0, 0, ["No hay periodo activo."]
     pid = per["id"]
     ins = 0; reac = 0; errs = []
 
+    if not val:
+        return 0, 0, ["Lista vacia."]
+
     with cursor() as (con, cur):
-        # ─── Cargar catalogos en memoria (una sola vez) ───
         cur.execute("SELECT id, nombre FROM turnos")
         mapa_turnos = {r["nombre"]: r["id"] for r in cur.fetchall()}
 
@@ -743,80 +739,88 @@ def insertar_alumnos_validos(val):
         cur.execute("SELECT id, nombre, grado_id, turno_id FROM secciones")
         mapa_secciones = {}
         for r in cur.fetchall():
-            key = (r["nombre"], r["grado_id"], r["turno_id"])
-            mapa_secciones[key] = r["id"]
+            mapa_secciones[(r["nombre"], r["grado_id"], r["turno_id"])] = r["id"]
 
-        cur.execute("SELECT id, dni FROM alumnos WHERE dni = ANY(%s)",
-                    ([d["dni"] for d in val],))
-        mapa_alumnos = {r["dni"]: r["id"] for r in cur.fetchall()}
+        dni_list = [d["dni"] for d in val]
+        mapa_alumnos = {}
+        for i in range(0, len(dni_list), 500):
+            chunk = dni_list[i:i+500]
+            ph = ",".join("?" * len(chunk))
+            cur.execute(f"SELECT id, dni FROM alumnos WHERE dni IN ({ph})", chunk)
+            for r in cur.fetchall():
+                mapa_alumnos[r["dni"]] = r["id"]
 
         cur.execute("SELECT id, nombre, COALESCE(telefono,'') AS tel FROM apoderados")
         mapa_apoderados = {}
         for r in cur.fetchall():
-            key = (r["nombre"], r["tel"])
-            mapa_apoderados[key] = r["id"]
+            mapa_apoderados[(r["nombre"], r["tel"])] = r["id"]
 
-        # ─── Procesar cada alumno (en memoria, sin ir a Neon por catalogo) ───
-        for i, d in enumerate(val):
+        for d in val:
+            grado_id = mapa_grados.get(d["grado"])
+            turno_id = mapa_turnos.get(d["turno"])
+            if not grado_id or not turno_id:
+                continue
+            key = (d["seccion"], grado_id, turno_id)
+            if key not in mapa_secciones:
+                cur.execute(
+                    "INSERT INTO secciones(nombre, grado_id, turno_id) VALUES(%s,%s,%s)",
+                    (d["seccion"], grado_id, turno_id))
+                mapa_secciones[key] = cur.lastrowid
+
+        for d in val:
+            if d["apoderado_nombre"]:
+                key = (d["apoderado_nombre"], d["apoderado_telefono"] or "")
+                if key not in mapa_apoderados:
+                    cur.execute(
+                        "INSERT INTO apoderados(nombre, telefono) VALUES(%s,%s)",
+                        (d["apoderado_nombre"], d["apoderado_telefono"] or None))
+                    mapa_apoderados[key] = cur.lastrowid
+
+        for d in val:
             try:
                 grado_id = mapa_grados.get(d["grado"])
-                if not grado_id:
-                    errs.append(f"Fila {i+1}: grado no encontrado"); continue
-
                 turno_id = mapa_turnos.get(d["turno"])
-                if not turno_id:
-                    errs.append(f"Fila {i+1}: turno no encontrado"); continue
-
-                # Seccion (crear si no existe)
-                sec_key = (d["seccion"], grado_id, turno_id)
-                idsec = mapa_secciones.get(sec_key)
+                if not grado_id or not turno_id:
+                    errs.append(f"{d['dni']}: grado/turno no encontrado")
+                    continue
+                idsec = mapa_secciones.get((d["seccion"], grado_id, turno_id))
                 if not idsec:
-                    cur.execute(
-                        "INSERT INTO secciones(nombre,grado_id,turno_id) "
-                        "VALUES(%s,%s,%s) RETURNING id",
-                        (d["seccion"], grado_id, turno_id))
-                    idsec = cur.fetchone()["id"]
-                    mapa_secciones[sec_key] = idsec
+                    errs.append(f"{d['dni']}: seccion no encontrada")
+                    continue
 
-                # Apoderado (crear si no existe)
                 ida = None
                 if d["apoderado_nombre"]:
-                    ap_key = (d["apoderado_nombre"], d["apoderado_telefono"] or "")
-                    ida = mapa_apoderados.get(ap_key)
-                    if not ida:
-                        cur.execute(
-                            "INSERT INTO apoderados(nombre,telefono) "
-                            "VALUES(%s,%s) RETURNING id",
-                            (d["apoderado_nombre"], d["apoderado_telefono"] or None))
-                        ida = cur.fetchone()["id"]
-                        mapa_apoderados[ap_key] = ida
+                    ida = mapa_apoderados.get((d["apoderado_nombre"], d["apoderado_telefono"] or ""))
 
-                # Alumno: update o insert
-                alumno_id = mapa_alumnos.get(d["dni"])
-                if alumno_id:
+                aid = mapa_alumnos.get(d["dni"])
+                if aid:
                     cur.execute("""
-                        UPDATE alumnos SET nombres=%s,apellido_paterno=%s,
-                            apellido_materno=%s,seccion_id=%s,apoderado_id=%s,
-                            nombre_apoderado=%s,telefono_apoderado=%s,
-                            periodo_id=%s,activo=1,retirado_en=NULL
+                        UPDATE alumnos SET nombres=%s, apellido_paterno=%s,
+                            apellido_materno=%s, seccion_id=%s, apoderado_id=%s,
+                            nombre_apoderado=%s, telefono_apoderado=%s,
+                            periodo_id=%s, activo=1, retirado_en=NULL
                         WHERE id=%s
-                    """, (d["nombres"], d["apellido_paterno"], d["apellido_materno"],
-                          idsec, ida, d["apoderado_nombre"] or None,
-                          d["apoderado_telefono"] or None, pid, alumno_id))
+                    """, (d["nombres"], d["apellido_paterno"],
+                          d["apellido_materno"] or None, idsec, ida,
+                          d["apoderado_nombre"] or None,
+                          d["apoderado_telefono"] or None, pid, aid))
                     reac += 1
                 else:
                     cur.execute("""
-                        INSERT INTO alumnos(dni,nombres,apellido_paterno,
-                            apellido_materno,seccion_id,apoderado_id,
-                            nombre_apoderado,telefono_apoderado,periodo_id,activo)
+                        INSERT INTO alumnos(dni, nombres, apellido_paterno,
+                            apellido_materno, seccion_id, apoderado_id,
+                            nombre_apoderado, telefono_apoderado,
+                            periodo_id, activo)
                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,1)
                     """, (d["dni"], d["nombres"], d["apellido_paterno"],
-                          d["apellido_materno"], idsec, ida,
+                          d["apellido_materno"] or None, idsec, ida,
                           d["apoderado_nombre"] or None,
                           d["apoderado_telefono"] or None, pid))
                     ins += 1
             except Exception as e:
-                errs.append(f"Fila {i+1}: {e}")
+                errs.append(f"{d['dni']}: {e}")
+
+    log.info("Import: %d nuevos, %d actualizados, %d errs", ins, reac, len(errs))
     return ins, reac, errs
 
 # ─── BLOQUEOS ──────────────────────────────────────────────────────────────
@@ -877,19 +881,17 @@ def alumno_bloqueado(idal):
 def crear_bloqueo(idal, motivo, usuario, origen="automatico"):
     escribir("INSERT INTO bloqueos(alumno_id,motivo,activo,fecha_inicio,"
              "creado_por,origen) VALUES(%s,%s,1,%s,%s,%s)",
-             (idal, motivo, ahora().date(), usuario["usuario"], origen))
+             (idal, motivo, hoy_str(), usuario["usuario"], origen))
     auditar(usuario["usuario"], f"Bloqueo {origen} alumno_id={idal}",
             tb="bloqueos", rid=idal)
-
 
 def liberar_bloqueo(idal, usuario, obs=""):
     escribir("UPDATE bloqueos SET activo=0,fecha_fin=%s,liberado_por=%s "
              "WHERE alumno_id=%s AND activo=1",
-             (ahora(), usuario["usuario"], idal))
+             (timestamp_str(), usuario["usuario"], idal))
     auditar(usuario["usuario"],
             f"Libero bloqueo alumno_id={idal}. Obs: {obs}",
             tb="bloqueos", rid=idal)
-
 
 def historial_bloqueos_alumno(alumno_id):
     return leer_df("SELECT id,motivo,activo,fecha_inicio,fecha_fin,"
@@ -984,7 +986,7 @@ def crear_justificacion_previa(idal, fecha_obj, tipo, motivo, usuario):
                 motivo,creado_por,timestamp,aplicada)
             VALUES(%s,%s,%s,%s,%s,%s,0)
         """, (idal, to_date(fecha_obj), FALTA, motivo.strip(),
-              usuario["usuario"], ahora()))
+              usuario["usuario"], timestamp_str()))
     auditar(usuario["usuario"], f"Creo justificacion previa {fecha_obj} id={idal}",
             tb="justificaciones_previas", rid=idal)
     return True, "Justificacion registrada. Se aplicara automaticamente cuando llegue el dia."
@@ -1010,7 +1012,7 @@ def crear_permiso(idal, fi, ff, motivo, usuario):
     with cursor() as (con, cur):
         cur.execute("SELECT id FROM permisos WHERE alumno_id=%s AND activo=1 "
                     "AND NOT (fecha_fin < %s OR fecha_inicio > %s)",
-                    (idal, fi_d, ff_d))
+                    (idal, to_date(fi_d), to_date(ff_d)))
         if cur.fetchone():
             return False, "El alumno ya tiene un permiso que se solapa con esas fechas."
         per = obtener_periodo_activo()
@@ -1019,7 +1021,8 @@ def crear_permiso(idal, fi, ff, motivo, usuario):
             INSERT INTO permisos(alumno_id,fecha_inicio,fecha_fin,motivo,
                 creado_por,timestamp,activo,periodo_id)
             VALUES(%s,%s,%s,%s,%s,%s,1,%s)
-        """, (idal, fi_d, ff_d, motivo.strip(), usuario["usuario"], ahora(), pid))
+        """, (idal, to_date(fi_d), to_date(ff_d), motivo.strip(),
+              usuario["usuario"], timestamp_str(), pid))
     auditar(usuario["usuario"], f"Creo permiso {fi} a {ff} id={idal}",
             tb="permisos", rid=idal)
     return True, f"Permiso registrado del {fi} al {ff}."
@@ -1059,7 +1062,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
     fecha_str = hoy_str()
     fecha_d = hoy_date()
     ha = hora_corta()
-    h_time = hora_time()
+    h_time = hora_corta()
     per = obtener_periodo_activo()
     pid = per["id"] if per else None
 
@@ -1177,7 +1180,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                         justificada,origen,registrado_por,timestamp,periodo_id)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """, (al["id"], fecha_d, h_time, n, acc, just_final, origen,
-                      usuario["usuario"], ahora(), pid))
+                      usuario["usuario"], timestamp_str(), pid))
             except Exception as e:
                 if "unique" not in str(e).lower() and "duplicate" not in str(e).lower():
                     log.warning("tardanza: %s", e)
@@ -1201,11 +1204,11 @@ def registrar_entrada(dni, usuario, origen="qr"):
         " | " + tipo_real.upper() + " Puntual " + ha
     ), {"alumno": al, "evento_nombre": ev_nombre}
 
-
 def marcar_faltas_al_cierre():
     fecha_d = hoy_date()
     fecha_str = hoy_str()
     ha = hora_corta()
+    h_str = hora_corta()
     per = obtener_periodo_activo()
     pid = per["id"] if per else None
 
@@ -1245,14 +1248,14 @@ def marcar_faltas_al_cierre():
                                     tipo,hora,estado,justificada,observacion,origen,
                                     periodo_id,dia_especial_id)
                                 VALUES(%s,%s,%s,'evento',%s,%s,1,%s,%s,%s,%s)
-                            """, (al["id"], fecha_d, v["id"], hora_time(),
+                            """, (al["id"], fecha_d, v["id"], h_str,
                                   PERMISO, "Permiso", "manual", pid, evento["id"]))
                             continue
                         cur.execute("""
                             INSERT INTO asistencias(alumno_id,fecha,ventana_id,
                                 tipo,hora,estado,origen,periodo_id,dia_especial_id)
                             VALUES(%s,%s,%s,'evento',%s,%s,%s,%s,%s)
-                        """, (al["id"], fecha_d, v["id"], hora_time(), "Falta",
+                        """, (al["id"], fecha_d, v["id"], h_str, "Falta",
                               "auto", pid, evento["id"]))
             return
 
@@ -1281,7 +1284,7 @@ def marcar_faltas_al_cierre():
                                 tipo,hora,estado,justificada,observacion,origen,
                                 periodo_id)
                             VALUES(%s,%s,%s,%s,%s,%s,1,%s,%s,%s)
-                        """, (al["id"], fecha_d, v["id"], tipo, hora_time(),
+                        """, (al["id"], fecha_d, v["id"], tipo, h_str,
                               PERMISO, "Permiso otorgado", "manual", pid))
                         continue
                     jp = (_aplicar_just_prev(cur, al["id"], fecha_str, "Falta")
@@ -1290,9 +1293,8 @@ def marcar_faltas_al_cierre():
                         INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,
                             hora,estado,justificada,origen,periodo_id)
                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """, (al["id"], fecha_d, v["id"], tipo, hora_time(), est,
+                    """, (al["id"], fecha_d, v["id"], tipo, h_str, est,
                           1 if jp else 0, "auto", pid))
-
 
 def justificar_asistencia(ida, obs, usuario):
     with cursor() as (con, cur):
@@ -1313,11 +1315,10 @@ def justificar_asistencia(ida, obs, usuario):
             return False, "La observacion es obligatoria."
         cur.execute("UPDATE asistencias SET justificada=1,observacion=%s,"
                     "justificado_por=%s,justificado_en=%s WHERE id=%s",
-                    (obs.strip(), usuario["usuario"], ahora(), ida))
+                    (obs.strip(), usuario["usuario"], timestamp_str(), ida))
     auditar(usuario["usuario"], f"Justifico falta id={ida} motivo: {obs}",
             tb="asistencias", rid=ida)
     return True, "Falta justificada."
-
 
 def quitar_justificacion(ida, usuario):
     with cursor() as (con, cur):
@@ -1534,7 +1535,7 @@ def perfil_alumno_datos(idal):
         COALESCE(a.observacion,'') AS observacion,
         COALESCE(a.origen,'qr') AS origen,
         COALESCE(a.justificado_por,'') AS justificado_por,
-        COALESCE(a.justificado_en::text,'') AS justificado_en,
+        COALESCE(a.justificado_en,'') AS justificado_en,
         COALESCE(d.descripcion,'') AS evento_nombre,a.ventana_id
         FROM asistencias a
         LEFT JOIN dias_especiales d ON a.dia_especial_id=d.id
@@ -1546,7 +1547,7 @@ def perfil_alumno_datos(idal):
         FROM tardanzas WHERE alumno_id=%s ORDER BY fecha DESC,hora DESC
     """, (idal,))
     db = leer_df("""
-        SELECT fecha_inicio,COALESCE(fecha_fin::text,'-') AS fecha_fin,
+        SELECT fecha_inicio,COALESCE(fecha_fin,'-') AS fecha_fin,
                COALESCE(motivo,'') AS motivo,activo
         FROM bloqueos WHERE alumno_id=%s ORDER BY fecha_inicio DESC
     """, (idal,))
@@ -1656,15 +1657,15 @@ def cerrar_año_escolar(usuario, pid, nuevo_nombre, fi, ff):
                 rep_json = rep.to_json(orient="records", force_ascii=False)
         except Exception:
             rep_json = None
-        fecha = ahora()
+        fecha_str = timestamp_str()
         cur.execute("""
             INSERT INTO cierres_anuales(periodo_id,fecha_cierre,generado_por,
                 reporte_json) VALUES(%s,%s,%s,%s)
-        """, (pid, fecha, usuario["usuario"], rep_json))
+        """, (pid, fecha_str, usuario["usuario"], rep_json))
         cur.execute("UPDATE periodos SET activo=0,fecha_cierre=%s,cerrado=1 "
-                    "WHERE id=%s", (fecha, pid))
+                    "WHERE id=%s", (fecha_str, pid))
         cur.execute("UPDATE alumnos SET activo=0,retirado_en=%s WHERE periodo_id=%s",
-                    (fecha, pid))
+                    (fecha_str, pid))
         cur.execute("""
             INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado)
             VALUES(%s,%s,%s,1,0)
@@ -1672,7 +1673,6 @@ def cerrar_año_escolar(usuario, pid, nuevo_nombre, fi, ff):
     auditar(usuario["usuario"], f"Cerro periodo {p['nombre']}",
             tb="periodos", rid=pid)
     return True, f"Periodo '{p['nombre']}' cerrado. Nuevo: '{nuevo_nombre}'."
-
 
 def listar_cierres_anuales():
     return leer_df("""
@@ -2006,18 +2006,18 @@ def pdf_carnets_por_seccion(idsec):
 def pdf_carnets_seleccionados(ids, titulo=None):
     if not ids:
         return None
+    ph = ",".join("?" * len(ids))
     with cursor() as (con, cur):
-        cur.execute("""
+        cur.execute(f"""
             SELECT a.*,s.nombre AS seccion,g.nombre AS grado,t.nombre AS turno
             FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
             JOIN grados g ON s.grado_id=g.id
             JOIN turnos t ON s.turno_id=t.id
-            WHERE a.id = ANY(%s) AND a.activo=1
+            WHERE a.id IN ({ph}) AND a.activo=1
             ORDER BY a.apellido_paterno,a.apellido_materno
-        """, (ids,))
+        """, ids)
         filas = [dict(r) for r in cur.fetchall()]
     return _render_carnets(filas, titulo) if filas else None
-
 
 def pdf_carnet_alumno(dni):
     with cursor() as (con, cur):
@@ -2683,7 +2683,7 @@ def _generar_hojas_diario(fecha, ids_secs):
         """, (idsec, to_date(fecha)))
         df_ref = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
-            a.nombres AS Nombres, 'Vino' AS Estado, COALESCE(ast.hora::text,'') AS Hora
+            a.nombres AS Nombres, 'Vino' AS Estado, COALESCE(ast.hora,'') AS Hora
             FROM alumnos a JOIN asistencias ast ON ast.alumno_id=a.id
             WHERE a.seccion_id=%s AND a.activo=1 AND ast.fecha=%s
               AND ast.tipo='reforzamiento' AND ast.estado='Asistio'
@@ -2696,7 +2696,6 @@ def _generar_hojas_diario(fecha, ids_secs):
             ("ALUMNOS QUE VINIERON A REFORZAMIENTO", df_ref),
         ]
     return hojas
-
 
 def _generar_hojas_mensual(mes, anio, ids_secs):
     hojas = {}
@@ -2985,7 +2984,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
 
 def _rep_general_por_turno_admin():
     st.subheader("Reporte general por auxiliar")
-    st.caption("Agrupado por auxiliar. Solo se puede generar cuando la ventana de clases del turno ya cerro.")
+    st.caption("Muestra TODAS las secciones del turno. Si no hay asistencias, aparecen con 0.")
     turnos = listar_turnos()
     if not turnos:
         st.info("Sin turnos configurados."); return
@@ -3025,32 +3024,59 @@ def _rep_general_por_turno_admin():
             ops_p[et] = r["id"]
         sel_lbl = st.selectbox("Periodo", list(ops_p.keys()), key="repgen_pid")
         pid = ops_p[sel_lbl]
-    q = """
-    SELECT s.id AS seccion_id, g.nombre AS grado, s.nombre AS seccion,
-    COALESCE(u.nombres, '(Sin auxiliar)') AS auxiliar,
-    SUM(CASE WHEN ast.estado='Puntual' AND ast.tipo='clases' THEN 1 ELSE 0 END) AS puntuales,
-    SUM(CASE WHEN ast.estado='Falta' AND ast.tipo='clases' THEN 1 ELSE 0 END) AS faltas
+
+    # ═══════════════════════════════════════════════════════════════════
+    # QUERY: parte de secciones → LEFT JOIN con todo lo demás
+    # ═══════════════════════════════════════════════════════════════════
+    cond_periodo = " AND ast.periodo_id = %s" if pid is not None else ""
+
+    q = f"""
+    SELECT
+        s.id AS seccion_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        COALESCE(u.nombres, '(Sin auxiliar)') AS auxiliar,
+        COALESCE((
+            SELECT COUNT(*) FROM asistencias ast
+            JOIN alumnos a ON ast.alumno_id = a.id
+            WHERE a.seccion_id = s.id AND a.activo = 1
+              AND ast.tipo = 'clases' AND ast.estado = 'Puntual'
+              AND ast.fecha BETWEEN %s AND %s {cond_periodo}
+        ), 0) AS puntuales,
+        COALESCE((
+            SELECT COUNT(*) FROM asistencias ast
+            JOIN alumnos a ON ast.alumno_id = a.id
+            WHERE a.seccion_id = s.id AND a.activo = 1
+              AND ast.tipo = 'clases' AND ast.estado = 'Falta'
+              AND ast.fecha BETWEEN %s AND %s {cond_periodo}
+        ), 0) AS faltas
     FROM secciones s
-    JOIN grados g ON s.grado_id=g.id
+    JOIN grados g ON s.grado_id = g.id
     LEFT JOIN auxiliar_secciones ause ON ause.seccion_id = s.id
     LEFT JOIN usuarios u ON u.id = ause.usuario_id
-        AND u.rol='Auxiliar' AND u.activo=1
-    LEFT JOIN asistencias ast ON ast.alumno_id IN (
-        SELECT id FROM alumnos WHERE seccion_id=s.id
-    ) AND ast.fecha BETWEEN %s AND %s
-    WHERE s.turno_id=%s
+        AND u.rol = 'Auxiliar' AND u.activo = 1
+    WHERE s.turno_id = %s
+    ORDER BY g.nombre, s.nombre, u.nombres
     """
-    p = [desde, hasta, id_turno]
-    if pid is not None:
-        q += " AND ast.periodo_id=%s"
-        p.append(pid)
-    q += " GROUP BY s.id, g.nombre, s.nombre, auxiliar ORDER BY auxiliar, g.nombre, s.nombre"
+
+    p = [to_date(desde), to_date(hasta)]
+    if pid is not None: p.append(pid)
+    p += [to_date(desde), to_date(hasta)]
+    if pid is not None: p.append(pid)
+    p.append(id_turno)
+
     df = leer_df(q, p)
     if df.empty:
-        st.info("Sin datos en ese rango."); return
+        st.warning("No hay secciones creadas en este turno.")
+        return
+
     df["total"] = df["puntuales"] + df["faltas"]
+
+    # ─── Mostrar resultado ─────────────────────────────────────────────
     st.markdown("---")
     st.markdown(f"**Turno {sel_turno}** — del {desde} al {hasta}")
+    st.caption(f"{len(df)} secciones en este turno.")
+
     filas = []
     for aux in df["auxiliar"].unique().tolist():
         df_aux = df[df["auxiliar"] == aux]
@@ -3065,29 +3091,27 @@ def _rep_general_por_turno_admin():
             })
         filas.append({
             "Auxiliar": f"  >> Subtotal {aux}",
-            "Grado": "",
-            "Seccion": "",
+            "Grado": "", "Seccion": "",
             "Puntuales": int(df_aux["puntuales"].sum()),
             "Faltas": int(df_aux["faltas"].sum()),
             "Total": int(df_aux["total"].sum()),
         })
     filas.append({
         "Auxiliar": "TOTAL GENERAL",
-        "Grado": "",
-        "Seccion": "",
+        "Grado": "", "Seccion": "",
         "Puntuales": int(df["puntuales"].sum()),
         "Faltas": int(df["faltas"].sum()),
         "Total": int(df["total"].sum()),
     })
     df_export = pd.DataFrame(filas)
     st.dataframe(df_export, width='stretch', hide_index=True)
+
     st.markdown("---")
     st.markdown("### Descargar")
     c1, c2 = st.columns(2)
     with c1:
         st.download_button(
-            "Excel",
-            df_a_xlsx(df_export, "General por auxiliar"),
+            "Excel", df_a_xlsx(df_export, "General por auxiliar"),
             f"Reporte_general_{sel_turno}_{desde}_{hasta}.xlsx",
             width='stretch', key="repgen_dl_x"
         )
@@ -3101,8 +3125,6 @@ def _rep_general_por_turno_admin():
             f"Reporte_general_{sel_turno}_{desde}_{hasta}.pdf",
             "application/pdf", width='stretch', key="repgen_dl_p"
         )
-
-
 def vista_reportes():
     st.title("Reportes y Consultas")
     usuario = st.session_state["user"]; rol = usuario["rol"]
@@ -3638,13 +3660,15 @@ def vista_ventanas():
                     elif not verificar_password_critica(pwd):
                         st.error("Contrasena incorrecta.")
                     else:
+                        ap = ap_t.strftime("%H:%M")
+                        lim = lim_t.strftime("%H:%M")
+                        ci = ci_t.strftime("%H:%M")
                         escribir("UPDATE ventanas SET hora_apertura=%s,"
                                  "hora_limite_puntual=%s,hora_cierre=%s WHERE id=%s",
-                                 (ap_t, lim_t, ci_t, v["id"]))
+                                 (ap, lim, ci, v["id"]))
                         auditar(st.session_state["user"]["usuario"],
                                 f"Edito ventana id={v['id']}")
                         st.toast("Ventana actualizada"); st.rerun()
-
 
 # ─── USUARIOS ──────────────────────────────────────────────────────────────
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
@@ -4164,12 +4188,12 @@ def vista_dias_especiales():
                     cur.execute("""
                         INSERT INTO dias_especiales(fecha,descripcion,turno_id,
                             hora_entrada,tipo,periodo_id,contar_como_clases)
-                        VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                        VALUES(%s,%s,%s,%s,%s,%s,%s)
                     """, (to_date(fecha), desc.strip(), idt,
                           to_time(hora) if tipo == "Evento" else to_time("00:00"),
                           "evento" if tipo == "Evento" else "feriado",
                           pid, 1 if contar_como_clases else 0))
-                    idd = cur.fetchone()["id"]
+                    idd = cur.lastrowid
                     for sid in selecciones_secciones:
                         try:
                             cur.execute("INSERT INTO dias_especiales_secciones"
@@ -4189,15 +4213,18 @@ def vista_dias_especiales():
 
     with tabs[1]:
         df = leer_df("""
-            SELECT d.id,d.fecha,d.descripcion,COALESCE(t.nombre,'Ambos') AS turno,
-            d.hora_entrada,d.tipo,d.contar_como_clases,
-            (SELECT string_agg(g.nombre||' '||s.nombre, ', ')
-             FROM dias_especiales_secciones ds
-             JOIN secciones s ON ds.seccion_id=s.id
-             JOIN grados g ON s.grado_id=g.id
-             WHERE ds.dia_especial_id=d.id) AS secciones_aplicadas
-            FROM dias_especiales d LEFT JOIN turnos t ON d.turno_id=t.id
-            WHERE d.fecha>=%s AND d.activo=1 ORDER BY d.fecha, d.hora_entrada
+            SELECT d.id, d.fecha, d.descripcion,
+                   COALESCE(t.nombre, 'Ambos') AS turno,
+                   d.hora_entrada, d.tipo, d.contar_como_clases,
+                   (SELECT GROUP_CONCAT(g.nombre || ' ' || s.nombre, ', ')
+                    FROM dias_especiales_secciones ds
+                    JOIN secciones s ON ds.seccion_id = s.id
+                    JOIN grados g ON s.grado_id = g.id
+                    WHERE ds.dia_especial_id = d.id) AS secciones_aplicadas
+            FROM dias_especiales d
+            LEFT JOIN turnos t ON d.turno_id = t.id
+            WHERE d.fecha >= %s AND d.activo=1
+            ORDER BY d.fecha, d.hora_entrada
         """, (to_date(hoy_str()),))
         if df.empty:
             st.info("Sin dias especiales.")
@@ -4219,7 +4246,6 @@ def vista_dias_especiales():
                 st.session_state["_aviso_crear_usuario"] = {
                     "tipo": "ok", "msg": "Dia especial eliminado."}
                 st.rerun()
-
 
 # ─── JUSTIFICACIONES Y PERMISOS ────────────────────────────────────────────
 def _buscar_alumno_widget(clave):
@@ -4257,8 +4283,6 @@ def _buscar_alumno_widget(clave):
         """, (idal,))
         al = cur.fetchone()
     return dict(al) if al else None
-
-
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, manana o pasado manana.")
@@ -4312,7 +4336,7 @@ def _frag_justificacion_previa(usuario):
         elif filtro_estado == "Aplicadas":
             q += " AND jp.aplicada=1"
         if filtro_texto.strip():
-            q += " AND (a.dni LIKE %s OR a.apellido_paterno ILIKE %s OR a.apellido_materno ILIKE %s)"
+            q += " AND (a.dni LIKE %s OR a.apellido_paterno LIKE %s OR a.apellido_materno LIKE %s)"
             pat = "%" + filtro_texto.strip() + "%"
             params += [pat, pat, pat]
         q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
@@ -4383,7 +4407,6 @@ def _frag_justificacion_previa(usuario):
         else:
             st.info("Sin justificaciones previas.")
 
-
 def _frag_permisos(usuario):
     st.subheader("Permisos de inasistencia")
     st.caption("Permisos para dias FUTUROS (desde manana, maximo "
@@ -4453,7 +4476,7 @@ def _frag_permisos(usuario):
         elif filtro_estado == "Inactivos":
             q += " AND p.activo=0"
         if filtro_texto.strip():
-            q += " AND (a.dni LIKE %s OR a.apellido_paterno ILIKE %s OR a.apellido_materno ILIKE %s)"
+            q += " AND (a.dni LIKE %s OR a.apellido_paterno LIKE %s OR a.apellido_materno LIKE %s)"
             pat = "%" + filtro_texto.strip() + "%"
             params += [pat, pat, pat]
         q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
@@ -4523,8 +4546,6 @@ def _frag_permisos(usuario):
             st.dataframe(df_perm, width='stretch', hide_index=True)
         else:
             st.info("Sin permisos registrados.")
-
-
 def vista_justificaciones_permisos():
     st.title("Justificaciones y Permisos")
     usuario = st.session_state["user"]
@@ -4536,12 +4557,18 @@ def vista_justificaciones_permisos():
 
 
 # ─── MENU Y RUTAS ─────────────────────────────────────────────────────────
+
+def vista_backup():
+    st.title("Backup de base de datos")
+    from sync import boton_backup
+    boton_backup()
+
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     if rol == "Admin":
         return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
-                "Justificaciones y Permisos", "Usuarios", "Auditoria", "Mi cuenta"]
+                "Justificaciones y Permisos", "Usuarios", "Backup", "Auditoria", "Mi cuenta"]
     if rol == "Direccion":
         return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
                 "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
@@ -4549,7 +4576,6 @@ def obtener_opciones_por_rol(usuario):
         return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes",
                 "Mi cuenta"]
     return []
-
 
 RUTAS = {
     "Puerta": vista_puerta,
@@ -4562,11 +4588,11 @@ RUTAS = {
     "Dias especiales": vista_dias_especiales,
     "Ventanas": vista_ventanas,
     "Usuarios": vista_usuarios,
+    "Backup": vista_backup,          # ← AÑADIR
     "Auditoria": vista_auditoria,
     "Mi cuenta": vista_mi_cuenta,
     "Justificaciones y Permisos": vista_justificaciones_permisos,
 }
-
 
 def menu_lateral():
     usuario = st.session_state["user"]
@@ -4616,9 +4642,13 @@ def main():
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
+        # ⚡ Descargar BD de R2 al arrancar
+        from db import descargar_bd_si_no_existe
+        descargar_bd_si_no_existe()
+
         inicializar_bd()
-        ping()
         aplicar_estilos()
+
         if not st.session_state.get("user"):
             vista_login(); return
         if not _verificar_admin_activo():
@@ -4644,14 +4674,8 @@ def main():
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
-    except psycopg2.OperationalError as e:
-        st.error(f"Error de conexion a Neon: {e}")
-        st.info("Verifica tu archivo .streamlit/secrets.toml y que Neon este activo. "
-                "Si el error persiste, espera 30 segundos.")
-        log.exception("Error de conexion en main")
     except Exception as e:
         st.error(f"Error inesperado: {e}")
-        st.info("El error quedo registrado en logs/app.log.")
         log.exception("Error en main")
 
 
