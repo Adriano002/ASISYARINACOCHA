@@ -1816,7 +1816,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
         draw.line([(0, y), (FRANJA_W, y)], fill=(r, g, b))
 
-    # ─── FUENTE: intenta TTF real, si no hay, escala la default ───
+    # ═══ FUENTES ═══
     def _font(size, bold=False, italic=False):
         nombres = []
         if bold and italic:
@@ -1832,14 +1832,74 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                 return ImageFont.truetype(n, size)
             except Exception:
                 continue
-        # Fallback: escalar la fuente default al tamaño pedido
         try:
             base_font = ImageFont.load_default()
             return base_font.font_variant(size=size)
         except Exception:
             return ImageFont.load_default()
 
-    # ═══ TAMAÑOS AGRANDADOS ═══
+    # ═══ DIBUJAR TEXTO CON SOPORTE DE Ñ (aunque la fuente no la tenga) ═══
+    def _dibujar_texto(x, y, texto, font, color):
+        """Dibuja texto. Si tiene Ñ/ñ, dibuja N + tilde encima."""
+        if "Ñ" not in texto and "ñ" not in texto:
+            draw.text((x, y), texto, fill=color, font=font)
+            return
+
+        # Dibujar el texto reemplazando Ñ→N y ñ→n
+        texto_base = texto.replace("Ñ", "N").replace("ñ", "n")
+        draw.text((x, y), texto_base, fill=color, font=font)
+
+        # Calcular alto de la letra para posicionar la tilde
+        try:
+            bbox = draw.textbbox((0, 0), "N", font=font)
+            alto_letra = bbox[3] - bbox[1]
+        except Exception:
+            alto_letra = getattr(font, "size", 30)
+
+        # Ancho de la N para dibujar la tilde proporcional
+        try:
+            ancho_N = draw.textlength("N", font=font)
+        except Exception:
+            ancho_N = getattr(font, "size", 30) * 0.6
+
+        # Grosor de la tilde
+        grosor = max(2, int(alto_letra * 0.10))
+
+        # Recorrer el texto para encontrar cada Ñ/ñ
+        for i, ch in enumerate(texto):
+            if ch in ("Ñ", "ñ"):
+                prefijo = texto_base[:i]
+                try:
+                    x_actual = x + draw.textlength(prefijo, font=font)
+                except Exception:
+                    x_actual = x + i * ancho_N
+
+                # La tilde va encima de la N
+                # Posición base: centro horizontal de la N
+                centro_x = x_actual + ancho_N / 2
+                # Altura: justo arriba de la letra
+                tilde_y = y + max(0, int(alto_letra * 0.05))
+                # Tamaño de la tilde
+                tilde_w = ancho_N * 0.85
+                tilde_h = max(3, int(alto_letra * 0.18))
+
+                # Dibujar la tilde como una "onda" (~)
+                x1 = centro_x - tilde_w / 2
+                x2 = centro_x + tilde_w / 2
+                puntos = [
+                    (x1, tilde_y + tilde_h),
+                    (x1 + tilde_w * 0.25, tilde_y),
+                    (x1 + tilde_w * 0.5, tilde_y + tilde_h * 0.5),
+                    (x1 + tilde_w * 0.75, tilde_y + tilde_h),
+                    (x2, tilde_y + tilde_h * 0.2),
+                ]
+                try:
+                    draw.line(puntos, fill=color, width=grosor, joint="curve")
+                except TypeError:
+                    # Versiones viejas de Pillow no aceptan joint
+                    draw.line(puntos, fill=color, width=grosor)
+
+    # ═══ TAMAÑOS ═══
     f_colegio = _font(20, bold=True); f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True); f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
@@ -1860,11 +1920,12 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             tw = bbox[2] - bbox[0]
         except Exception:
             tw = len(texto) * 7
-        draw.text(((FRANJA_W - tw) // 2, y), texto, fill=color, font=font)
+        _dibujar_texto((FRANJA_W - tw) // 2, y, texto, font, color)
 
     y_txt = esc_y + esc_size + 6
     for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
         _txt_centrado(lbl, y_txt, f_colegio, BLANCO); y_txt += 20
+
     foto_x = 0; foto_y = ALTO_PX - FOTO_H
     draw.rectangle([foto_x, foto_y, foto_x + FOTO_W, foto_y + FOTO_H],
                    fill=BLANCO)
@@ -1885,8 +1946,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         tw = 280
     espacio_d = ANCHO_PX - DER_X
-    draw.text((DER_X + (espacio_d - tw) // 2, 10), titulo_txt,
-              fill=NEGRO, font=f_titulo)
+    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
+                   f_titulo, NEGRO)
+
     ap_p = alumno['apellido_paterno'].upper()
     ap_m = (alumno['apellido_materno'] or "").upper()
     nombres = alumno['nombres'].upper(); dni = alumno["dni"]
@@ -1900,7 +1962,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         while size > 10:
             f = _font(size, bold=bold)
             try:
-                ancho = draw.textlength(texto, font=f)
+                # Medir con el texto base (Ñ→N) para que sea consistente
+                ancho = draw.textlength(texto.replace("Ñ", "N").replace("ñ", "n"),
+                                         font=f)
             except Exception:
                 ancho = len(texto) * size * 0.55
             if ancho <= max_ancho:
@@ -1908,21 +1972,21 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    # ═══ COORDENADAS Y TAMAÑOS AGRANDADOS ═══
     INFO_Y = 135; alto_linea = 65
     ap_full = ap_p + " " + ap_m
-    draw.text((info_x, INFO_Y), ap_full, fill=NEGRO,
-              font=_ajustar(ap_full, 46, ancho_info, True))
+    _dibujar_texto(info_x, INFO_Y, ap_full,
+                   _ajustar(ap_full, 46, ancho_info, True), NEGRO)
     y2 = INFO_Y + alto_linea
-    draw.text((info_x, y2), nombres, fill=NEGRO,
-              font=_ajustar(nombres, 46, ancho_info, True))
+    _dibujar_texto(info_x, y2, nombres,
+                   _ajustar(nombres, 46, ancho_info, True), NEGRO)
 
     def _linea(y, label, valor, size=42):
-        draw.text((info_x, y), label, fill=GRIS_LABEL, font=f_label)
+        _dibujar_texto(info_x, y, label, f_label, GRIS_LABEL)
         an = draw.textlength(label, font=f_label)
         vx = info_x + int(an) + 10
-        draw.text((vx, y), valor, fill=NEGRO,
-                  font=_ajustar(valor, size, ancho_info - int(an) - 10, True))
+        _dibujar_texto(vx, y, valor,
+                       _ajustar(valor, size, ancho_info - int(an) - 10, True),
+                       NEGRO)
 
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
@@ -1935,16 +1999,17 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                                back_color="white").convert("RGB").resize(
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
     img.paste(qr_img_pil, (qr_x, 60))
+
     frase = '"Ser del CNY, es ser mejor"'
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
         fw = 250
-    draw.text((DER_X + (espacio_d - fw) // 2, ALTO_PX - 46), frase,
-              fill=NARANJA_FRANJA, font=f_frase)
-    return img
+    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 46, frase,
+                   f_frase, NARANJA_FRANJA)
 
+    return img
 
 def _render_carnets(filas, titulo=None):
     buf = BytesIO(); m = 5
