@@ -664,6 +664,7 @@ def _normalizar_grado(n):
 
 
 def validar_importacion(df, mapeo):
+    """Valida el Excel cargando catalogos en memoria (1 query por catalogo)."""
     errs = []; val = []; vistos = {}
 
     def _limpiar(v):
@@ -678,89 +679,121 @@ def validar_importacion(df, mapeo):
         if s.lower() == "nan": return ""
         return s
 
+    # ─── Cargar catalogos UNA VEZ ───
     with cursor() as (con, cur):
-        for idx, fila in df.iterrows():
-            nf = idx + 2
-            try:
-                dni = _limpiar(fila[mapeo["dni"]])
-                nom = _limpiar(fila[mapeo["nombres"]])
-                ap = _limpiar(fila[mapeo["apellido_paterno"]])
-                am = _limpiar(fila[mapeo["apellido_materno"]]) if mapeo.get("apellido_materno") else ""
-                gr = _normalizar_grado(_limpiar(fila[mapeo["grado"]]))
-                sec = _limpiar(fila[mapeo["seccion"]]).upper()
-                tur = _limpiar(fila[mapeo["turno"]]).lower()
-                an = _limpiar(fila[mapeo["apoderado_nombre"]]) if mapeo.get("apoderado_nombre") else ""
-                at = _limpiar(fila[mapeo["apoderado_telefono"]]) if mapeo.get("apoderado_telefono") else ""
-                if not dni:
-                    errs.append({"fila": nf, "motivo": "DNI vacio"}); continue
-                if not re.fullmatch(r"\d{8}", dni):
-                    errs.append({"fila": nf, "motivo": f"DNI invalido '{dni}'"}); continue
-                if dni in vistos:
-                    errs.append({"fila": nf, "motivo": f"DNI {dni} duplicado"}); continue
-                if not nom or not ap or not gr or not sec:
-                    errs.append({"fila": nf, "motivo": "Faltan campos"}); continue
-                cur.execute("SELECT id FROM grados WHERE nombre=%s", (gr,))
-                if not cur.fetchone():
-                    errs.append({"fila": nf, "motivo": f"Grado '{gr}' no existe"}); continue
-                if tur in ("mañana", "manana", "m", "am", "mñ"): tn = "Mañana"
-                elif tur in ("tarde", "t", "tm", "pm"): tn = "Tarde"
-                else:
-                    errs.append({"fila": nf, "motivo": f"Turno '{tur}'"}); continue
-                vistos[dni] = nf
-                val.append({
-                    "dni": dni, "nombres": nom, "apellido_paterno": ap,
-                    "apellido_materno": am, "grado": gr, "seccion": sec,
-                    "turno": tn, "apoderado_nombre": an, "apoderado_telefono": at,
-                })
-            except (KeyError, ValueError, TypeError) as e:
-                errs.append({"fila": nf, "motivo": f"Error: {e}"})
+        cur.execute("SELECT id, nombre FROM grados")
+        grados_set = {r["nombre"] for r in cur.fetchall()}
+
+    for idx, fila in df.iterrows():
+        nf = idx + 2
+        try:
+            dni = _limpiar(fila[mapeo["dni"]])
+            nom = _limpiar(fila[mapeo["nombres"]])
+            ap = _limpiar(fila[mapeo["apellido_paterno"]])
+            am = _limpiar(fila[mapeo["apellido_materno"]]) if mapeo.get("apellido_materno") else ""
+            gr = _normalizar_grado(_limpiar(fila[mapeo["grado"]]))
+            sec = _limpiar(fila[mapeo["seccion"]]).upper()
+            tur = _limpiar(fila[mapeo["turno"]]).lower()
+            an = _limpiar(fila[mapeo["apoderado_nombre"]]) if mapeo.get("apoderado_nombre") else ""
+            at = _limpiar(fila[mapeo["apoderado_telefono"]]) if mapeo.get("apoderado_telefono") else ""
+
+            if not dni:
+                errs.append({"fila": nf, "motivo": "DNI vacio"}); continue
+            if not re.fullmatch(r"\d{8}", dni):
+                errs.append({"fila": nf, "motivo": f"DNI invalido '{dni}'"}); continue
+            if dni in vistos:
+                errs.append({"fila": nf, "motivo": f"DNI {dni} duplicado"}); continue
+            if not nom or not ap or not gr or not sec:
+                errs.append({"fila": nf, "motivo": "Faltan campos"}); continue
+            if gr not in grados_set:
+                errs.append({"fila": nf, "motivo": f"Grado '{gr}' no existe"}); continue
+            if tur in ("mañana", "manana", "m", "am", "mñ"):
+                tn = "Mañana"
+            elif tur in ("tarde", "t", "tm", "pm"):
+                tn = "Tarde"
+            else:
+                errs.append({"fila": nf, "motivo": f"Turno '{tur}'"}); continue
+            vistos[dni] = nf
+            val.append({
+                "dni": dni, "nombres": nom, "apellido_paterno": ap,
+                "apellido_materno": am, "grado": gr, "seccion": sec,
+                "turno": tn, "apoderado_nombre": an, "apoderado_telefono": at,
+            })
+        except (KeyError, ValueError, TypeError) as e:
+            errs.append({"fila": nf, "motivo": f"Error: {e}"})
     return val, errs, {"total": len(df), "validas": len(val), "errores": len(errs)}
 
 
 def insertar_alumnos_validos(val):
+    """Inserta cargando catalogos en memoria. 1 query por operacion, no por fila."""
     per = obtener_periodo_activo()
     if not per:
         return 0, 0, ["No hay periodo activo."]
-    pid = per["id"]; ins = 0; reac = 0; errs = []
+    pid = per["id"]
+    ins = 0; reac = 0; errs = []
+
     with cursor() as (con, cur):
-        cur.execute("SELECT id,nombre FROM turnos")
-        mapa_t = {f["nombre"]: f["id"] for f in cur.fetchall()}
+        # ─── Cargar catalogos en memoria (una sola vez) ───
+        cur.execute("SELECT id, nombre FROM turnos")
+        mapa_turnos = {r["nombre"]: r["id"] for r in cur.fetchall()}
+
+        cur.execute("SELECT id, nombre FROM grados")
+        mapa_grados = {r["nombre"]: r["id"] for r in cur.fetchall()}
+
+        cur.execute("SELECT id, nombre, grado_id, turno_id FROM secciones")
+        mapa_secciones = {}
+        for r in cur.fetchall():
+            key = (r["nombre"], r["grado_id"], r["turno_id"])
+            mapa_secciones[key] = r["id"]
+
+        cur.execute("SELECT id, dni FROM alumnos WHERE dni = ANY(%s)",
+                    ([d["dni"] for d in val],))
+        mapa_alumnos = {r["dni"]: r["id"] for r in cur.fetchall()}
+
+        cur.execute("SELECT id, nombre, COALESCE(telefono,'') AS tel FROM apoderados")
+        mapa_apoderados = {}
+        for r in cur.fetchall():
+            key = (r["nombre"], r["tel"])
+            mapa_apoderados[key] = r["id"]
+
+        # ─── Procesar cada alumno (en memoria, sin ir a Neon por catalogo) ───
         for i, d in enumerate(val):
             try:
-                cur.execute("SELECT id FROM grados WHERE nombre=%s", (d["grado"],))
-                fg = cur.fetchone()
-                if not fg:
-                    errs.append(f"Fila {i+1}: grado no reconocido"); continue
-                it = mapa_t.get(d["turno"])
-                if not it:
+                grado_id = mapa_grados.get(d["grado"])
+                if not grado_id:
+                    errs.append(f"Fila {i+1}: grado no encontrado"); continue
+
+                turno_id = mapa_turnos.get(d["turno"])
+                if not turno_id:
                     errs.append(f"Fila {i+1}: turno no encontrado"); continue
-                cur.execute("SELECT id FROM secciones WHERE nombre=%s "
-                            "AND grado_id=%s AND turno_id=%s",
-                            (d["seccion"], fg["id"], it))
-                fs = cur.fetchone()
-                if fs:
-                    idsec = fs["id"]
-                else:
-                    cur.execute("INSERT INTO secciones(nombre,grado_id,turno_id) "
-                                "VALUES(%s,%s,%s) RETURNING id",
-                                (d["seccion"], fg["id"], it))
+
+                # Seccion (crear si no existe)
+                sec_key = (d["seccion"], grado_id, turno_id)
+                idsec = mapa_secciones.get(sec_key)
+                if not idsec:
+                    cur.execute(
+                        "INSERT INTO secciones(nombre,grado_id,turno_id) "
+                        "VALUES(%s,%s,%s) RETURNING id",
+                        (d["seccion"], grado_id, turno_id))
                     idsec = cur.fetchone()["id"]
+                    mapa_secciones[sec_key] = idsec
+
+                # Apoderado (crear si no existe)
                 ida = None
                 if d["apoderado_nombre"]:
-                    cur.execute("SELECT id FROM apoderados WHERE nombre=%s "
-                                "AND COALESCE(telefono,'')=%s",
-                                (d["apoderado_nombre"], d["apoderado_telefono"] or ""))
-                    fa = cur.fetchone()
-                    if fa:
-                        ida = fa["id"]
-                    else:
-                        cur.execute("INSERT INTO apoderados(nombre,telefono) "
-                                    "VALUES(%s,%s) RETURNING id",
-                                    (d["apoderado_nombre"], d["apoderado_telefono"] or None))
+                    ap_key = (d["apoderado_nombre"], d["apoderado_telefono"] or "")
+                    ida = mapa_apoderados.get(ap_key)
+                    if not ida:
+                        cur.execute(
+                            "INSERT INTO apoderados(nombre,telefono) "
+                            "VALUES(%s,%s) RETURNING id",
+                            (d["apoderado_nombre"], d["apoderado_telefono"] or None))
                         ida = cur.fetchone()["id"]
-                cur.execute("SELECT id FROM alumnos WHERE dni=%s", (d["dni"],))
-                ex = cur.fetchone()
-                if ex:
+                        mapa_apoderados[ap_key] = ida
+
+                # Alumno: update o insert
+                alumno_id = mapa_alumnos.get(d["dni"])
+                if alumno_id:
                     cur.execute("""
                         UPDATE alumnos SET nombres=%s,apellido_paterno=%s,
                             apellido_materno=%s,seccion_id=%s,apoderado_id=%s,
@@ -769,7 +802,7 @@ def insertar_alumnos_validos(val):
                         WHERE id=%s
                     """, (d["nombres"], d["apellido_paterno"], d["apellido_materno"],
                           idsec, ida, d["apoderado_nombre"] or None,
-                          d["apoderado_telefono"] or None, pid, ex["id"]))
+                          d["apoderado_telefono"] or None, pid, alumno_id))
                     reac += 1
                 else:
                     cur.execute("""
@@ -785,7 +818,6 @@ def insertar_alumnos_validos(val):
             except Exception as e:
                 errs.append(f"Fila {i+1}: {e}")
     return ins, reac, errs
-
 
 # ─── BLOQUEOS ──────────────────────────────────────────────────────────────
 def _fecha_ultimo_desbloqueo(idal):
