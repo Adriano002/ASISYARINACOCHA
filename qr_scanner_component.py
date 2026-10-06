@@ -1,9 +1,6 @@
 # qr_scanner_component.py
-# v18 original (html5-qrcode) adaptado a la firma nueva de main.py.
-# - Escaneo rapido como el v18 original
-# - Sonido click inmediato al leer QR
-# - Sonido especifico (puntual/tardanza/etc) via data.sonido_nonce
-# - Pausa/reanudar al cambiar de pestaña (como el v18 original)
+# Componente de escaneo QR para Streamlit.
+# - destruirScanner resetea el estado de edge detection.
 import streamlit as st
 
 QR_SCANNER_COMPONENT = st.components.v2.component(
@@ -79,17 +76,21 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     """,
     js="""
     export default function(component) {
-        const { setTriggerValue, data } = component;
+        const { setTriggerValue } = component;
         let scanner = null;
         let iniciado = false;
         let pausado = false;
 
-        // ═══ EDGE DETECTION ═══
-        const COOLDOWN_MS = 2500;
+        // ============================================================
+        // EDGE DETECTION - evita emitir el mismo DNI multiples veces
+        // ============================================================
+        const COOLDOWN_MS = 2500;   // mismo DNI: no re-emitir antes de 2.5s
         let ultimoDniEmitido = null;
         let ultimoTimestampEmision = 0;
 
-        // ═══ AUDIO ═══
+        // ============================================================
+        // MOTOR DE AUDIO
+        // ============================================================
         let audioCtx = null;
         function getAudioCtx() {
             if (!audioCtx) {
@@ -105,6 +106,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             return audioCtx;
         }
 
+        // Helper: un tono
         function _tono(freq, dur, tipo, vol, delay) {
             const ctx = getAudioCtx();
             if (!ctx) return;
@@ -121,34 +123,50 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             osc.stop(t0 + dur + 0.02);
         }
 
-        function sonidoClick() { _tono(880, 0.05, 'sine', 0.25, 0); }
+        // ============================================================
+        // 5 SONIDOS
+        // ============================================================
+
+        // 1) PUNTUAL: DO -> MI -> SOL, subida alegre
         function sonidoPuntual() {
             _tono(523, 0.10, 'sine', 0.40, 0);
             _tono(659, 0.10, 'sine', 0.40, 0.10);
             _tono(784, 0.15, 'sine', 0.40, 0.20);
         }
-        function sonidoTardanza() { _tono(440, 0.30, 'sine', 0.35, 0); }
+
+        // 2) TARDANZA: nota neutra, plana
+        function sonidoTardanza() {
+            _tono(440, 0.30, 'sine', 0.35, 0);
+        }
+
+        // 3) DUPLICADO: buzz grave doble, fuerte
         function sonidoDuplicado() {
             _tono(220, 0.18, 'square', 0.45, 0);
             _tono(220, 0.18, 'square', 0.45, 0.22);
         }
+
+        // 4) ERROR (DNI no existe): disonancia horrible ascendente
         function sonidoError() {
             _tono(180, 0.15, 'sawtooth', 0.45, 0);
             _tono(250, 0.15, 'sawtooth', 0.45, 0.15);
             _tono(330, 0.15, 'sawtooth', 0.45, 0.30);
             _tono(440, 0.25, 'sawtooth', 0.45, 0.45);
         }
+
+        // 5) BLOQUEADO (por si acaso): triple buzz grave
         function sonidoBloqueado() {
             _tono(160, 0.15, 'sawtooth', 0.45, 0);
             _tono(120, 0.15, 'sawtooth', 0.45, 0.18);
             _tono(90, 0.30, 'sawtooth', 0.45, 0.36);
         }
 
+        // ============================================================
+        // API PARA PYTHON
+        // ============================================================
         function reproducir(kind) {
             try {
                 getAudioCtx();
                 switch (kind) {
-                    case "click":       sonidoClick();       break;
                     case "puntual":     sonidoPuntual();     break;
                     case "tardanza":    sonidoTardanza();    break;
                     case "duplicado":   sonidoDuplicado();   break;
@@ -161,10 +179,17 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }
         }
 
+        // Registrar en window propio Y en window.parent (por si acaso)
         window.__qrFeedback = reproducir;
-        try { window.parent.__qrFeedback = reproducir; } catch (e) {}
+        try {
+            window.parent.__qrFeedback = reproducir;
+        } catch (e) {
+            console.warn('[QR] no se pudo registrar en parent:', e);
+        }
 
-        // ═══ UTILIDADES ═══
+        // ============================================================
+        // UTILIDADES
+        // ============================================================
         function setStatus(t) {
             const el = document.getElementById('qr-status');
             if (el) { el.textContent = t; el.style.display = 'block'; }
@@ -183,11 +208,14 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                 scanner = null;
             }
             iniciado = false;
+            // Reset edge detection al destruir
             ultimoDniEmitido = null;
             ultimoTimestampEmision = 0;
         }
 
-        // ═══ SCANNER ═══
+        // ============================================================
+        // SCANNER
+        // ============================================================
         function iniciarScanner() {
             if (iniciado) return;
             if (typeof Html5QrcodeScanner === 'undefined') {
@@ -232,17 +260,19 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                         if (!m) return;
                         const dni = m[1];
 
+                        // ---- EDGE DETECTION ----
                         const ahora = Date.now();
                         const esMismoDni = (dni === ultimoDniEmitido);
                         const dentroCooldown = (ahora - ultimoTimestampEmision) < COOLDOWN_MS;
 
-                        if (esMismoDni && dentroCooldown) return;
+                        if (esMismoDni && dentroCooldown) {
+                            // Mismo QR en camara: ignorar silenciosamente.
+                            return;
+                        }
 
                         ultimoDniEmitido = dni;
                         ultimoTimestampEmision = ahora;
 
-                        // Click inmediato (feedback local, sin esperar a Python)
-                        reproducir("click");
                         setStatus('QR: ' + dni);
                         setTriggerValue("qr_dni", dni);
                     } catch (e) {
@@ -276,21 +306,25 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }, 500);
         }
 
-        // ═══ VISIBILITY (igual que el v18 original) ═══
+        // ============================================================
+        // VISIBILITY - pausar/reanudar al cambiar de pestaña
+        // ============================================================
         function pausarScanner() {
             if (!scanner || !iniciado || pausado) return;
             try {
-                scanner.pause(true);
+                scanner.pause(true);   // true = congela tambien el video
                 pausado = true;
-                setStatus('Camara en pausa.');
+                setStatus('Camara en pausa (volviste a la pestana).');
             } catch (e) {
                 console.warn('[QR] pause fallo:', e);
+                // Si pause falla, mejor destruir para que al volver se reinicie
                 destruirScanner();
             }
         }
 
         function reanudarScanner() {
             if (!scanner || !iniciado) {
+                // No hay scanner vivo: reiniciar
                 iniciarScanner();
                 return;
             }
@@ -313,6 +347,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }
         });
 
+        // Extra: al perder foco la ventana (alt-tab), tambien pausar
         window.addEventListener('blur', () => {
             if (document.visibilityState === 'hidden') pausarScanner();
         });
@@ -320,25 +355,9 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             if (document.visibilityState === 'visible') reanudarScanner();
         });
 
-        // ═══ SONIDO ESPECIFICO DESDE PYTHON ═══
-        // Se dispara SOLO cuando Python cambia el nonce (una vez por escaneo).
-        let ultimoSonidoNonce = 0;
-        function revisarSonidoPendiente() {
-            try {
-                if (!data) return;
-                const nonce = data.sonido_nonce || 0;
-                const kind = data.sonido_kind || '';
-                if (nonce > 0 && nonce !== ultimoSonidoNonce && kind) {
-                    ultimoSonidoNonce = nonce;
-                    reproducir(kind);
-                }
-            } catch(e) {}
-        }
-        // Chequeo cada 400ms. Sin loop infinito porque el nonce se actualiza
-        // una sola vez por escaneo (Python lo incrementa en _procesar_escaneo).
-        setInterval(revisarSonidoPendiente, 400);
-
-        // ═══ CARGA DE LIBRERIA ═══
+        // ============================================================
+        // CARGA DE LIBRERIA
+        // ============================================================
         window.addEventListener('beforeunload', destruirScanner);
 
         if (window.__qrV18Listo && typeof Html5QrcodeScanner !== 'undefined') {
@@ -387,14 +406,10 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
 )
 
 
-def qr_scanner(key="qr_scanner", on_scan=None, sonido_kind="", sonido_nonce=0):
+def qr_scanner(key="qr_scanner", on_scan=None):
     if on_scan is None:
         on_scan = lambda: None
     return QR_SCANNER_COMPONENT(
         key=key,
         on_qr_dni_change=on_scan,
-        data={
-            "sonido_kind": sonido_kind,
-            "sonido_nonce": sonido_nonce,
-        },
     )
