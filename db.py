@@ -3,7 +3,6 @@ import os
 import sqlite3
 import threading
 import logging
-import streamlit as st
 from pathlib import Path
 from contextlib import contextmanager
 from datetime import datetime, date, time
@@ -52,22 +51,46 @@ def liberar_conexion(con):
         pass
 
 
+# ─── WRAPPER DE CURSOR (traduce %s → ?) ────────────────────────────────────
+class CursorWrapper:
+    """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
+    def __init__(self, cursor):
+        self._cur = cursor
+        self.lastrowid = None
+        self.description = None
+
+    def execute(self, sql, params=()):
+        r = self._cur.execute(_q(sql), params)
+        self.lastrowid = self._cur.lastrowid
+        self.description = self._cur.description
+        return r
+
+    def executemany(self, sql, seq):
+        r = self._cur.executemany(_q(sql), seq)
+        self.lastrowid = self._cur.lastrowid
+        self.description = self._cur.description
+        return r
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def fetchmany(self, size=None):
+        return self._cur.fetchmany(size) if size else self._cur.fetchmany()
+
+    def close(self):
+        return self._cur.close()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
 @contextmanager
 def cursor(dict_rows=True):
     con = obtener_conexion()
-    cur = con.cursor()
-    orig_execute = cur.execute
-    orig_executemany = cur.executemany
-
-    def execute(sql, params=()):
-        return orig_execute(_q(sql), params)
-
-    def executemany(sql, seq):
-        return orig_executemany(_q(sql), seq)
-
-    cur.execute = execute
-    cur.executemany = executemany
-
+    cur = CursorWrapper(con.cursor())
     try:
         yield con, cur
     except Exception:
