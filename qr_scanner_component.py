@@ -1,6 +1,9 @@
 # qr_scanner_component.py
 # v18 original (html5-qrcode) adaptado a la firma nueva de main.py.
-# Recibe sonido_kind y sonido_nonce (los ignora, pero acepta los parámetros).
+# - Escaneo rapido como el v18 original
+# - Sonido click inmediato al leer QR
+# - Sonido especifico (puntual/tardanza/etc) via data.sonido_nonce
+# - Pausa/reanudar al cambiar de pestaña (como el v18 original)
 import streamlit as st
 
 QR_SCANNER_COMPONENT = st.components.v2.component(
@@ -238,7 +241,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                         ultimoDniEmitido = dni;
                         ultimoTimestampEmision = ahora;
 
-                        // ═══ CLICK INMEDIATO ═══
+                        // Click inmediato (feedback local, sin esperar a Python)
                         reproducir("click");
                         setStatus('QR: ' + dni);
                         setTriggerValue("qr_dni", dni);
@@ -273,7 +276,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }, 500);
         }
 
-        // ═══ VISIBILITY ═══
+        // ═══ VISIBILITY (igual que el v18 original) ═══
         function pausarScanner() {
             if (!scanner || !iniciado || pausado) return;
             try {
@@ -317,7 +320,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             if (document.visibilityState === 'visible') reanudarScanner();
         });
 
-        // ═══ SONIDO ESPECÍFICO DESDE PYTHON ═══
+        // ═══ SONIDO ESPECIFICO DESDE PYTHON ═══
+        // Se dispara SOLO cuando Python cambia el nonce (una vez por escaneo).
         let ultimoSonidoNonce = 0;
         function revisarSonidoPendiente() {
             try {
@@ -330,7 +334,9 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                 }
             } catch(e) {}
         }
-        setInterval(revisarSonidoPendiente, 300);
+        // Chequeo cada 400ms. Sin loop infinito porque el nonce se actualiza
+        // una sola vez por escaneo (Python lo incrementa en _procesar_escaneo).
+        setInterval(revisarSonidoPendiente, 400);
 
         // ═══ CARGA DE LIBRERIA ═══
         window.addEventListener('beforeunload', destruirScanner);
