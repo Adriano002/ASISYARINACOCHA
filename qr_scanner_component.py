@@ -1,14 +1,22 @@
 # qr_scanner_component.py
-# Escaner QR con BarcodeDetector + polyfill ZXing.
-# Deteccion en vivo, proteccion contra NotReadableError, pausa al cambiar pestaña,
-# y sonido disparado desde el propio componente.
+# Escaner QR optimizado: maxima velocidad + todas las funcionalidades v54.
+# - Deteccion en vivo (200ms)
+# - Click inmediato al leer QR
+# - Boton pausar
+# - Rotacion de AudioContext (audio estable)
+# - Anti-rebote doble
+# - Pausa al cambiar pestaña
 import streamlit as st
 
 QR_SCANNER_COMPONENT = st.components.v2.component(
-    name="mi_qr_scanner_v50",
+    name="mi_qr_scanner_v55",
     isolate_styles=False,
     html="""
     <div id="qr-wrapper">
+        <div id="qr-header">
+            <div id="qr-titulo">Escaneo QR</div>
+            <button id="qr-toggle" type="button">⏸ Pausar</button>
+        </div>
         <video id="qr-video" playsinline autoplay muted></video>
         <div id="qr-status">Iniciando camara...</div>
         <div id="qr-error" style="display:none;"></div>
@@ -21,6 +29,34 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         margin: 0 auto;
         position: relative;
     }
+    #qr-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        gap: 10px;
+    }
+    #qr-titulo {
+        font-size: 15px;
+        font-weight: 700;
+        color: #E65100;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #qr-toggle {
+        background: #E65100;
+        color: #FFF;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transition: background 0.15s ease;
+    }
+    #qr-toggle:hover { background: #BF360C; }
+    #qr-toggle.pausado { background: #22C55E; }
+    #qr-toggle.pausado:hover { background: #16A34A; }
     #qr-video {
         border-radius: 10px;
         overflow: hidden;
@@ -30,6 +66,10 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         height: 300px;
         object-fit: cover;
         display: block;
+    }
+    #qr-video.pausado {
+        opacity: 0.4;
+        filter: grayscale(100%);
     }
     #qr-status {
         text-align: center;
@@ -55,14 +95,19 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         const { setTriggerValue, data } = component;
 
         const DNI_REGEX = /\\b(\\d{8})\\b/;
-        const SCAN_INTERVAL_MS = 250;
-        const ANTI_REBOTE_MS = 1500;
+        const SCAN_INTERVAL_MS = 200;      // ⚡ OPTIMIZADO (era 500)
+        const ANTI_REBOTE_MS = 1800;       // ⚡ OPTIMIZADO (era 3500)
         const ARRANQUE_ESPERA_MS = 2000;
+        const SONIDO_CHECK_MS = 200;       // ⚡ OPTIMIZADO (era 150)
+
+        // Persistencia por usuario (en sessionStorage del navegador)
+        const KEY_PAUSADO = 'qr_scanner_pausado';
 
         let stream = null;
         let detector = null;
         let videoElement = null;
         let scanLoop = null;
+        let sonidoLoop = null;
         let ultimoDni = null;
         let ultimoTimestampDni = 0;
         let iniciado = false;
@@ -70,37 +115,86 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         let intentosFallidos = 0;
         let arranqueTimestamp = 0;
         let ultimoSonidoNonce = 0;
+        let ultimoDniEnviado = null;
+        let contadorFrameSinQR = 0;
         const MAX_INTENTOS = 5;
+        const MAX_FRAMES_SIN_QR = 2;       // ⚡ OPTIMIZADO (era 3)
+
+        // Estado de pausa (persistente por sesión)
+        let pausado = sessionStorage.getItem(KEY_PAUSADO) === '1';
 
         // ══════════════════════════════════════════════════════
-        // AUDIO - engine propio del componente
+        // AUDIO - con rotación de AudioContext
         // ══════════════════════════════════════════════════════
         let audioCtx = null;
-        function getAudioCtx() {
-            if (!audioCtx) {
-                try {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                } catch(e) { console.warn('[QR] AudioContext fallo:', e); }
+        let sonidosReproducidos = 0;
+        const MAX_SONIDOS_POR_CTX = 40;
+        const MIN_MS_ENTRE_SONIDOS = 150;  // ⚡ OPTIMIZADO (era 200)
+
+        function crearAudioContext() {
+            try {
+                if (audioCtx && audioCtx.state !== 'closed') {
+                    try { audioCtx.close(); } catch(e) {}
+                }
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return null;
+                audioCtx = new Ctx();
+                sonidosReproducidos = 0;
+                return audioCtx;
+            } catch(e) {
+                audioCtx = null;
+                return null;
             }
-            if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
+        }
+
+        function getAudioCtx() {
+            if (!audioCtx || audioCtx.state === 'closed') {
+                return crearAudioContext();
             }
             return audioCtx;
         }
 
+        function asegurarAudioActivo() {
+            try {
+                let ctx = getAudioCtx();
+                if (!ctx) return null;
+                if (sonidosReproducidos >= MAX_SONIDOS_POR_CTX) {
+                    ctx = crearAudioContext();
+                }
+                if (!ctx) return null;
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                    setTimeout(() => {
+                        if (audioCtx && audioCtx.state !== 'running') {
+                            crearAudioContext();
+                        }
+                    }, 50);
+                }
+                return ctx;
+            } catch(e) {
+                return crearAudioContext();
+            }
+        }
+
         function _tono(freq, dur, tipo, vol, delay) {
-            const ctx = getAudioCtx();
+            const ctx = asegurarAudioActivo();
             if (!ctx) return;
-            const t0 = ctx.currentTime + (delay || 0);
-            const osc = ctx.createOscillator();
-            const g = ctx.createGain();
-            osc.connect(g); g.connect(ctx.destination);
-            osc.type = tipo || 'sine';
-            osc.frequency.setValueAtTime(freq, t0);
-            g.gain.setValueAtTime(0, t0);
-            g.gain.linearRampToValueAtTime(vol || 0.35, t0 + 0.015);
-            g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-            osc.start(t0); osc.stop(t0 + dur + 0.02);
+            try {
+                const t0 = ctx.currentTime + (delay || 0);
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.connect(g); g.connect(ctx.destination);
+                osc.type = tipo || 'sine';
+                osc.frequency.setValueAtTime(freq, t0);
+                g.gain.setValueAtTime(0, t0);
+                g.gain.linearRampToValueAtTime(vol || 0.35, t0 + 0.015);
+                g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+                osc.start(t0); osc.stop(t0 + dur + 0.02);
+                osc.onended = () => {
+                    try { osc.disconnect(); g.disconnect(); } catch(e) {}
+                };
+                sonidosReproducidos++;
+            } catch(e) {}
         }
 
         function sonidoClick() {
@@ -131,9 +225,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             _tono(90, 0.30, 'sawtooth', 0.45, 0.36);
         }
 
-        function reproducir(kind) {
+        function _reproducirAhora(kind) {
             try {
-                getAudioCtx();
                 switch (kind) {
                     case "puntual":     sonidoPuntual();     break;
                     case "tardanza":    sonidoTardanza();    break;
@@ -143,14 +236,27 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                     case "error":
                     default:            sonidoError();       break;
                 }
-            } catch(e) { console.error('[QR] reproducir:', e); }
+            } catch(e) {}
         }
 
-        // Exponer para postMessage por si acaso
+        function reproducir(kind) {
+            try {
+                const ahora = Date.now();
+                // El click NO respeta el MIN_MS (es feedback inmediato)
+                if (kind !== "click") {
+                    if (ahora - ultimoMsSonido < MIN_MS_ENTRE_SONIDOS) return;
+                }
+                ultimoMsSonido = ahora;
+                asegurarAudioActivo();
+                _reproducirAhora(kind);
+            } catch(e) {}
+        }
+
+        let ultimoMsSonido = 0;
+
         window.__qrFeedback = reproducir;
         try { window.parent.__qrFeedback = reproducir; } catch(e) {}
 
-        // Listener de postMessage (por si Python quiere forzar sonido)
         window.addEventListener('message', (event) => {
             try {
                 if (event.data && event.data.type === 'qr_sound' && event.data.kind) {
@@ -159,12 +265,20 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             } catch(e) {}
         });
 
-        // Desbloquear audio con el primer click
-        document.addEventListener('click', () => { getAudioCtx(); }, { once: true });
-        document.addEventListener('touchstart', () => { getAudioCtx(); }, { once: true });
+        function desbloquearAudio() {
+            try {
+                if (!audioCtx || audioCtx.state === 'closed') crearAudioContext();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(() => {});
+                }
+            } catch(e) {}
+        }
 
-        // ══════════════════════════════════════════════════════
-        // UTILIDADES
+        ['click', 'touchstart', 'touchend', 'keydown', 'mousedown', 'pointerdown']
+            .forEach(evt => document.addEventListener(evt, desbloquearAudio, { passive: true }));
+        window.addEventListener('focus', desbloquearAudio);
+        window.addEventListener('pageshow', desbloquearAudio);
+
         // ══════════════════════════════════════════════════════
         function setStatus(t) {
             const el = document.getElementById('qr-status');
@@ -175,13 +289,44 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             const s = document.getElementById('qr-status');
             if (e) { e.textContent = t; e.style.display = 'block'; }
             if (s) s.style.display = 'none';
-            console.error('[QR]', t);
         }
         function limpiarError() {
             const e = document.getElementById('qr-error');
             if (e) { e.style.display = 'none'; }
         }
 
+        // ══════════════════════════════════════════════════════
+        // BOTÓN PAUSAR / ACTIVAR
+        // ══════════════════════════════════════════════════════
+        function actualizarBoton() {
+            const btn = document.getElementById('qr-toggle');
+            const video = document.getElementById('qr-video');
+            if (!btn) return;
+            if (pausado) {
+                btn.textContent = '▶ Activar camara';
+                btn.classList.add('pausado');
+                if (video) video.classList.add('pausado');
+            } else {
+                btn.textContent = '⏸ Pausar';
+                btn.classList.remove('pausado');
+                if (video) video.classList.remove('pausado');
+            }
+        }
+
+        function togglePausa() {
+            pausado = !pausado;
+            sessionStorage.setItem(KEY_PAUSADO, pausado ? '1' : '0');
+            actualizarBoton();
+            if (pausado) {
+                detenerCamara();
+                setStatus('Camara pausada. Presiona Activar para reanudar.');
+            } else {
+                setStatus('Reanudando camara...');
+                setTimeout(() => { iniciarScanner(); }, 200);
+            }
+        }
+
+        // ══════════════════════════════════════════════════════
         function detenerCamara() {
             if (scanLoop) { clearTimeout(scanLoop); scanLoop = null; }
             if (stream) {
@@ -202,11 +347,10 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             arranqueTimestamp = 0;
             ultimoDni = null;
             ultimoTimestampDni = 0;
+            ultimoDniEnviado = null;
+            contadorFrameSinQR = 0;
         }
 
-        // ══════════════════════════════════════════════════════
-        // POLYFILL
-        // ══════════════════════════════════════════════════════
         function cargarPolyfill() {
             return new Promise((resolve, reject) => {
                 if (polyfillCargado) { resolve(); return; }
@@ -223,11 +367,9 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             });
         }
 
-        // ══════════════════════════════════════════════════════
-        // INICIAR
-        // ══════════════════════════════════════════════════════
         async function iniciarScanner() {
             if (iniciado) return;
+            if (pausado) { setStatus('Camara pausada.'); return; }
             limpiarError();
             detenerCamara();
             videoElement = document.getElementById('qr-video');
@@ -263,7 +405,6 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                 bucleEscaneo();
 
             } catch (err) {
-                console.error('[QR] Error:', err);
                 detenerCamara();
                 intentosFallidos++;
                 const esNotReadable = err.name === 'NotReadableError' ||
@@ -280,58 +421,67 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }
         }
 
-        // ══════════════════════════════════════════════════════
-        // BUCLE
-        // ══════════════════════════════════════════════════════
         function bucleEscaneo() {
             if (!iniciado || !videoElement || !detector) return;
+            if (pausado) { scanLoop = setTimeout(bucleEscaneo, SCAN_INTERVAL_MS); return; }
+
             if (videoElement.readyState >= 2) {
                 detector.detect(videoElement)
                     .then(barcodes => {
-                        if (!iniciado) return;
+                        if (!iniciado || pausado) return;
                         if (Date.now() - arranqueTimestamp < ARRANQUE_ESPERA_MS) return;
+
                         if (barcodes && barcodes.length > 0) {
+                            contadorFrameSinQR = 0;
                             const codigo = barcodes[0];
                             const texto = codigo.rawValue;
                             const match = texto.match(DNI_REGEX);
                             if (match) {
                                 const dni = match[1];
                                 const ahora = Date.now();
+
                                 if (dni === ultimoDni && (ahora - ultimoTimestampDni) < ANTI_REBOTE_MS) {
-                                    // ignorar
-                                } else {
-                                    ultimoDni = dni;
-                                    ultimoTimestampDni = ahora;
-                                    // *** CLICK INMEDIATO ***
-                                    sonidoClick();
+                                    return;
+                                }
+
+                                ultimoDni = dni;
+                                ultimoTimestampDni = ahora;
+
+                                if (dni !== ultimoDniEnviado) {
+                                    ultimoDniEnviado = dni;
+                                    desbloquearAudio();
+                                    // ═══ SONIDO CLICK INMEDIATO (no espera a Python) ═══
+                                    reproducir("click");
                                     setStatus('QR: ' + dni);
                                     setTriggerValue("qr_dni", dni);
                                 }
                             }
+                        } else {
+                            contadorFrameSinQR++;
+                            if (contadorFrameSinQR >= MAX_FRAMES_SIN_QR) {
+                                ultimoDniEnviado = null;
+                            }
                         }
                     })
-                    .catch(err => { console.debug('[QR] Error detect:', err); });
+                    .catch(err => {});
             }
-            if (iniciado) scanLoop = setTimeout(bucleEscaneo, SCAN_INTERVAL_MS);
+            if (iniciado && !pausado) scanLoop = setTimeout(bucleEscaneo, SCAN_INTERVAL_MS);
         }
 
-        // ══════════════════════════════════════════════════════
-        // VISIBILITY
-        // ══════════════════════════════════════════════════════
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 detenerCamara();
                 setStatus('Camara en pausa.');
             } else if (document.visibilityState === 'visible') {
-                if (!iniciado) {
-                    setTimeout(() => { if (!iniciado) iniciarScanner(); }, 1000);
+                if (!iniciado && !pausado) {
+                    setTimeout(() => { if (!iniciado && !pausado) iniciarScanner(); }, 1000);
                 }
             }
         });
         window.addEventListener('beforeunload', detenerCamara);
 
         // ══════════════════════════════════════════════════════
-        // LEER SONIDO ESPECIFICO DESDE data
+        // SONIDO PENDIENTE DESDE PYTHON
         // ══════════════════════════════════════════════════════
         function revisarSonidoPendiente() {
             try {
@@ -346,14 +496,22 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         }
 
         // ══════════════════════════════════════════════════════
-        // ARRANQUE
+        // INICIALIZACIÓN
         // ══════════════════════════════════════════════════════
         setTimeout(() => {
-            iniciarScanner();
-            // Revisar si hay sonido pendiente al arrancar
+            const btn = document.getElementById('qr-toggle');
+            if (btn) btn.addEventListener('click', togglePausa);
+            actualizarBoton();
+
+            if (pausado) {
+                setStatus('Camara pausada. Presiona Activar para reanudar.');
+            } else {
+                iniciarScanner();
+            }
+
             revisarSonidoPendiente();
-            // Y cada 500ms
-            setInterval(revisarSonidoPendiente, 500);
+            if (sonidoLoop) clearInterval(sonidoLoop);
+            sonidoLoop = setInterval(revisarSonidoPendiente, SONIDO_CHECK_MS);
         }, 500);
     }
     """,
