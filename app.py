@@ -1388,18 +1388,55 @@ def escaner_qr_continuo(key="qr_scanner"):
     st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
                 '<div class="scan-sub">Apunta al codigo del alumno</div></div>',
                 unsafe_allow_html=True)
-    sp = st.session_state.get("_qr_sonido_pendiente") or {}
-    sonido_kind = sp.get("kind", ""); sonido_nonce = sp.get("nonce", 0)
+
     mount_id = st.session_state.get("_qr_mount_id", 0)
-    result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None,
-                        sonido_kind=sonido_kind, sonido_nonce=sonido_nonce)
+    result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
+
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
         if not (ult.get("dni") == dni and (time.time() - ult.get("ts", 0)) < 1.5):
             st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
+
+            # ═══ DISPARAR SONIDO VIA JS INYECTADO (una sola vez) ═══
+            sp = st.session_state.get("_qr_sonido_pendiente") or {}
+            kind = sp.get("kind", "")
+            if kind:
+                st.components.v1.html(f"""
+                    <script>
+                    (function() {{
+                        let tries = 0;
+                        const disparar = () => {{
+                            tries++;
+                            try {{
+                                if (window.parent && typeof window.parent.__qrFeedback === 'function') {{
+                                    window.parent.__qrFeedback('{kind}');
+                                    return;
+                                }}
+                            }} catch(e) {{}}
+                            try {{
+                                const frames = document.querySelectorAll('iframe');
+                                for (const f of frames) {{
+                                    try {{
+                                        const w = f.contentWindow;
+                                        if (w && typeof w.__qrFeedback === 'function') {{
+                                            w.__qrFeedback('{kind}');
+                                            return;
+                                        }}
+                                    }} catch(e) {{}}
+                                }}
+                            }} catch(e) {{}}
+                            if (tries < 60) setTimeout(disparar, 100);
+                        }};
+                        disparar();
+                    }})();
+                    </script>
+                """, height=0)
+                st.session_state.pop("_qr_sonido_pendiente", None)
+
             st.rerun()
+
     mensajes = st.session_state.get("_qr_mensajes", [])
     if mensajes:
         m = mensajes[0]
