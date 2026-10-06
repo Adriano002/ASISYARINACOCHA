@@ -1356,7 +1356,60 @@ def _procesar_escaneo(dni):
     st.session_state["_qr_sonido_contador"] = contador
     st.session_state["_qr_sonido_pendiente"] = {
         "kind": sonido, "nonce": contador, "ts": time.time()}
+def escaner_qr_continuo(key="qr_scanner"):
+    st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
+                '<div class="scan-sub">Apunta al codigo del alumno</div></div>',
+                unsafe_allow_html=True)
 
+    mount_id = st.session_state.get("_qr_mount_id", 0)
+    result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
+
+    if result is not None and getattr(result, "qr_dni", None):
+        dni = str(result.qr_dni).strip()
+        ult = st.session_state.get("_ultimo_qr_scan", {})
+        if not (ult.get("dni") == dni and (time.time() - ult.get("ts", 0)) < 0.5):
+            st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
+            _procesar_escaneo(dni)
+
+            # SONIDO VIA JS INYECTADO (sin loops, no congela)
+            sp = st.session_state.get("_qr_sonido_pendiente") or {}
+            kind = sp.get("kind", "")
+            if kind:
+                st.components.v1.html(f"""
+                    <script>
+                    (function() {{
+                        try {{
+                            if (window.parent && typeof window.parent.__qrFeedback === 'function') {{
+                                window.parent.__qrFeedback('{kind}');
+                            }}
+                        }} catch(e) {{}}
+                    }})();
+                    </script>
+                """, height=0)
+                st.session_state.pop("_qr_sonido_pendiente", None)
+
+            # RERUN: cada 10 escaneos o cada 2 segundos
+            pendientes = st.session_state.get("_qr_pendientes_rerun", 0) + 1
+            st.session_state["_qr_pendientes_rerun"] = pendientes
+            ult_rerun = st.session_state.get("_qr_ultimo_rerun", 0)
+            ahora_ts = time.time()
+
+            if pendientes >= 10 or (ahora_ts - ult_rerun) >= 2.0:
+                st.session_state["_qr_pendientes_rerun"] = 0
+                st.session_state["_qr_ultimo_rerun"] = ahora_ts
+                st.rerun()
+
+    # MENSAJES (se acumulan, se muestran en cada rerun)
+    mensajes = st.session_state.get("_qr_mensajes", [])
+    if mensajes:
+        m = mensajes[0]
+        if (time.time() - m.get("ts", 0)) < 8:
+            _render_mensaje_qr(m)
+        if len(mensajes) > 1:
+            st.markdown('<div class="scan-ultimos">Ultimos escaneos</div>',
+                        unsafe_allow_html=True)
+            for msg in mensajes[1:6]:
+                _render_mensaje_qr(msg)
 
 def _render_mensaje_qr(msg):
     tipo = msg["tipo"]; mensaje = msg["mensaje"]
