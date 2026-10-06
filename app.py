@@ -1816,6 +1816,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
         draw.line([(0, y), (FRANJA_W, y)], fill=(r, g, b))
 
+    # ─── FUENTE: intenta TTF real, si no hay, escala la default ───
     def _font(size, bold=False, italic=False):
         nombres = []
         if bold and italic:
@@ -1831,11 +1832,17 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                 return ImageFont.truetype(n, size)
             except Exception:
                 continue
-        return ImageFont.load_default()
+        # Fallback: escalar la fuente default al tamaño pedido
+        try:
+            base_font = ImageFont.load_default()
+            return base_font.font_variant(size=size)
+        except Exception:
+            return ImageFont.load_default()
 
-    f_colegio = _font(13, bold=True); f_foto = _font(14, bold=True)
-    f_titulo = _font(20, bold=True); f_frase = _font(19, bold=True, italic=True)
-    f_label = _font(20, bold=True)
+    # ═══ TAMAÑOS AGRANDADOS ═══
+    f_colegio = _font(20, bold=True); f_foto = _font(24, bold=True)
+    f_titulo = _font(32, bold=True); f_frase = _font(28, bold=True, italic=True)
+    f_label = _font(30, bold=True)
     esc_size = 80; esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H; alto_bloque = esc_size + 70
     esc_y = max(8, (espacio - alto_bloque) // 2 + 10)
@@ -1857,7 +1864,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
 
     y_txt = esc_y + esc_size + 6
     for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
-        _txt_centrado(lbl, y_txt, f_colegio, BLANCO); y_txt += 14
+        _txt_centrado(lbl, y_txt, f_colegio, BLANCO); y_txt += 20
     foto_x = 0; foto_y = ALTO_PX - FOTO_H
     draw.rectangle([foto_x, foto_y, foto_x + FOTO_W, foto_y + FOTO_H],
                    fill=BLANCO)
@@ -1878,7 +1885,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         tw = 280
     espacio_d = ANCHO_PX - DER_X
-    draw.text((DER_X + (espacio_d - tw) // 2, 12), titulo_txt,
+    draw.text((DER_X + (espacio_d - tw) // 2, 10), titulo_txt,
               fill=NEGRO, font=f_titulo)
     ap_p = alumno['apellido_paterno'].upper()
     ap_m = (alumno['apellido_materno'] or "").upper()
@@ -1901,15 +1908,16 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    INFO_Y = 130; alto_linea = 52
+    # ═══ COORDENADAS Y TAMAÑOS AGRANDADOS ═══
+    INFO_Y = 135; alto_linea = 65
     ap_full = ap_p + " " + ap_m
     draw.text((info_x, INFO_Y), ap_full, fill=NEGRO,
-              font=_ajustar(ap_full, 32, ancho_info, True))
+              font=_ajustar(ap_full, 46, ancho_info, True))
     y2 = INFO_Y + alto_linea
     draw.text((info_x, y2), nombres, fill=NEGRO,
-              font=_ajustar(nombres, 32, ancho_info, True))
+              font=_ajustar(nombres, 46, ancho_info, True))
 
-    def _linea(y, label, valor, size=28):
+    def _linea(y, label, valor, size=42):
         draw.text((info_x, y), label, fill=GRIS_LABEL, font=f_label)
         an = draw.textlength(label, font=f_label)
         vx = info_x + int(an) + 10
@@ -1933,7 +1941,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         fw = bbox[2] - bbox[0]
     except Exception:
         fw = 250
-    draw.text((DER_X + (espacio_d - fw) // 2, ALTO_PX - 42), frase,
+    draw.text((DER_X + (espacio_d - fw) // 2, ALTO_PX - 46), frase,
               fill=NARANJA_FRANJA, font=f_frase)
     return img
 
