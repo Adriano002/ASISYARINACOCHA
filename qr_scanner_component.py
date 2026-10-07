@@ -189,7 +189,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             ultimoTimestampEmision = 0;
         }
 
-        #escaner
+        //
         function iniciarScanner() {
             if (iniciado) return;
             if (typeof Html5QrcodeScanner === 'undefined') {
