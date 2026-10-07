@@ -1,11 +1,8 @@
-# sync.py
+# sincronizacion con cloudflare
 import logging
 import streamlit as st
 from pathlib import Path
-
 log = logging.getLogger("sync")
-
-
 def _client():
     """Crea cliente boto3 apuntando a Cloudflare R2."""
     import boto3
@@ -23,10 +20,8 @@ def _client():
         region_name="auto",
         config=cfg,
     )
-
-
 def descargar_bd(destino: Path):
-    """Descarga asistencia.db desde R2 al path local."""
+    """Descarga la base de datos local"""
     try:
         cliente = _client()
         bucket = st.secrets["r2"]["bucket"]
@@ -58,7 +53,7 @@ def subir_bd(origen: Path):
 
 
 def boton_backup():
-    """Widget de Streamlit para subir/descargar BD manualmente."""
+    """SUBIR ASISYARINA MANUALMENTE"""
     import streamlit as st
     from db import DB_PATH, reset_pool
 
@@ -68,15 +63,15 @@ def boton_backup():
         tam = DB_PATH.stat().st_size / 1024
         st.success(f"BD local: {DB_PATH} ({tam:.1f} KB)")
     else:
-        st.error("No hay BD local.")
+        st.error("No hay Bade de Datos local")
 
     c1, c2 = st.columns(2)
 
     with c1:
-        if st.button("⬆️ Subir BD a R2", type="primary", width="stretch"):
+        if st.button("Subir base de datos al almacenamiento", type="primary", width="stretch"):
             with st.spinner("Subiendo..."):
                 if subir_bd(DB_PATH):
-                    st.success("BD subida a R2 correctamente.")
+                    st.success("Asisyarinasubido correctamente")
                 else:
                     st.error("Error al subir. Revisa los logs.")
 
