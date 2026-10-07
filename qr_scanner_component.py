@@ -1,8 +1,13 @@
-#version turbo del compoenente
-#escaeno instantaneo
+# qr_scanner_component.py
+# Componente de escaneo QR para Streamlit - version TURBO.
+# - Escaneo rapido (fps: 20)
+# - Click inmediato al leer QR
+# - Pausa/reanudar al cambiar de pestaña
+# - Sin setInterval de sonido (sin bug de bucle)
 import streamlit as st
+
 QR_SCANNER_COMPONENT = st.components.v2.component(
-    name="mi_qr_scanner_v1",
+    name="mi_qr_scanner_v18",
     isolate_styles=False,
     html="""
     <div id="qr-wrapper">
@@ -189,7 +194,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             ultimoTimestampEmision = 0;
         }
 
-        //
+        // ═══ SCANNER ═══
         function iniciarScanner() {
             if (iniciado) return;
             if (typeof Html5QrcodeScanner === 'undefined') {
@@ -282,7 +287,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             }, 500);
         }
 
-        #visibilidad
+        // ═══ VISIBILITY ═══
         function pausarScanner() {
             if (!scanner || !iniciado || pausado) return;
             try {
@@ -373,6 +378,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     }
     """,
 )
+
+
 def qr_scanner(key="qr_scanner", on_scan=None):
     if on_scan is None:
         on_scan = lambda: None
