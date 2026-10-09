@@ -2237,7 +2237,7 @@ def _render_carnets(filas, titulo=None):
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=m, leftMargin=m,
                             topMargin=m, bottomMargin=m)
     est = getSampleStyleSheet()
-    MM = 2.8346; ANCHO = 85.0 * MM; ALTO = 50.0 * MM
+    MM = 2.8346; ANCHO = 85.0 * MM; ALTO = 53.0 * MM
     escudo_path = Path("escudo.png")
 
     def _fotocheck(alumno):
