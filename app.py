@@ -1039,6 +1039,168 @@ def listar_permisos(solo_activos=True):
     q += " ORDER BY p.fecha_inicio DESC"
     return leer_df(q)
 
+  def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
+    """
+    Anula un permiso (soft delete: activo=0).
+    Si el permiso ya genero asistencias tipo 'Permiso' en su rango,
+    tambien las revierte (las pasa a 'Falta' o elimina el registro
+    si no corresponde).
+    Registra todo en auditoria.
+    """
+    with cursor() as (con, cur):
+        cur.execute("""
+            SELECT p.id, p.alumno_id, p.fecha_inicio, p.fecha_fin,
+                   COALESCE(p.motivo,'') AS motivo, p.periodo_id,
+                   a.dni,
+                   a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS alumno
+            FROM permisos p
+            JOIN alumnos a ON p.alumno_id = a.id
+            WHERE p.id=%s AND p.activo=1
+        """, (id_permiso,))
+        perm = cur.fetchone()
+
+        if not perm:
+            return False, "Permiso no encontrado o ya estaba anulado."
+
+        # 1) Soft delete del permiso
+        cur.execute("UPDATE permisos SET activo=0 WHERE id=%s", (id_permiso,))
+
+        # 2) Revertir asistencias tipo 'Permiso' generadas por este permiso
+        #    en el rango de fechas. Solo si aun no fue justificada manualmente.
+        asistencias_revertidas = []
+        cur.execute("""
+            SELECT id, fecha FROM asistencias
+            WHERE alumno_id=%s
+              AND fecha BETWEEN %s AND %s
+              AND estado='Permiso'
+              AND justificada=1
+              AND origen='manual'
+        """, (perm["alumno_id"], perm["fecha_inicio"], perm["fecha_fin"]))
+        filas = cur.fetchall()
+
+        for f in filas:
+            # Verificar si hay OTRO permiso activo que cubra esa fecha
+            cur.execute("""
+                SELECT id FROM permisos
+                WHERE alumno_id=%s AND activo=1
+                  AND fecha_inicio<=%s AND fecha_fin>=%s
+                LIMIT 1
+            """, (perm["alumno_id"], f["fecha"], f["fecha"]))
+            if cur.fetchone():
+                # Aun hay otro permiso, no tocar
+                continue
+
+            # Revertir: el alumno no tenia permiso real, se marca Falta
+            cur.execute("""
+                UPDATE asistencias
+                SET estado='Falta', justificada=0, observacion=NULL,
+                    justificado_por=NULL, justificado_en=NULL
+                WHERE id=%s
+            """, (f["id"],))
+            asistencias_revertidas.append((f["id"], f["fecha"]))
+
+    # Auditoria
+    accion = (
+        f"Anulo permiso id={id_permiso} de {perm['alumno']} "
+        f"(DNI {perm['dni']}, del {fmt_date(perm['fecha_inicio'])} "
+        f"al {fmt_date(perm['fecha_fin'])})"
+    )
+    if asistencias_revertidas:
+        accion += f" | Revertidas {len(asistencias_revertidas)} asistencia(s) tipo Permiso"
+    if motivo_eliminacion.strip():
+        accion += f" | Motivo: {motivo_eliminacion.strip()}"
+    auditar(usuario["usuario"], accion, tb="permisos", rid=id_permiso)
+
+    for aid, afecha in asistencias_revertidas:
+        auditar(usuario["usuario"],
+                f"Revertida asistencia id={aid} (Permiso->Falta) "
+                f"por anulacion de permiso id={id_permiso}",
+                tb="asistencias", rid=aid)
+
+    msg = f"Permiso de {perm['alumno']} anulado."
+    if asistencias_revertidas:
+        msg += f" Se revirtieron {len(asistencias_revertidas)} asistencia(s)."
+    return True, msg
+def anular_justificacion_previa(id_just, usuario, motivo_anulacion=""):
+    """
+    Anula una justificacion previa.
+    - Si aun NO se aplico (aplicada=0): solo se marca como anulada (aplicada=-1).
+    - Si YA se aplico (aplicada=1): se marca como anulada Y se revierte
+      la justificacion de la falta correspondiente.
+    Registra todo en auditoria.
+    """
+    with cursor() as (con, cur):
+        cur.execute("""
+            SELECT jp.id, jp.alumno_id, jp.fecha_objetivo, jp.tipo,
+                   COALESCE(jp.motivo,'') AS motivo, jp.aplicada,
+                   a.dni,
+                   a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS alumno
+            FROM justificaciones_previas jp
+            JOIN alumnos a ON jp.alumno_id = a.id
+            WHERE jp.id=%s
+        """, (id_just,))
+        just = cur.fetchone()
+
+        if not just:
+            return False, "Justificacion previa no encontrada."
+
+        if just["aplicada"] == -1:
+            return False, "Esta justificacion previa ya estaba anulada."
+
+        # 1) Marcar la justificacion previa como anulada
+        cur.execute("""
+            UPDATE justificaciones_previas
+            SET aplicada = -1
+            WHERE id = %s
+        """, (id_just,))
+
+        # 2) Si ya se habia aplicado, revertir la justificacion de la falta
+        asistencia_afectada = None
+        if just["aplicada"] == 1 and just["tipo"] == FALTA:
+            cur.execute("""
+                SELECT id FROM asistencias
+                WHERE alumno_id=%s
+                  AND fecha=%s
+                  AND tipo='clases'
+                  AND estado='Falta'
+                  AND justificada=1
+                ORDER BY id DESC LIMIT 1
+            """, (just["alumno_id"], just["fecha_objetivo"]))
+            fila_ast = cur.fetchone()
+            if fila_ast:
+                asistencia_afectada = fila_ast["id"]
+                cur.execute("""
+                    UPDATE asistencias
+                    SET justificada=0,
+                        observacion=NULL,
+                        justificado_por=NULL,
+                        justificado_en=NULL
+                    WHERE id=%s
+                """, (asistencia_afectada,))
+
+    # Auditoria
+    accion = (
+        f"Anulo justificacion previa id={id_just} de {just['alumno']} "
+        f"(DNI {just['dni']}, fecha objetivo {fmt_date(just['fecha_objetivo'])})"
+    )
+    if just["aplicada"] == 1:
+        accion += " | Estaba APLICADA"
+    if motivo_anulacion.strip():
+        accion += f" | Motivo: {motivo_anulacion.strip()}"
+    auditar(usuario["usuario"], accion,
+            tb="justificaciones_previas", rid=id_just)
+
+    if asistencia_afectada:
+        auditar(usuario["usuario"],
+                f"Quito justificacion de asistencia id={asistencia_afectada} "
+                f"por anulacion de justificacion previa id={id_just}",
+                tb="asistencias", rid=asistencia_afectada)
+
+    msg = f"Justificacion previa de {just['alumno']} anulada."
+    if asistencia_afectada:
+        msg += " Se revirtio la justificacion de la falta."
+    return True, msg
+
 
 # asistencia
 def registrar_entrada(dni, usuario, origen="qr"):
@@ -1573,11 +1735,11 @@ def perfil_alumno_datos(idal):
         FROM bloqueos WHERE alumno_id=%s ORDER BY fecha_inicio DESC
     """, (idal,))
     dp = leer_df("""
-        SELECT fecha_inicio,fecha_fin,COALESCE(motivo,'') AS motivo,activo,creado_por
+        SELECT id,fecha_inicio,fecha_fin,COALESCE(motivo,'') AS motivo,activo,creado_por
         FROM permisos WHERE alumno_id=%s ORDER BY fecha_inicio DESC
     """, (idal,))
     dj = leer_df("""
-        SELECT fecha_objetivo,tipo,motivo,aplicada,creado_por,timestamp
+        SELECT id,fecha_objetivo,tipo,motivo,aplicada,creado_por,timestamp
         FROM justificaciones_previas WHERE alumno_id=%s
         ORDER BY fecha_objetivo DESC
     """, (idal,))
@@ -3419,8 +3581,7 @@ def _frag_listar_alumnos():
                     unsafe_allow_html=True)
         if c2.button("Ver perfil", key="perfil_" + str(al['id'])):
             st.session_state["perfil_alumno_id"] = al["id"]; st.rerun()
-
-
+          
 def _perfil_alumno(idal):
     d = perfil_alumno_datos(idal)
     if not d:
@@ -3581,17 +3742,77 @@ def _perfil_alumno(idal):
         if d["permisos"].empty:
             st.info("Sin permisos.")
         else:
-            st.dataframe(d["permisos"], width='stretch')
+            for _, perm in d["permisos"].iterrows():
+                c1, c2, c3 = st.columns([4, 2, 1])
+                estado_txt = "Activo" if perm["activo"] else "Anulado"
+                c1.write(f"**{perm['fecha_inicio']} -> {perm['fecha_fin']}** - {perm['motivo']}")
+                c2.write(estado_txt)
+                if perm["activo"]:
+                    if c3.button("Anular", key=f"anul_perm_{perm['id']}"):
+                        st.session_state["_anular_perm_id"] = perm["id"]
+
+            if st.session_state.get("_anular_perm_id"):
+                pid = st.session_state["_anular_perm_id"]
+                st.markdown("---")
+                st.warning("Vas a anular este permiso. "
+                           "Si ya genero asistencias tipo 'Permiso', tambien se revertiran.")
+                motivo_elim = st.text_input("Motivo de anulacion (opcional)",
+                                             key="anul_perm_motivo")
+                if _pedir_password_critica("anul_perm", "Confirmar anulacion"):
+                    ok, msg = eliminar_permiso(pid, usuario, motivo_elim)
+                    st.session_state.pop("_anular_perm_id", None)
+                    st.session_state.pop("anul_perm_motivo", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+                if st.button("Cancelar", key="anul_perm_cancel"):
+                    st.session_state.pop("_anular_perm_id", None)
+                    st.session_state.pop("anul_perm_motivo", None)
+                    st.rerun()
+
     with tabs[4]:
         if d["justificaciones_previas"].empty:
             st.info("Sin justificaciones previas.")
         else:
             dj = d["justificaciones_previas"].copy()
-            dj["aplicada"] = dj["aplicada"].apply(lambda x: "Si" if x else "Pendiente")
-            dj = dj.rename(columns={"fecha_objetivo": "Fecha objetivo", "tipo": "Tipo",
-                                     "motivo": "Motivo", "aplicada": "Aplicada",
-                                     "creado_por": "Creado por", "timestamp": "Registrado"})
-            st.dataframe(dj, width='stretch', hide_index=True)
+
+            def _estado_jp(v):
+                if v == 1:  return "Aplicada"
+                if v == -1: return "Anulada"
+                return "Pendiente"
+
+            dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
+
+            for _, jp in dj.iterrows():
+                c1, c2, c3, c4 = st.columns([3, 3, 2, 1])
+                c1.write(f"**{jp['fecha_objetivo']}**")
+                c2.write(jp["motivo"])
+                c3.write(jp["estado_txt"])
+                if jp["aplicada"] != -1:
+                    if c4.button("Anular", key=f"anul_jp_{jp['id']}"):
+                        st.session_state["_anular_jp_id"] = jp["id"]
+
+            if st.session_state.get("_anular_jp_id"):
+                jid = st.session_state["_anular_jp_id"]
+                st.markdown("---")
+                st.warning("Vas a anular esta justificacion previa. "
+                           "Si ya estaba aplicada, se quitara la justificacion de la falta.")
+                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                             key="anul_jp_motivo")
+                if _pedir_password_critica("anul_jp", "Confirmar anulacion"):
+                    ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
+                    st.session_state.pop("_anular_jp_id", None)
+                    st.session_state.pop("anul_jp_motivo", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+                if st.button("Cancelar", key="anul_jp_cancel"):
+                    st.session_state.pop("_anular_jp_id", None)
+                    st.session_state.pop("anul_jp_motivo", None)
+                    st.rerun()
+
 
 
 def vista_alumnos():
@@ -3605,7 +3826,7 @@ def vista_alumnos():
     with tabs[2]: _frag_editar_alumno()
 
 
-# ─── GRADOS Y SECCIONES ────────────────────────────────────────────────────
+# 
 def vista_grados_secciones():
     st.title("Grados y Secciones")
     st.caption("Las secciones se crean automaticamente al importar el Excel de alumnos.")
@@ -4377,6 +4598,7 @@ def _buscar_alumno_widget(clave):
         """, (idal,))
         al = cur.fetchone()
     return dict(al) if al else None
+    
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, manana o pasado manana.")
@@ -4390,7 +4612,9 @@ def _frag_justificacion_previa(usuario):
             a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
             g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
             jp.motivo AS Motivo,
-            CASE WHEN jp.aplicada=1 THEN 'Aplicada' ELSE 'Pendiente' END AS Estado,
+            CASE WHEN jp.aplicada=1 THEN 'Aplicada'
+                 WHEN jp.aplicada=-1 THEN 'Anulada'
+                 ELSE 'Pendiente' END AS Estado,
             jp.creado_por AS "Creado por", jp.timestamp AS "Registrado"
             FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
             JOIN secciones s ON a.seccion_id=s.id
@@ -4408,17 +4632,19 @@ def _frag_justificacion_previa(usuario):
         c1, c2 = st.columns(2)
         with c1:
             filtro_estado = st.selectbox("Filtrar por estado",
-                                         ["Todas", "Pendientes", "Aplicadas"],
+                                         ["Todas", "Pendientes", "Aplicadas", "Anuladas"],
                                          key="jp_filtro_estado")
         with c2:
             filtro_texto = st.text_input("Buscar por DNI o apellido",
                                           key="jp_filtro_texto",
                                           placeholder="Ej: 12345678 o Quispe")
-        q = ("""SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
+        q = ("""SELECT jp.id AS id, jp.fecha_objetivo AS Fecha, a.dni AS DNI,
              a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
              g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
              jp.motivo AS Motivo,
-             CASE WHEN jp.aplicada=1 THEN 'Aplicada' ELSE 'Pendiente' END AS Estado,
+             CASE WHEN jp.aplicada=1 THEN 'Aplicada'
+                  WHEN jp.aplicada=-1 THEN 'Anulada'
+                  ELSE 'Pendiente' END AS Estado,
              jp.creado_por AS "Creado por", jp.timestamp AS "Registrado"
              FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
              JOIN secciones s ON a.seccion_id=s.id
@@ -4429,6 +4655,8 @@ def _frag_justificacion_previa(usuario):
             q += " AND jp.aplicada=0"
         elif filtro_estado == "Aplicadas":
             q += " AND jp.aplicada=1"
+        elif filtro_estado == "Anuladas":
+            q += " AND jp.aplicada=-1"
         if filtro_texto.strip():
             q += " AND (a.dni LIKE %s OR a.apellido_paterno LIKE %s OR a.apellido_materno LIKE %s)"
             pat = "%" + filtro_texto.strip() + "%"
@@ -4440,6 +4668,31 @@ def _frag_justificacion_previa(usuario):
         else:
             st.write(f"{len(df_all)} justificaciones")
             st.dataframe(df_all, width='stretch', hide_index=True)
+
+            st.markdown("---")
+            st.markdown("**Anular una justificacion previa**")
+            opciones_anular = {}
+            for _, r in df_all.iterrows():
+                if r["Estado"] != "Anulada":
+                    et = f"{r['Fecha']} - {r['Alumno']} (DNI {r['DNI']}) - {r['Estado']}"
+                    opciones_anular[et] = r["id"]
+            if opciones_anular:
+                sel_anular = st.selectbox("Selecciona justificacion a anular",
+                                           list(opciones_anular.keys()),
+                                           key="jp_sel_anular")
+                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                             key="jp_motivo_anular_global")
+                if _pedir_password_critica("jp_anular_global", "Confirmar anulacion"):
+                    ok, msg = anular_justificacion_previa(
+                        opciones_anular[sel_anular], usuario, motivo_anul)
+                    st.session_state.pop("jp_motivo_anular_global", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+            else:
+                st.info("No hay justificaciones anulables con los filtros actuales.")
+
     with tabs[1]:
         al = _buscar_alumno_widget("jp")
         if not al:
@@ -4489,8 +4742,10 @@ def _frag_justificacion_previa(usuario):
                   ", " + al['nombres']).strip(", ")
         st.markdown(f"**{nombre}** | DNI {al['dni']}", unsafe_allow_html=True)
         df_prev = leer_df("""
-            SELECT fecha_objetivo AS "Fecha objetivo", motivo AS Motivo,
-            CASE WHEN aplicada=1 THEN 'Aplicada' ELSE 'Pendiente' END AS Estado,
+            SELECT id, fecha_objetivo AS "Fecha objetivo", motivo AS Motivo,
+            CASE WHEN aplicada=1 THEN 'Aplicada'
+                 WHEN aplicada=-1 THEN 'Anulada'
+                 ELSE 'Pendiente' END AS Estado,
             creado_por AS "Creado por", timestamp AS "Registrado"
             FROM justificaciones_previas WHERE alumno_id=%s
             ORDER BY fecha_objetivo DESC
@@ -4498,6 +4753,29 @@ def _frag_justificacion_previa(usuario):
         if not df_prev.empty:
             st.write(f"{len(df_prev)} justificaciones")
             st.dataframe(df_prev, width='stretch', hide_index=True)
+
+            st.markdown("---")
+            st.markdown("**Anular una justificacion previa de este alumno**")
+            opciones = {}
+            for _, r in df_prev.iterrows():
+                if r["Estado"] != "Anulada":
+                    et = f"{r['Fecha objetivo']} - {r['Motivo']} - {r['Estado']}"
+                    opciones[et] = r["id"]
+            if opciones:
+                sel = st.selectbox("Selecciona justificacion", list(opciones.keys()),
+                                    key="jp_al_sel_anular")
+                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                             key="jp_al_motivo_anular")
+                if _pedir_password_critica("jp_al_anular", "Confirmar anulacion"):
+                    ok, msg = anular_justificacion_previa(
+                        opciones[sel], usuario, motivo_anul)
+                    st.session_state.pop("jp_al_motivo_anular", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+            else:
+                st.info("Todas las justificaciones de este alumno ya estan anuladas.")
         else:
             st.info("Sin justificaciones previas.")
 
@@ -4555,7 +4833,7 @@ def _frag_permisos(usuario):
             filtro_texto = st.text_input("Buscar por DNI o apellido",
                                           key="perm_filtro_texto",
                                           placeholder="Ej: 12345678")
-        q = ("""SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
+        q = ("""SELECT p.id AS id, p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
              a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
              g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
              COALESCE(p.motivo,'') AS Motivo,
@@ -4580,6 +4858,31 @@ def _frag_permisos(usuario):
         else:
             st.write(f"{len(df_all)} permisos")
             st.dataframe(df_all, width='stretch', hide_index=True)
+
+            st.markdown("---")
+            st.markdown("**Anular un permiso**")
+            opciones_anular = {}
+            for _, r in df_all.iterrows():
+                if r["Estado"] == "Activo":
+                    et = f"{r['Inicio']} -> {r['Fin']} - {r['Alumno']} (DNI {r['DNI']})"
+                    opciones_anular[et] = r["id"]
+            if opciones_anular:
+                sel_anular = st.selectbox("Selecciona permiso a anular",
+                                           list(opciones_anular.keys()),
+                                           key="perm_sel_anular")
+                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                             key="perm_motivo_anular_global")
+                if _pedir_password_critica("perm_anular_global", "Confirmar anulacion"):
+                    ok, msg = eliminar_permiso(
+                        opciones_anular[sel_anular], usuario, motivo_anul)
+                    st.session_state.pop("perm_motivo_anular_global", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+            else:
+                st.info("No hay permisos activos con los filtros actuales.")
+
     with tabs[1]:
         al = _buscar_alumno_widget("perm")
         if not al:
@@ -4629,7 +4932,7 @@ def _frag_permisos(usuario):
                   ", " + al['nombres']).strip(", ")
         st.markdown(f"**{nombre}** | DNI {al['dni']}", unsafe_allow_html=True)
         df_perm = leer_df("""
-            SELECT fecha_inicio AS Inicio, fecha_fin AS Fin,
+            SELECT id, fecha_inicio AS Inicio, fecha_fin AS Fin,
             COALESCE(motivo,'') AS Motivo,
             CASE WHEN activo=1 THEN 'Activo' ELSE 'Inactivo' END AS Estado,
             creado_por AS "Creado por", timestamp AS "Registrado"
@@ -4638,6 +4941,28 @@ def _frag_permisos(usuario):
         if not df_perm.empty:
             st.write(f"{len(df_perm)} permisos")
             st.dataframe(df_perm, width='stretch', hide_index=True)
+
+            st.markdown("---")
+            st.markdown("**Anular un permiso de este alumno**")
+            opciones = {}
+            for _, r in df_perm.iterrows():
+                if r["Estado"] == "Activo":
+                    et = f"{r['Inicio']} -> {r['Fin']} - {r['Motivo']}"
+                    opciones[et] = r["id"]
+            if opciones:
+                sel = st.selectbox("Selecciona permiso", list(opciones.keys()),
+                                    key="perm_al_sel_anular")
+                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                             key="perm_al_motivo_anular")
+                if _pedir_password_critica("perm_al_anular", "Confirmar anulacion"):
+                    ok, msg = eliminar_permiso(opciones[sel], usuario, motivo_anul)
+                    st.session_state.pop("perm_al_motivo_anular", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+            else:
+                st.info("Este alumno no tiene permisos activos.")
         else:
             st.info("Sin permisos registrados.")
 def vista_justificaciones_permisos():
