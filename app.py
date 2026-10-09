@@ -1863,7 +1863,7 @@ def reporte_detallado_por_mes(pid):
     return res
 
 
-def cerrar_año_escolar(usuario, pid, nuevo_nombre, fi, ff):
+def cerrar_AÑO_escolar(usuario, pid, nuevo_nombre, fi, ff):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE id=%s", (pid,))
         p = cur.fetchone()
@@ -2100,7 +2100,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                 centro_x = x_actual + ancho_N / 2
                 # Altura: justo arriba de la letra
                 tilde_y = y + max(0, int(alto_letra * 0.05))
-                # Tamaño de la tilde
+                # TamAÑO de la tilde
                 tilde_w = ancho_N * 0.85
                 tilde_h = max(3, int(alto_letra * 0.18))
 
@@ -2174,7 +2174,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     ap_m = (alumno['apellido_materno'] or "").upper()
     nombres = alumno['nombres'].upper(); dni = alumno["dni"]
     grado = alumno['grado'].upper(); seccion = alumno['seccion'].upper()
-    turno = alumno['turno'].upper(); año = str(datetime.now().year)
+    turno = alumno['turno'].upper(); AÑO = str(datetime.now().year)
     info_x = DER_X; QR_SIZE = 215; qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
@@ -2212,7 +2212,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "año:", año)
+    _linea(y2 + 4 * alto_linea, "AÑO:", AÑO)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(str(alumno["dni"]).strip()); qr.make(fit=True)
@@ -2991,10 +2991,10 @@ def _generar_hojas_diario(fecha, ids_secs):
         ]
     return hojas
 
-def _generar_hojas_mensual(mes, año, ids_secs):
+def _generar_hojas_mensual(mes, AÑO, ids_secs):
     hojas = {}
-    ult = monthrange(año, mes)[1]
-    ini = date(año, mes, 1); fin = date(año, mes, ult)
+    ult = monthrange(AÑO, mes)[1]
+    ini = date(AÑO, mes, 1); fin = date(AÑO, mes, ult)
     for idsec in ids_secs:
         with cursor() as (con, cur):
             cur.execute("""SELECT s.id,s.nombre AS seccion,g.nombre AS grado,
@@ -3006,7 +3006,7 @@ def _generar_hojas_mensual(mes, año, ids_secs):
             continue
         dias = []
         for d in range(1, ult + 1):
-            f = date(año, mes, d)
+            f = date(AÑO, mes, d)
             if f.weekday() >= 5:
                 with cursor() as (con, cur):
                     cur.execute("SELECT id FROM dias_especiales WHERE fecha=%s "
@@ -4329,7 +4329,7 @@ def _frag_importar_excel():
 def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
-    tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
+    tabs = st.tabs(["Registros", "Periodos", "Cierre de AÑO"])
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
@@ -4389,7 +4389,7 @@ def vista_auditoria():
                 else:
                     st.error(msg)
     with tabs[2]:
-        st.subheader("Cierre de año escolar")
+        st.subheader("Cierre de AÑO escolar")
         st.warning("Al cerrar el periodo se desactivan TODOS los alumnos.")
         p = obtener_periodo_activo()
         if not p:
@@ -4417,14 +4417,14 @@ def vista_auditoria():
         desc = st.session_state.get("_reporte_descargado", False)
         if not desc:
             st.info("Debes descargar el reporte anual antes.")
-        with st.form("cerrar_año"):
+        with st.form("cerrar_AÑO"):
             c1, c2, c3 = st.columns(3)
             with c1: nn = st.text_input("Nombre nuevo periodo", value=str(ahora().year + 1))
             with c2: fi = st.date_input("Inicio nuevo", date(ahora().year + 1, 3, 1))
             with c3: ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
             pwd = st.text_input("Contrasena de Admin o Direccion", type="password")
             conf = st.text_input("Escribe CERRAR para confirmar")
-            sub = st.form_submit_button("Cerrar año escolar", type="primary")
+            sub = st.form_submit_button("Cerrar AÑO escolar", type="primary")
         if sub:
             if not desc:
                 st.error("Primero debes descargar el reporte anual.")
@@ -4435,7 +4435,7 @@ def vista_auditoria():
             elif not verificar_password_critica(pwd):
                 st.error("Contrasena incorrecta.")
             else:
-                ok, msg = cerrar_año_escolar(usuario, p["id"], nn,
+                ok, msg = cerrar_AÑO_escolar(usuario, p["id"], nn,
                                               fi.strftime("%Y-%m-%d"),
                                               ff.strftime("%Y-%m-%d"))
                 if ok:
