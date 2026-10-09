@@ -1039,7 +1039,7 @@ def listar_permisos(solo_activos=True):
     q += " ORDER BY p.fecha_inicio DESC"
     return leer_df(q)
 
-  def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
+def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
     """
     Anula un permiso (soft delete: activo=0).
     Si el permiso ya genero asistencias tipo 'Permiso' en su rango,
