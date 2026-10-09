@@ -1121,6 +1121,7 @@ def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
     if asistencias_revertidas:
         msg += f" Se revirtieron {len(asistencias_revertidas)} asistencia(s)."
     return True, msg
+
 def anular_justificacion_previa(id_just, usuario, motivo_anulacion=""):
     """
     Anula una justificacion previa.
@@ -1201,6 +1202,43 @@ def anular_justificacion_previa(id_just, usuario, motivo_anulacion=""):
         msg += " Se revirtio la justificacion de la falta."
     return True, msg
 
+def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
+    """
+    Reactiva una justificacion previa que estaba anulada (aplicada=-1).
+    La vuelve a estado Pendiente (aplicada=0).
+    """
+    with cursor() as (con, cur):
+        cur.execute("""
+            SELECT jp.id, jp.alumno_id, jp.fecha_objetivo, jp.tipo,
+                   COALESCE(jp.motivo,'') AS motivo, jp.aplicada,
+                   a.dni,
+                   a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS alumno
+            FROM justificaciones_previas jp
+            JOIN alumnos a ON jp.alumno_id = a.id
+            WHERE jp.id=%s
+        """, (id_just,))
+        just = cur.fetchone()
+
+        if not just:
+            return False, "Justificacion previa no encontrada."
+        if just["aplicada"] != -1:
+            return False, "Esta justificacion no esta anulada."
+
+        motivo_final = motivo_nuevo.strip() if motivo_nuevo and motivo_nuevo.strip() \
+                       else just["motivo"]
+
+        cur.execute("""
+            UPDATE justificaciones_previas
+            SET aplicada = 0,
+                motivo = %s
+            WHERE id = %s
+        """, (motivo_final, id_just))
+
+    auditar(usuario["usuario"],
+            f"Reactivo justificacion previa id={id_just} de {just['alumno']} "
+            f"(DNI {just['dni']}, fecha objetivo {fmt_date(just['fecha_objetivo'])})",
+            tb="justificaciones_previas", rid=id_just)
+    return True, f"Justificacion de {just['alumno']} reactivada (pendiente)."
 
 # asistencia
 def registrar_entrada(dni, usuario, origen="qr"):
@@ -4603,6 +4641,7 @@ def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, manana o pasado manana.")
     tabs = st.tabs(["Historial global", "Registrar nueva", "Por alumno"])
+
     with tabs[0]:
         hoy_s = hoy_str()
         pasado_s = (ahora().date() + timedelta(days=2)).strftime("%Y-%m-%d")
@@ -4627,8 +4666,10 @@ def _frag_justificacion_previa(usuario):
             st.info("Sin justificaciones previas para hoy, manana o pasado manana.")
         else:
             st.dataframe(df_vig, width='stretch', hide_index=True)
+
         st.markdown("---")
         st.markdown("**Todas las justificaciones previas registradas**")
+
         c1, c2 = st.columns(2)
         with c1:
             filtro_estado = st.selectbox("Filtrar por estado",
@@ -4638,6 +4679,7 @@ def _frag_justificacion_previa(usuario):
             filtro_texto = st.text_input("Buscar por DNI o apellido",
                                           key="jp_filtro_texto",
                                           placeholder="Ej: 12345678 o Quispe")
+
         q = ("""SELECT jp.id AS id, jp.fecha_objetivo AS Fecha, a.dni AS DNI,
              a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
              g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
@@ -4663,35 +4705,81 @@ def _frag_justificacion_previa(usuario):
             params += [pat, pat, pat]
         q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
         df_all = leer_df(q, params)
+
         if df_all.empty:
             st.info("Sin justificaciones previas.")
         else:
             st.write(f"{len(df_all)} justificaciones")
-            st.dataframe(df_all, width='stretch', hide_index=True)
 
-            st.markdown("---")
-            st.markdown("**Anular una justificacion previa**")
-            opciones_anular = {}
+            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1.1, 2, 0.9, 0.8, 1, 2, 0.9, 1.1])
+            h1.markdown("**Fecha**")
+            h2.markdown("**Alumno**")
+            h3.markdown("**Grado**")
+            h4.markdown("**Secc.**")
+            h5.markdown("**Estado**")
+            h6.markdown("**Motivo**")
+            h7.markdown("**Creado por**")
+            h8.markdown("**Accion**")
+
             for _, r in df_all.iterrows():
-                if r["Estado"] != "Anulada":
-                    et = f"{r['Fecha']} - {r['Alumno']} (DNI {r['DNI']}) - {r['Estado']}"
-                    opciones_anular[et] = r["id"]
-            if opciones_anular:
-                sel_anular = st.selectbox("Selecciona justificacion a anular",
-                                           list(opciones_anular.keys()),
-                                           key="jp_sel_anular")
+                c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.1, 2, 0.9, 0.8, 1, 2, 0.9, 1.1])
+                c1.write(str(r["Fecha"]))
+                c2.write(r["Alumno"])
+                c3.write(r["Grado"])
+                c4.write(r["Seccion"])
+                c5.write(r["Estado"])
+                c6.write(r["Motivo"])
+                c7.write(str(r["Creado por"]))
+                if r["Estado"] == "Anulada":
+                    if c8.button("Reactivar", key=f"reac_jp_glob_{r['id']}"):
+                        st.session_state["_reactivar_jp_global_id"] = r["id"]
+                else:
+                    if c8.button("Anular", key=f"anul_jp_glob_{r['id']}"):
+                        st.session_state["_anular_jp_global_id"] = r["id"]
+
+            # ─── CONFIRMACIÓN DE ANULACIÓN ────────────────────────
+            if st.session_state.get("_anular_jp_global_id"):
+                jid = st.session_state["_anular_jp_global_id"]
+                st.markdown("---")
+                st.warning("Vas a anular esta justificacion previa. "
+                           "Si ya estaba aplicada, se quitara la justificacion de la falta.")
                 motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                             key="jp_motivo_anular_global")
-                if _pedir_password_critica("jp_anular_global", "Confirmar anulacion"):
-                    ok, msg = anular_justificacion_previa(
-                        opciones_anular[sel_anular], usuario, motivo_anul)
-                    st.session_state.pop("jp_motivo_anular_global", None)
+                                             key="jp_glob_motivo_anul")
+                if _pedir_password_critica("jp_glob_anular", "Confirmar anulacion"):
+                    ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
+                    st.session_state.pop("_anular_jp_global_id", None)
+                    st.session_state.pop("jp_glob_motivo_anul", None)
                     if ok:
                         st.toast(msg); st.rerun()
                     else:
                         st.error(msg)
-            else:
-                st.info("No hay justificaciones anulables con los filtros actuales.")
+                if st.button("Cancelar", key="jp_glob_cancel"):
+                    st.session_state.pop("_anular_jp_global_id", None)
+                    st.session_state.pop("jp_glob_motivo_anul", None)
+                    st.rerun()
+
+            # ─── CONFIRMACIÓN DE REACTIVACIÓN ─────────────────────
+            if st.session_state.get("_reactivar_jp_global_id"):
+                jid = st.session_state["_reactivar_jp_global_id"]
+                st.markdown("---")
+                st.info("Vas a reactivar esta justificacion previa. "
+                        "Volvera a estado Pendiente y se aplicara cuando llegue el dia.")
+                motivo_nuevo = st.text_input(
+                    "Motivo nuevo (opcional, deja vacio para mantener el anterior)",
+                    key="jp_glob_motivo_reactivar")
+                if _pedir_password_critica("jp_glob_reactivar", "Confirmar reactivacion"):
+                    ok, msg = reactivar_justificacion_previa(
+                        jid, usuario, motivo_nuevo)
+                    st.session_state.pop("_reactivar_jp_global_id", None)
+                    st.session_state.pop("jp_glob_motivo_reactivar", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+                if st.button("Cancelar", key="jp_glob_cancel_reactivar"):
+                    st.session_state.pop("_reactivar_jp_global_id", None)
+                    st.session_state.pop("jp_glob_motivo_reactivar", None)
+                    st.rerun()
 
     with tabs[1]:
         al = _buscar_alumno_widget("jp")
@@ -4710,6 +4798,23 @@ def _frag_justificacion_previa(usuario):
                         if al.get("telefono_apoderado") else ""))
         st.markdown("---")
         st.markdown("**Registrar nueva justificacion previa (FALTA)**")
+
+        # ─── AVISO SI HAY JUSTIFICACIONES ANULADAS PARA ESTE ALUMNO ───
+        with cursor() as (con, cur):
+            cur.execute("""
+                SELECT fecha_objetivo, motivo FROM justificaciones_previas
+                WHERE alumno_id=%s AND aplicada=-1
+                ORDER BY fecha_objetivo DESC LIMIT 5
+            """, (al["id"],))
+            anuladas = cur.fetchall()
+        if anuladas:
+            st.warning("Este alumno tiene justificaciones ANULADAS. "
+                       "Si quieres reusar una, ve al tab **'Por alumno'** "
+                       "y usa el boton **Reactivar**.")
+            with st.expander("Ver justificaciones anuladas"):
+                for a in anuladas:
+                    st.write(f"- {fmt_date(a['fecha_objetivo'])} — {a['motivo']}")
+
         hoy = ahora().date()
         with st.form("form_just_prev"):
             c1, c2 = st.columns(2)
@@ -4733,6 +4838,7 @@ def _frag_justificacion_previa(usuario):
                     st.toast(msg); st.rerun()
                 else:
                     st.error(msg)
+
     with tabs[2]:
         st.markdown("**Busca un alumno para ver TODAS sus justificaciones previas**")
         al = _buscar_alumno_widget("jp_ver")
@@ -4755,27 +4861,51 @@ def _frag_justificacion_previa(usuario):
             st.dataframe(df_prev, width='stretch', hide_index=True)
 
             st.markdown("---")
-            st.markdown("**Anular una justificacion previa de este alumno**")
-            opciones = {}
+            st.markdown("**Anular / Reactivar justificaciones de este alumno**")
+
+            opciones_anular = {}
+            opciones_reactivar = {}
             for _, r in df_prev.iterrows():
-                if r["Estado"] != "Anulada":
-                    et = f"{r['Fecha objetivo']} - {r['Motivo']} - {r['Estado']}"
-                    opciones[et] = r["id"]
-            if opciones:
-                sel = st.selectbox("Selecciona justificacion", list(opciones.keys()),
+                et = f"{r['Fecha objetivo']} - {r['Motivo']} - {r['Estado']}"
+                if r["Estado"] == "Anulada":
+                    opciones_reactivar[et] = r["id"]
+                else:
+                    opciones_anular[et] = r["id"]
+
+            if opciones_anular:
+                st.markdown("**Anular una justificacion**")
+                sel = st.selectbox("Selecciona justificacion a anular",
+                                    list(opciones_anular.keys()),
                                     key="jp_al_sel_anular")
                 motivo_anul = st.text_input("Motivo de anulacion (opcional)",
                                              key="jp_al_motivo_anular")
                 if _pedir_password_critica("jp_al_anular", "Confirmar anulacion"):
                     ok, msg = anular_justificacion_previa(
-                        opciones[sel], usuario, motivo_anul)
+                        opciones_anular[sel], usuario, motivo_anul)
                     st.session_state.pop("jp_al_motivo_anular", None)
                     if ok:
                         st.toast(msg); st.rerun()
                     else:
                         st.error(msg)
-            else:
-                st.info("Todas las justificaciones de este alumno ya estan anuladas.")
+
+            if opciones_reactivar:
+                st.markdown("**Reactivar una justificacion anulada**")
+                sel_r = st.selectbox("Selecciona justificacion a reactivar",
+                                     list(opciones_reactivar.keys()),
+                                     key="jp_al_sel_reactivar")
+                motivo_nuevo = st.text_input("Motivo nuevo (opcional)",
+                                              key="jp_al_motivo_reactivar")
+                if _pedir_password_critica("jp_al_reactivar", "Confirmar reactivacion"):
+                    ok, msg = reactivar_justificacion_previa(
+                        opciones_reactivar[sel_r], usuario, motivo_nuevo)
+                    st.session_state.pop("jp_al_motivo_reactivar", None)
+                    if ok:
+                        st.toast(msg); st.rerun()
+                    else:
+                        st.error(msg)
+
+            if not opciones_anular and not opciones_reactivar:
+                st.info("No hay justificaciones previas de este alumno.")
         else:
             st.info("Sin justificaciones previas.")
 
