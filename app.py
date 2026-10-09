@@ -2174,7 +2174,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     ap_m = (alumno['apellido_materno'] or "").upper()
     nombres = alumno['nombres'].upper(); dni = alumno["dni"]
     grado = alumno['grado'].upper(); seccion = alumno['seccion'].upper()
-    turno = alumno['turno'].upper(); anio = str(datetime.now().year)
+    turno = alumno['turno'].upper(); año = str(datetime.now().year)
     info_x = DER_X; QR_SIZE = 215; qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
@@ -2212,7 +2212,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "ANIO:", anio)
+    _linea(y2 + 4 * alto_linea, "año:", año)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(str(alumno["dni"]).strip()); qr.make(fit=True)
@@ -2991,10 +2991,10 @@ def _generar_hojas_diario(fecha, ids_secs):
         ]
     return hojas
 
-def _generar_hojas_mensual(mes, anio, ids_secs):
+def _generar_hojas_mensual(mes, año, ids_secs):
     hojas = {}
-    ult = monthrange(anio, mes)[1]
-    ini = date(anio, mes, 1); fin = date(anio, mes, ult)
+    ult = monthrange(año, mes)[1]
+    ini = date(año, mes, 1); fin = date(año, mes, ult)
     for idsec in ids_secs:
         with cursor() as (con, cur):
             cur.execute("""SELECT s.id,s.nombre AS seccion,g.nombre AS grado,
@@ -3006,7 +3006,7 @@ def _generar_hojas_mensual(mes, anio, ids_secs):
             continue
         dias = []
         for d in range(1, ult + 1):
-            f = date(anio, mes, d)
+            f = date(año, mes, d)
             if f.weekday() >= 5:
                 with cursor() as (con, cur):
                     cur.execute("SELECT id FROM dias_especiales WHERE fecha=%s "
