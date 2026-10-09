@@ -275,15 +275,15 @@ def auditar(usuario, accion, va=None, vn=None, tb=None, rid=None):
 
 
 def _pedir_password_critica(clave, texto_boton="Confirmar",
-                            texto_input="Contrasena de Admin o Direccion"):
+                            texto_input="contraseña de Admin o Direccion"):
     pwd = st.text_input(texto_input, type="password", key="pwd_crit_" + clave)
     conf = st.checkbox("Confirmo esta accion", key="conf_crit_" + clave)
     if st.button(texto_boton, type="primary", key="btn_crit_" + clave,
                  disabled=not conf):
         if not pwd:
-            st.error("Ingresa la contrasena."); return False
+            st.error("Ingresa la contraseña."); return False
         if not verificar_password_critica(pwd):
-            st.error("Contrasena incorrecta."); return False
+            st.error("contraseña incorrecta."); return False
         return True
     return False
 
@@ -2538,8 +2538,8 @@ def vista_login():
     with centro:
         with st.form("login"):
             usuario = st.text_input("Usuario", placeholder="tu usuario")
-            password = st.text_input("Contrasena", type="password",
-                                     placeholder="tu contrasena")
+            password = st.text_input("contraseña", type="password",
+                                     placeholder="tu contraseña")
             enviado = st.form_submit_button("Ingresar", type="primary",
                                             width='stretch')
             if enviado:
@@ -2554,12 +2554,12 @@ def vista_login():
 
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
-    st.title("Cambio obligatorio de contrasena")
-    st.warning("Tu cuenta tiene una contrasena temporal.")
+    st.title("Cambio obligatorio de contraseña")
+    st.warning("Tu cuenta tiene una contraseña temporal.")
     _, centro, _ = st.columns([1, 1.2, 1])
     with centro:
         with st.form("cambio_pwd"):
-            nueva = st.text_input("Nueva contrasena", type="password")
+            nueva = st.text_input("Nueva contraseña", type="password")
             confirmar = st.text_input("Confirmar", type="password")
             ok = st.form_submit_button("Cambiar", type="primary", width='stretch')
         if ok:
@@ -2619,14 +2619,14 @@ def vista_mi_cuenta():
         st.dataframe(df_act, width='stretch')
 
     st.markdown("---")
-    st.subheader("Cambiar contrasena")
+    st.subheader("Cambiar contraseña")
     with st.form("cambiar_mi_pwd"):
-        actual = st.text_input("Contrasena actual", type="password")
-        nueva = st.text_input("Nueva contrasena", type="password")
-        confirmar = st.text_input("Confirmar nueva contrasena", type="password")
-        if st.form_submit_button("Cambiar contrasena", type="primary"):
+        actual = st.text_input("contraseña actual", type="password")
+        nueva = st.text_input("Nueva contraseña", type="password")
+        confirmar = st.text_input("Confirmar nueva contraseña", type="password")
+        if st.form_submit_button("Cambiar contraseña", type="primary"):
             if not verificar_password(actual, usuario["password"]):
-                st.error("Contrasena actual incorrecta.")
+                st.error("contraseña actual incorrecta.")
             elif len(nueva) < 6:
                 st.error("Minimo 6 caracteres.")
             elif nueva != confirmar:
@@ -2636,8 +2636,8 @@ def vista_mi_cuenta():
                 escribir("UPDATE usuarios SET password=%s WHERE id=%s",
                          (nueva_hash, usuario["id"]))
                 st.session_state["user"]["password"] = nueva_hash
-                auditar(usuario["usuario"], "Cambio su contrasena")
-                st.success("Contrasena actualizada.")
+                auditar(usuario["usuario"], "Cambio su contraseña")
+                st.success("contraseña actualizada.")
 
     st.markdown("---")
     if st.button("Cerrar sesion"):
@@ -3476,7 +3476,7 @@ def _frag_crear_alumno():
     with c4:
         tel = st.text_input("Telefono (opcional)", key="nue_al_tel")
 
-    pwd = st.text_input("Contrasena de Admin o Direccion",
+    pwd = st.text_input("contraseña de Admin o Direccion",
                         type="password", key="nue_al_pwd")
 
     if st.button("Crear alumno", type="primary", key="nue_al_btn"):
@@ -3485,9 +3485,9 @@ def _frag_crear_alumno():
         elif not re.fullmatch(r"\d{8}", dni.strip()):
             st.error("DNI invalido (8 digitos).")
         elif not pwd:
-            st.error("Ingresa la contrasena.")
+            st.error("Ingresa la contraseña.")
         elif not verificar_password_critica(pwd):
-            st.error("Contrasena incorrecta.")
+            st.error("contraseña incorrecta.")
         else:
             ok, msg = crear_alumno(
                 dni.strip(), nom.strip(), pat.strip(), mat.strip(),
@@ -3583,16 +3583,16 @@ def _frag_editar_alumno():
             f"**{g['nombre']} {s['nombre'] if s else '?'}**"
         )
 
-    pwd = st.text_input("Contrasena de Admin o Direccion",
+    pwd = st.text_input("contraseña de Admin o Direccion",
                         type="password", key=f"ed_pwd_{idal}")
 
     if st.button("Guardar cambios", type="primary", key=f"ed_btn_{idal}"):
         if not g or not s:
             st.error("Selecciona grado y sección.")
         elif not pwd:
-            st.error("Ingresa la contrasena.")
+            st.error("Ingresa la contraseña.")
         elif not verificar_password_critica(pwd):
-            st.error("Contrasena incorrecta.")
+            st.error("contraseña incorrecta.")
         else:
             ok, msg = editar_alumno(idal, apo, tel, s["id"],
                                      datos["dni"], st.session_state["user"])
@@ -4005,13 +4005,13 @@ def vista_ventanas():
                     "Cierre",
                     value=datetime.strptime(v["hora_cierre"], "%H:%M").time(),
                     key="ci_" + str(v['id']))
-                pwd = st.text_input("Contrasena de Admin o Direccion",
+                pwd = st.text_input("contraseña de Admin o Direccion",
                                     type="password", key="pwd_vent_" + str(v['id']))
                 if st.button("Guardar", type="primary", key="btn_vent_" + str(v['id'])):
                     if not pwd:
-                        st.error("Ingresa la contrasena.")
+                        st.error("Ingresa la contraseña.")
                     elif not verificar_password_critica(pwd):
-                        st.error("Contrasena incorrecta.")
+                        st.error("contraseña incorrecta.")
                     else:
                         ap = ap_t.strftime("%H:%M")
                         lim = lim_t.strftime("%H:%M")
@@ -4077,7 +4077,7 @@ def vista_usuarios():
         c1, c2 = st.columns(2)
         with c1:
             u = st.text_input("Usuario", key="crear_u_usuario")
-            p = st.text_input("Contrasena", type="password", key="crear_u_pass")
+            p = st.text_input("contraseña", type="password", key="crear_u_pass")
         with c2:
             n = st.text_input("Nombres", key="crear_u_nombres")
             roles_disp = (["Admin", "Direccion", "Auxiliar"] if soy_principal
@@ -4088,19 +4088,19 @@ def vista_usuarios():
             t_lbl = st.selectbox("Turno", [x["nombre"] for x in listar_turnos()],
                                   key="crear_u_turno")
             idt = next((x["id"] for x in listar_turnos() if x["nombre"] == t_lbl), None)
-        pwd_crit = st.text_input("Contrasena de Admin o Direccion", type="password",
+        pwd_crit = st.text_input("contraseña de Admin o Direccion", type="password",
                                   key="crear_u_pwd_crit")
         if st.button("Crear usuario", type="primary", key="crear_u_btn"):
             if not u or not p or not n:
-                st.error("Completa usuario, contrasena y nombres.")
+                st.error("Completa usuario, contraseña y nombres.")
             elif len(p) < 6:
                 st.error("Minimo 6 caracteres.")
             elif r == "Auxiliar" and not idt:
                 st.error("Selecciona un turno.")
             elif not pwd_crit:
-                st.error("Ingresa la contrasena critica.")
+                st.error("Ingresa la contraseña critica.")
             elif not verificar_password_critica(pwd_crit):
-                st.error("Contrasena incorrecta.")
+                st.error("contraseña incorrecta.")
             else:
                 u_norm = u.strip().lower()
                 with cursor() as (con, cur):
@@ -4156,20 +4156,20 @@ def vista_usuarios():
                 with st.form("edit_u"):
                     u = st.text_input("Usuario", value=datos["usuario"])
                     n = st.text_input("Nombres", value=datos["nombres"])
-                    p = st.text_input("Nueva contrasena (opcional)", type="password")
+                    p = st.text_input("Nueva contraseña (opcional)", type="password")
                     roles_edit = (["Admin", "Direccion", "Auxiliar"] if soy_principal
                                   else ["Direccion", "Auxiliar"])
                     idx_rol = (roles_edit.index(datos["rol"])
                                if datos["rol"] in roles_edit else 0)
                     r = st.selectbox("Rol", roles_edit, index=idx_rol)
                     act = st.checkbox("Activo", value=bool(datos["activo"]))
-                    pwd_crit = st.text_input("Contrasena de Admin o Direccion",
+                    pwd_crit = st.text_input("contraseña de Admin o Direccion",
                                               type="password")
                     if st.form_submit_button("Guardar", type="primary"):
                         if not pwd_crit:
-                            st.error("Ingresa la contrasena.")
+                            st.error("Ingresa la contraseña.")
                         elif not verificar_password_critica(pwd_crit):
-                            st.error("Contrasena incorrecta.")
+                            st.error("contraseña incorrecta.")
                         else:
                             u_norm = u.strip().lower()
                             with cursor() as (con, cur):
@@ -4344,7 +4344,7 @@ def vista_auditoria():
             with c1: nom = st.text_input("Nombre (ej: 2026)")
             with c2: fi = st.date_input("Inicio", ahora().date())
             with c3: ff = st.date_input("Fin", ahora().date() + timedelta(days=270))
-            pwd_crit = st.text_input("Contrasena de Admin o Direccion",
+            pwd_crit = st.text_input("contraseña de Admin o Direccion",
                                       type="password")
             if st.form_submit_button("Crear y activar", type="primary"):
                 if not nom.strip():
@@ -4352,9 +4352,9 @@ def vista_auditoria():
                 elif (ff - fi).days < 30:
                     st.error("El periodo debe durar minimo 1 mes.")
                 elif not pwd_crit:
-                    st.error("Ingresa la contrasena.")
+                    st.error("Ingresa la contraseña.")
                 elif not verificar_password_critica(pwd_crit):
-                    st.error("Contrasena incorrecta.")
+                    st.error("contraseña incorrecta.")
                 else:
                     ok, msg = crear_periodo(nom.strip(), fi.strftime("%Y-%m-%d"),
                                              ff.strftime("%Y-%m-%d"), usuario)
@@ -4413,7 +4413,7 @@ def vista_auditoria():
                 st.session_state["_reporte_descargado"] = True
                 st.toast("Reporte generado.")
         st.markdown("---")
-        st.markdown("Paso 2: Cerrar periodo (requiere contrasena)")
+        st.markdown("Paso 2: Cerrar periodo (requiere contraseña)")
         desc = st.session_state.get("_reporte_descargado", False)
         if not desc:
             st.info("Debes descargar el reporte anual antes.")
@@ -4422,7 +4422,7 @@ def vista_auditoria():
             with c1: nn = st.text_input("Nombre nuevo periodo", value=str(ahora().year + 1))
             with c2: fi = st.date_input("Inicio nuevo", date(ahora().year + 1, 3, 1))
             with c3: ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
-            pwd = st.text_input("Contrasena de Admin o Direccion", type="password")
+            pwd = st.text_input("contraseña de Admin o Direccion", type="password")
             conf = st.text_input("Escribe CERRAR para confirmar")
             sub = st.form_submit_button("Cerrar AÑO escolar", type="primary")
         if sub:
@@ -4431,9 +4431,9 @@ def vista_auditoria():
             elif conf.strip() != "CERRAR":
                 st.error("Debes escribir exactamente CERRAR.")
             elif not pwd:
-                st.error("Ingresa la contrasena.")
+                st.error("Ingresa la contraseña.")
             elif not verificar_password_critica(pwd):
-                st.error("Contrasena incorrecta.")
+                st.error("contraseña incorrecta.")
             else:
                 ok, msg = cerrar_AÑO_escolar(usuario, p["id"], nn,
                                               fi.strftime("%Y-%m-%d"),
@@ -4519,7 +4519,7 @@ def vista_dias_especiales():
                                     selecciones_secciones.append(s["id"])
 
         st.session_state["_dia_keys_actuales"] = keys_actuales
-        pwd_crear = st.text_input("Contrasena de Admin o Direccion",
+        pwd_crear = st.text_input("contraseña de Admin o Direccion",
                                    type="password", key="dia_pwd")
 
         if st.button("Crear evento", type="primary", key="dia_btn_crear"):
@@ -4529,9 +4529,9 @@ def vista_dias_especiales():
                     and not selecciones_secciones:
                 st.error("Selecciona al menos una seccion.")
             elif not pwd_crear:
-                st.error("Ingresa la contrasena.")
+                st.error("Ingresa la contraseña.")
             elif not verificar_password_critica(pwd_crear):
-                st.error("Contrasena incorrecta.")
+                st.error("contraseña incorrecta.")
             else:
                 selecciones_secciones = list(set(selecciones_secciones))
                 idt = turnos_opts.get(t_lbl) if tipo == "Evento" else None
