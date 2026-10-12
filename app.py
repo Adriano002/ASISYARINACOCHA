@@ -5321,6 +5321,14 @@ def _frag_permisos(usuario):
 
 
 # ─── MENU Y RUTAS ─────────────────────────────────────────────────────────
+def vista_justificaciones_permisos():
+    st.title("Justificaciones y Permisos")
+    usuario = st.session_state["user"]
+    tabs = st.tabs(["Justificacion previa", "Permisos"])
+    with tabs[0]:
+        _frag_justificacion_previa(usuario)
+    with tabs[1]:
+        _frag_permisos(usuario)
 
 def vista_backup():
     st.title("Backup de base de datos")
