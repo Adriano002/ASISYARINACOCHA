@@ -2382,11 +2382,11 @@ def aplicar_estilos():
     st.markdown("""
     <style>
     :root{
-        --naranja:#F4A261;
-        --naranja-osc:#E08A4A;
-        --naranja-suave:rgba(244,162,97,.12);
-        --naranja-borde:rgba(244,162,97,.45);
-        --sombra:0 2px 8px rgba(0,0,0,.06);
+        --naranja:#E65100;
+        --naranja-osc:#BF360C;
+        --naranja-suave:rgba(230,81,0,.08);
+        --naranja-borde:rgba(230,81,0,.35);
+        --sombra:0 2px 8px rgba(0,0,0,.08);
         --radius:12px;
         --radius-sm:8px;
     }
@@ -2394,8 +2394,8 @@ def aplicar_estilos():
         font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif!important;
     }
     h1,h2,h3{font-weight:800!important;}
-    h1{font-size:2rem!important;color:#E08A4A!important;-webkit-text-fill-color:#E08A4A!important;}
-    h2{font-size:1.5rem!important;color:#E08A4A!important;}
+    h1{font-size:2rem!important;color:#E65100!important;-webkit-text-fill-color:#E65100!important;}
+    h2{font-size:1.5rem!important;color:#E65100!important;}
     section[data-testid="stSidebar"]{border-right:1px solid var(--naranja-borde);}
     section[data-testid="stSidebar"] .stRadio label{
         border-radius:var(--radius-sm)!important;
@@ -2408,7 +2408,7 @@ def aplicar_estilos():
     }
     section[data-testid="stSidebar"] .stRadio label:hover{
         background:var(--naranja-suave)!important;
-        border-left-color:var(--naranja);
+        border-left-color:#FF9800;
     }
     section[data-testid="stSidebar"] .stRadio input{display:none;}
     @media (max-width:768px){
@@ -2416,7 +2416,7 @@ def aplicar_estilos():
         div[data-testid="stSidebarOverlay"]{background-color:rgba(0,0,0,.4)!important;}
     }
     .encabezado-sidebar{
-        background:var(--naranja);
+        background:#E65100;
         padding:20px 16px;
         margin:8px 10px 18px 10px;
         border-radius:var(--radius);
@@ -2426,7 +2426,7 @@ def aplicar_estilos():
     }
     .encabezado-sidebar .avatar{
         width:58px;height:58px;border-radius:50%;
-        background:rgba(255,255,255,.28);
+        background:rgba(255,255,255,.25);
         display:flex;align-items:center;justify-content:center;
         font-size:24px;font-weight:800;color:#FFF;
         margin:0 auto 10px auto;
@@ -2435,7 +2435,7 @@ def aplicar_estilos():
     .encabezado-sidebar .nombre{font-size:15px;font-weight:700;color:#FFF!important;}
     .encabezado-sidebar .rol{
         display:inline-block;margin-top:8px;padding:4px 12px;
-        background:rgba(255,255,255,.28);border-radius:20px;
+        background:rgba(255,255,255,.25);border-radius:20px;
         font-size:10px;font-weight:800;text-transform:uppercase;
         letter-spacing:.10em;color:#FFF!important;
     }
@@ -2446,18 +2446,18 @@ def aplicar_estilos():
         border:2px solid rgba(128,128,128,.15)!important;
     }
     .stButton>button,.stFormSubmitButton>button,.stDownloadButton>button{
-        background:var(--naranja)!important;
+        background:#E65100!important;
         color:#FFF!important;
         border-radius:var(--radius-sm)!important;
         font-weight:700!important;
         border:none!important;
         padding:12px 22px!important;
-        box-shadow:var(--sombra);
+        box-shadow:0 2px 8px rgba(230,81,0,.25);
         font-size:14px!important;
         min-height:46px;
     }
     .stButton>button:hover,.stFormSubmitButton>button:hover,.stDownloadButton>button:hover{
-        background:var(--naranja-osc)!important;
+        background:#BF360C!important;
         transform:translateY(-1px);
     }
     div[data-testid="stMetric"]{
@@ -2471,13 +2471,13 @@ def aplicar_estilos():
         text-transform:uppercase;letter-spacing:.08em!important;
     }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
-        font-size:30px!important;font-weight:800!important;color:#E08A4A!important;
+        font-size:30px!important;font-weight:800!important;color:#E65100!important;
     }
     .stTabs [data-baseweb="tab-list"]{gap:4px;border-bottom:2px solid var(--naranja-borde);}
     .stTabs [data-baseweb="tab"]{font-weight:600!important;padding:12px 18px!important;font-size:13px!important;}
     .stTabs [aria-selected="true"]{
-        font-weight:800!important;color:#E08A4A!important;
-        border-bottom:3px solid var(--naranja)!important;
+        font-weight:800!important;color:#E65100!important;
+        border-bottom:3px solid #E65100!important;
     }
     .streamlit-expanderHeader,details summary{
         border:1px solid var(--naranja-borde)!important;
@@ -2485,7 +2485,7 @@ def aplicar_estilos():
         font-weight:600!important;padding:14px 16px!important;
     }
     .scan-header{
-        background:var(--naranja);
+        background:#E65100;
         padding:24px 28px;
         border-radius:var(--radius);
         margin-bottom:20px;
@@ -2497,7 +2497,7 @@ def aplicar_estilos():
     .scan-ultimos{
         font-size:11px;font-weight:800;text-transform:uppercase;
         letter-spacing:.12em;margin:24px 0 12px 0;padding-bottom:8px;
-        border-bottom:2px solid var(--naranja-borde);color:#E08A4A;
+        border-bottom:2px solid var(--naranja-borde);color:#E65100;
     }
     .qr-msg{
         padding:14px 18px;border-radius:var(--radius-sm);margin:8px 0;
@@ -2507,27 +2507,27 @@ def aplicar_estilos():
     .qr-nombre{font-size:15px;font-weight:800;margin-bottom:4px;}
     .qr-evento{
         font-size:11px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.10em;margin-bottom:5px;color:#E08A4A;
+        letter-spacing:.10em;margin-bottom:5px;color:#E65100;
         display:inline-block;padding:2px 8px;
-        background:rgba(244,162,97,.18);border-radius:6px;
+        background:rgba(230,81,0,.12);border-radius:6px;
     }
     .qr-texto{font-size:14px;font-weight:500;line-height:1.4;}
     .qr-puntual{border-left-color:#22C55E;background:rgba(34,197,94,.06);}
     .qr-tardanza{border-left-color:#F59E0B;background:rgba(245,158,11,.06);}
-    .qr-derivado{border-left-color:#FB923C;background:rgba(251,146,60,.08);}
-    .qr-retenido{border-left-color:#FB7185;font-weight:700;background:rgba(251,113,133,.08);}
+    .qr-derivado{border-left-color:#FF9800;background:rgba(255,152,0,.08);}
+    .qr-retenido{border-left-color:#FF7043;font-weight:700;background:rgba(255,112,67,.08);}
     .qr-refuerzo{border-left-color:#42A5F5;background:rgba(66,165,245,.06);}
-    .qr-bloqueado{border-left-color:#EF4444;border:2px solid #EF4444;font-weight:800;background:rgba(239,68,68,.08);}
+    .qr-bloqueado{border-left-color:#EF4444;border:2px solid #EF4444;font-weight:800;background:rgba(239,68,68,.10);}
     .qr-error{border-left-color:#888888;}
     .perfil-hero{
-        background:var(--naranja);
+        background:#E65100;
         border-radius:14px;padding:26px 28px;margin-bottom:20px;
         color:#FFF;box-shadow:var(--sombra);
         display:flex;align-items:center;gap:22px;flex-wrap:wrap;
     }
     .perfil-hero .hero-avatar{
         width:84px;height:84px;border-radius:50%;
-        background:rgba(255,255,255,.28);
+        background:rgba(255,255,255,.22);
         border:3px solid rgba(255,255,255,.55);
         display:flex;align-items:center;justify-content:center;
         font-size:34px;font-weight:800;color:#FFF;flex-shrink:0;
@@ -2538,7 +2538,7 @@ def aplicar_estilos():
     .perfil-hero .hero-badge{
         display:inline-block;padding:5px 14px;border-radius:20px;
         font-size:10.5px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.12em;background:rgba(255,255,255,.28);color:#FFF;
+        letter-spacing:.12em;background:rgba(255,255,255,.25);color:#FFF;
         margin-top:10px;border:1px solid rgba(255,255,255,.4);
     }
     .perfil-bloque{
@@ -2548,7 +2548,7 @@ def aplicar_estilos():
     }
     .perfil-bloque .titulo-seccion{
         font-size:11px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.12em;color:#E08A4A;margin-bottom:14px;
+        letter-spacing:.12em;color:#E65100;margin-bottom:14px;
         padding-bottom:8px;border-bottom:1px solid var(--naranja-borde);
     }
     .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;}
@@ -2557,7 +2557,7 @@ def aplicar_estilos():
         border:1px solid var(--naranja-borde);
         border-radius:10px;padding:16px 12px;text-align:center;
     }
-    .kpi-card .kpi-num{font-size:28px;font-weight:800;color:#E08A4A;line-height:1;margin-bottom:6px;}
+    .kpi-card .kpi-num{font-size:28px;font-weight:800;color:#E65100;line-height:1;margin-bottom:6px;}
     .kpi-card .kpi-lbl{
         font-size:10px;font-weight:700;text-transform:uppercase;
         letter-spacing:.08em;color:rgba(128,128,128,.9);line-height:1.3;
@@ -2571,7 +2571,7 @@ def aplicar_estilos():
     .info-linea .info-valor{font-weight:600;}
     .btn-sel .stButton>button{background:#43A047!important;color:#FFF!important;}
     .puerta-header{
-        background:var(--naranja);
+        background:#E65100;
         padding:26px 32px;border-radius:var(--radius);
         color:white;margin-bottom:24px;box-shadow:var(--sombra);
     }
