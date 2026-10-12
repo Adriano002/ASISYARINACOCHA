@@ -1534,8 +1534,15 @@ def _procesar_escaneo(dni):
     if not u:
         return
     ok, tipo, msg, extra = registrar_entrada(dni, u, origen="qr")
-    if not ok and tipo == "ERROR":
-        sonido = "duplicado" if ("ya registro" in msg or "ya tiene" in msg) else "error"
+
+    # Detectar duplicado real (ya registró hoy)
+    es_duplicado = (not ok and tipo == "ERROR" and
+                    ("ya registro" in msg or "ya tiene" in msg))
+
+    if es_duplicado:
+        sonido = "duplicado"
+    elif not ok and tipo == "ERROR":
+        sonido = "error"
     elif tipo == "BLOQUEADO":
         sonido = "bloqueado"
     elif ok and tipo == "TARDANZA":
@@ -1544,6 +1551,7 @@ def _procesar_escaneo(dni):
         sonido = "puntual"
     else:
         sonido = "error"
+
     st.session_state.setdefault("_qr_mensajes", [])
     st.session_state["_qr_mensajes"].insert(0, {
         "dni": dni, "tipo": tipo, "mensaje": msg, "extra": extra, "ts": time.time()})
@@ -1552,6 +1560,8 @@ def _procesar_escaneo(dni):
     st.session_state["_qr_sonido_contador"] = contador
     st.session_state["_qr_sonido_pendiente"] = {
         "kind": sonido, "nonce": contador, "ts": time.time()}
+
+
 def escaner_qr_continuo(key="qr_scanner"):
     st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
                 '<div class="scan-sub">Apunta al codigo del alumno</div></div>',
@@ -1563,10 +1573,10 @@ def escaner_qr_continuo(key="qr_scanner"):
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
-        if not (ult.get("dni") == dni and (time.time() - ult.get("ts", 0)) < 0.5):
+        if not (ult.get("dni") == dni and (time.time() - ult.get("ts", 0)) < 5.0):
             st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
-          #sonidos
+            # sonidos
             sp = st.session_state.get("_qr_sonido_pendiente") or {}
             kind = sp.get("kind", "")
             if kind:
@@ -1613,7 +1623,7 @@ def _render_mensaje_qr(msg):
     ev = extra.get("evento_nombre")
     clase = {"PUNTUAL": "qr-puntual", "TARDANZA": "qr-tardanza",
              "REFORZAMIENTO": "qr-refuerzo", "BLOQUEADO": "qr-bloqueado",
-             "ERROR": "qr-error"}.get(tipo, "qr-error")
+             "INFO": "qr-info", "ERROR": "qr-error"}.get(tipo, "qr-error")
     if tipo == "TARDANZA":
         acc = extra.get("accion")
         if acc == ACC_DERIVADO:
@@ -1630,8 +1640,6 @@ def _render_mensaje_qr(msg):
         html += f'<div class="qr-nombre">{nombre}</div>'
     html += f'<div class="qr-texto">{mensaje}</div></div>'
     st.markdown(html, unsafe_allow_html=True)
-
-
 # reportes
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
