@@ -1975,7 +1975,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(Paragraph(f"<b>{titulo_bloque}</b>", est["Heading4"]))
             el.append(Spacer(1, 4))
             if df is None or df.empty:
-                el.append(Paragraph("(Sin datos)", est["Normal"]))
+                el.append(Paragraph("Sin faltas registradas.", est["Normal"]))
                 el.append(Spacer(1, 10))
                 continue
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
@@ -2033,7 +2033,6 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             t.setStyle(TableStyle(estilos))
             el.append(t); el.append(Spacer(1, 12))
     doc.build(el); buf.seek(0); return buf.getvalue()
-
 
 def generar_qr(dni):
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
@@ -3081,6 +3080,7 @@ def _hoja_faltaron_dia(fecha, ids_secs):
             sec = cur.fetchone()
         if not sec:
             continue
+
         df_injust = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
                    a.nombres AS Nombres, ast.hora AS Hora
@@ -3089,6 +3089,7 @@ def _hoja_faltaron_dia(fecha, ids_secs):
               AND ast.tipo='clases' AND ast.estado='Falta' AND ast.justificada=0
             ORDER BY a.apellido_paterno, a.apellido_materno
         """, (idsec, to_date(fecha)))
+
         df_just = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
                    a.nombres AS Nombres, ast.hora AS Hora,
@@ -3098,16 +3099,33 @@ def _hoja_faltaron_dia(fecha, ids_secs):
               AND ast.tipo='clases' AND ast.estado='Falta' AND ast.justificada=1
             ORDER BY a.apellido_paterno, a.apellido_materno
         """, (idsec, to_date(fecha)))
+
+        # ── Bloque: FALTAS INJUSTIFICADAS (siempre) ──
         if not df_injust.empty:
             df_injust.insert(0, "N", range(1, len(df_injust) + 1))
             bloques.append(
                 (f"{sec['grado']} {sec['seccion']} - {sec['turno']} | FALTAS INJUSTIFICADAS",
                  df_injust))
+        else:
+            bloques.append(
+                (f"{sec['grado']} {sec['seccion']} - {sec['turno']} | FALTAS INJUSTIFICADAS",
+                 pd.DataFrame({"N": [], "Apellidos": [], "Nombres": [], "Hora": []})))
+
+        # ── Bloque: FALTAS JUSTIFICADAS (siempre) ──
         if not df_just.empty:
             df_just.insert(0, "N", range(1, len(df_just) + 1))
             bloques.append(
                 (f"{sec['grado']} {sec['seccion']} - {sec['turno']} | FALTAS JUSTIFICADAS",
                  df_just))
+        else:
+            bloques.append(
+                (f"{sec['grado']} {sec['seccion']} - {sec['turno']} | FALTAS JUSTIFICADAS",
+                 pd.DataFrame({"N": [], "Apellidos": [], "Nombres": [], "Hora": [],
+                               "Observacion": []})))
+
+    if not bloques:
+        bloques.append(
+            ("Sin secciones asignadas", pd.DataFrame({"Mensaje": []})))
     return bloques
 
 def _generar_hojas_diario(fecha, ids_secs):
@@ -3159,8 +3177,7 @@ def _generar_hojas_diario(fecha, ids_secs):
         ]
 
     bloques_faltaron = _hoja_faltaron_dia(fecha, ids_secs)
-    if bloques_faltaron:
-        hojas = {"ALUMNOS QUE FALTARON": bloques_faltaron, **hojas}
+    hojas = {"ALUMNOS QUE FALTARON": bloques_faltaron, **hojas}
     return hojas
 def _generar_hojas_mensual(mes, AÑO, ids_secs):
     hojas = {}
