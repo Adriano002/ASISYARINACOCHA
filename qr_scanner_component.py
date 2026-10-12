@@ -84,8 +84,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         let iniciado = false;
         let pausado = false;
 
-        // ═══ EDGE DETECTION (mismo DNI no re-emitir antes de 0.8s) ═══
-        const COOLDOWN_MS = 800;
+        // ═══ EDGE DETECTION (mismo DNI no re-emitir antes de 5s) ═══
+        const COOLDOWN_MS = 5000;
         let ultimoDniEmitido = null;
         let ultimoTimestampEmision = 0;
 
