@@ -73,6 +73,20 @@ def timestamp_str():
 def es_fin_de_semana(fecha=None):
     return (fecha or ahora().date()).weekday() >= 5
 
+def _safe_df(fn, default_cols=None):
+    """
+    Ejecuta una funcion que devuelve un DataFrame.
+    Si falla, devuelve un DataFrame vacio con las columnas indicadas.
+    Evita que un error en una query rompa todo el perfil.
+    """
+    try:
+        df = fn()
+        if df is None:
+            return pd.DataFrame(columns=default_cols or [])
+        return df
+    except Exception as e:
+        log.warning("_safe_df: query fallo -> %s", e)
+        return pd.DataFrame(columns=default_cols or [])
 def hashear_password(password):
     salt = secrets.token_bytes(16)
     d = hashlib.pbkdf2_hmac(PBK_ALG, password.encode("utf-8"), salt, PBK_ITER)
