@@ -655,7 +655,7 @@ def validar_importacion(df, mapeo):
                 errs.append({"fila": nf, "motivo": "Faltan campos"}); continue
             if gr not in grados_set:
                 errs.append({"fila": nf, "motivo": f"Grado '{gr}' no existe"}); continue
-            if tur in ("mañana", "manana", "m", "am", "mñ"):
+            if tur in ("mañana", "mañana", "m", "am", "mñ"):
                 tn = "Mañana"
             elif tur in ("tarde", "t", "tm", "pm"):
                 tn = "Tarde"
@@ -893,7 +893,7 @@ def _puede_justificar(fecha_objetivo_str, tipo_asistencia=None, ventana_id=None)
     if diff > 0:
         return False, "Ya paso la ventana."
     if diff < -2:
-        return False, "Solo se puede justificar hasta pasado manana."
+        return False, "Solo se puede justificar hasta pasado mañana."
     if diff == 0 and ventana_id is not None:
         with cursor() as (con, cur):
             cur.execute("SELECT hora_apertura,hora_cierre FROM ventanas WHERE id=?",
@@ -938,9 +938,9 @@ def crear_permiso(idal, fi, ff, motivo, usuario):
     except (ValueError, TypeError):
         return False, "Fechas invalidas."
     hoy = ahora().date()
-    manana = hoy + timedelta(days=1)
-    if fi_d < manana:
-        return False, "El permiso solo puede empezar desde manana en adelante."
+    mañana = hoy + timedelta(days=1)
+    if fi_d < mañana:
+        return False, "El permiso solo puede empezar desde mañana en adelante."
     if ff_d < fi_d:
         return False, "La fecha fin no puede ser anterior a la fecha inicio."
     dias = (ff_d - fi_d).days + 1
@@ -1761,7 +1761,7 @@ def reporte_detallado_por_mes(pid):
     return res
 
 
-def cerrar_anio_escolar(usuario, pid, nuevo_nombre, fi, ff):
+def cerrar_año_escolar(usuario, pid, nuevo_nombre, fi, ff):
     """Renombrado sin Ñ (fix problema 27)."""
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE id=?", (pid,))
@@ -2090,7 +2090,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     ap_m = (alumno['apellido_materno'] or "").upper()
     nombres = alumno['nombres'].upper(); dni = alumno["dni"]
     grado = alumno['grado'].upper(); seccion = alumno['seccion'].upper()
-    turno = alumno['turno'].upper(); ANIO = str(datetime.now().year)
+    turno = alumno['turno'].upper(); año = str(datetime.now().year)
     info_x = DER_X; QR_SIZE = 215; qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
@@ -2127,7 +2127,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "AÑO:", ANIO)
+    _linea(y2 + 4 * alto_linea, "AÑO:", año)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(str(alumno["dni"]).strip()); qr.make(fit=True)
@@ -3065,11 +3065,11 @@ def _generar_hojas_diario(fecha, ids_secs):
     return hojas
 
 
-def _generar_hojas_mensual(mes, anio, ids_secs):
+def _generar_hojas_mensual(mes, año, ids_secs):
     """FIX punto 10: 1 sola query para dias especiales del mes."""
     hojas = {}
-    ult = monthrange(anio, mes)[1]
-    ini = date(anio, mes, 1); fin = date(anio, mes, ult)
+    ult = monthrange(año, mes)[1]
+    ini = date(año, mes, 1); fin = date(año, mes, ult)
 
     # Pre-cargar dias especiales del mes (1 query)
     dias_especiales_mes = set()
@@ -3096,7 +3096,7 @@ def _generar_hojas_mensual(mes, anio, ids_secs):
 
         dias = []
         for d in range(1, ult + 1):
-            f = date(anio, mes, d)
+            f = date(año, mes, d)
             if f.weekday() >= 5 and f not in dias_especiales_mes:
                 continue
             dias.append(f)
@@ -4476,7 +4476,7 @@ def _frag_importar_excel():
 def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
-    tabs = st.tabs(["Registros", "Periodos", "Cierre de anio"])
+    tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
@@ -4536,7 +4536,7 @@ def vista_auditoria():
                 else:
                     st.error(msg)
     with tabs[2]:
-        st.subheader("Cierre de anio escolar")
+        st.subheader("Cierre de año escolar")
         st.warning("Al cerrar el periodo se desactivan TODOS los alumnos.")
         p = obtener_periodo_activo()
         if not p:
@@ -4564,14 +4564,14 @@ def vista_auditoria():
         desc = st.session_state.get("_reporte_descargado", False)
         if not desc:
             st.info("Debes descargar el reporte anual antes.")
-        with st.form("cerrar_anio"):
+        with st.form("cerrar_año"):
             c1, c2, c3 = st.columns(3)
             with c1: nn = st.text_input("Nombre nuevo periodo", value=str(ahora().year + 1))
             with c2: fi = st.date_input("Inicio nuevo", date(ahora().year + 1, 3, 1))
             with c3: ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
             pwd = st.text_input("contraseña de Admin o Direccion", type="password")
             conf = st.text_input("Escribe CERRAR para confirmar")
-            sub = st.form_submit_button("Cerrar anio escolar", type="primary")
+            sub = st.form_submit_button("Cerrar año escolar", type="primary")
         if sub:
             if not desc:
                 st.error("Primero debes descargar el reporte anual.")
@@ -4582,7 +4582,7 @@ def vista_auditoria():
             elif not verificar_password_critica(pwd):
                 st.error("contraseña incorrecta.")
             else:
-                ok, msg = cerrar_anio_escolar(usuario, p["id"], nn,
+                ok, msg = cerrar_año_escolar(usuario, p["id"], nn,
                                               fi.strftime("%Y-%m-%d"),
                                               ff.strftime("%Y-%m-%d"))
                 if ok:
@@ -4847,7 +4847,7 @@ def _selector_alumno_lista(clave, idsec, on_click_key):
 # ═══════════════════════════════════════════════════════════════════════════
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
-    st.caption("Solo aplica a FALTAS. Solo hoy, manana o pasado manana.")
+    st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
 
     # ─── FIX: "Historial global" PRIMERO para que el Admin lo vea de una ───
     tabs = st.tabs(["Historial global", "Registrar"])
@@ -4978,7 +4978,7 @@ def _render_historial_global_jp(usuario):
     hoy_s = hoy_str()
     pasado_s = (ahora().date() + timedelta(days=2)).strftime("%Y-%m-%d")
 
-    st.markdown("**Justificaciones previas de HOY / MANANA / PASADO MANANA**")
+    st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
     try:
         df_vig = leer_df("""
             SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
@@ -5001,7 +5001,7 @@ def _render_historial_global_jp(usuario):
         df_vig = pd.DataFrame()
 
     if df_vig.empty:
-        st.info("Sin justificaciones previas para hoy, manana o pasado manana.")
+        st.info("Sin justificaciones previas para hoy, mañana o pasado mañana.")
     else:
         st.dataframe(df_vig, width='stretch', hide_index=True)
 
@@ -5108,7 +5108,7 @@ def _render_historial_global_jp(usuario):
 # ═══════════════════════════════════════════════════════════════════════════
 def _frag_permisos(usuario):
     st.subheader("Permisos de inasistencia")
-    st.caption("Permisos para dias FUTUROS (desde manana, maximo "
+    st.caption("Permisos para dias FUTUROS (desde mañana, maximo "
                f"{MAX_DIAS_PERMISO} dias).")
 
     # ─── FIX: "Historial global" PRIMERO para que el Admin lo vea de una ───
@@ -5162,15 +5162,15 @@ def _render_registrar_perm(usuario):
 
     st.markdown("---")
     st.markdown("**Registrar nuevo permiso**")
-    manana = ahora().date() + timedelta(days=1)
+    mañana = ahora().date() + timedelta(days=1)
     with st.form("form_permiso"):
         c1, c2 = st.columns(2)
         with c1:
-            fi = st.date_input("Fecha inicio", value=manana,
-                                min_value=manana, key="perm_fi")
+            fi = st.date_input("Fecha inicio", value=mañana,
+                                min_value=mañana, key="perm_fi")
         with c2:
-            ff = st.date_input("Fecha fin", value=manana,
-                                min_value=manana, key="perm_ff")
+            ff = st.date_input("Fecha fin", value=mañana,
+                                min_value=mañana, key="perm_ff")
         motivo = st.text_area("Motivo (obligatorio)", key="perm_motivo",
                                placeholder="Ej: Viaje familiar")
         sub = st.form_submit_button("Registrar permiso", type="primary")
