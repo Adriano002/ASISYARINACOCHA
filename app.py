@@ -2967,9 +2967,8 @@ def vista_panel_direccion():
 # ─── REPORTES (HELPERS + UI) ───────────────────────────────────────────────
 def _hoja_faltaron_dia(fecha, ids_secs):
     """
-    Por cada seccion: un bloque con dos columnas lado a lado.
-    Izquierda: FALTAS JUSTIFICADAS  (Apellidos y Nombres)
-    Derecha:   FALTAS INJUSTIFICADAS (Apellidos y Nombres)
+    Por cada seccion: una tabla con DOS columnas:
+    izquierda JUSTIFICADAS, derecha INJUSTIFICADAS.
     """
     bloques = []
     for idsec in ids_secs:
@@ -3004,20 +3003,16 @@ def _hoja_faltaron_dia(fecha, ids_secs):
 
         for i in range(n_max):
             fila = {}
-            if i < len(df_just):
-                fila["JUSTIFICADAS"] = df_just.iloc[i]["Alumno"]
-            else:
-                fila["JUSTIFICADAS"] = ""
-            if i < len(df_injust):
-                fila["INJUSTIFICADAS"] = df_injust.iloc[i]["Alumno"]
-            else:
-                fila["INJUSTIFICADAS"] = ""
+            fila["Apellidos (JUST)"] = (df_just.iloc[i]["Alumno"]
+                                        if i < len(df_just) else "")
+            fila["Apellidos (INJUST)"] = (df_injust.iloc[i]["Alumno"]
+                                          if i < len(df_injust) else "")
             filas.append(fila)
 
         if filas:
             df_lado = pd.DataFrame(filas)
         else:
-            df_lado = pd.DataFrame(columns=["JUSTIFICADAS", "INJUSTIFICADAS"])
+            df_lado = pd.DataFrame(columns=["Apellidos (JUST)", "Apellidos (INJUST)"])
 
         titulo_bloque = (
             f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}   "
