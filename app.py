@@ -2967,9 +2967,9 @@ def vista_panel_direccion():
 # ─── REPORTES (HELPERS + UI) ───────────────────────────────────────────────
 def _hoja_faltaron_dia(fecha, ids_secs):
     """
-    Por cada seccion: un bloque con dos mitades lado a lado.
-    Izquierda: FALTAS JUSTIFICADAS
-    Derecha:   FALTAS INJUSTIFICADAS
+    Por cada seccion: un bloque con dos columnas lado a lado.
+    Izquierda: FALTAS JUSTIFICADAS  (Apellidos y Nombres)
+    Derecha:   FALTAS INJUSTIFICADAS (Apellidos y Nombres)
     """
     bloques = []
     for idsec in ids_secs:
@@ -2983,11 +2983,8 @@ def _hoja_faltaron_dia(fecha, ids_secs):
         if not sec:
             continue
 
-        grado_secc = f"{sec['grado']} {sec['seccion']}"
-
         df_just = leer_df("""
-            SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
-                   a.nombres AS Nombres, COALESCE(ast.hora,'') AS Hora
+            SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno
             FROM alumnos a JOIN asistencias ast ON ast.alumno_id=a.id
             WHERE a.seccion_id=? AND a.activo=1 AND ast.fecha=?
               AND ast.tipo='clases' AND ast.estado='Falta' AND ast.justificada=1
@@ -2995,68 +2992,32 @@ def _hoja_faltaron_dia(fecha, ids_secs):
         """, (idsec, to_date(fecha)))
 
         df_injust = leer_df("""
-            SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
-                   a.nombres AS Nombres, COALESCE(ast.hora,'') AS Hora
+            SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno
             FROM alumnos a JOIN asistencias ast ON ast.alumno_id=a.id
             WHERE a.seccion_id=? AND a.activo=1 AND ast.fecha=?
               AND ast.tipo='clases' AND ast.estado='Falta' AND ast.justificada=0
             ORDER BY a.apellido_paterno, a.apellido_materno
         """, (idsec, to_date(fecha)))
 
-        # Armar tabla lado a lado
         filas = []
         n_max = max(len(df_just), len(df_injust))
 
         for i in range(n_max):
             fila = {}
             if i < len(df_just):
-                r = df_just.iloc[i]
-                fila["J_N"] = i + 1
-                fila["J_Grado"] = grado_secc
-                fila["J_Apellidos"] = r["Apellidos"]
-                fila["J_Nombres"] = r["Nombres"]
-                fila["J_Hora"] = r["Hora"]
+                fila["JUSTIFICADAS"] = df_just.iloc[i]["Alumno"]
             else:
-                fila["J_N"] = ""
-                fila["J_Grado"] = ""
-                fila["J_Apellidos"] = ""
-                fila["J_Nombres"] = ""
-                fila["J_Hora"] = ""
-
+                fila["JUSTIFICADAS"] = ""
             if i < len(df_injust):
-                r = df_injust.iloc[i]
-                fila["F_N"] = i + 1
-                fila["F_Grado"] = grado_secc
-                fila["F_Apellidos"] = r["Apellidos"]
-                fila["F_Nombres"] = r["Nombres"]
-                fila["F_Hora"] = r["Hora"]
+                fila["INJUSTIFICADAS"] = df_injust.iloc[i]["Alumno"]
             else:
-                fila["F_N"] = ""
-                fila["F_Grado"] = ""
-                fila["F_Apellidos"] = ""
-                fila["F_Nombres"] = ""
-                fila["F_Hora"] = ""
-
+                fila["INJUSTIFICADAS"] = ""
             filas.append(fila)
 
         if filas:
-            df_lado = pd.DataFrame(filas).rename(columns={
-                "J_N": "N°",
-                "J_Grado": "Grado/Secc.",
-                "J_Apellidos": "Apellidos (JUST)",
-                "J_Nombres": "Nombres (JUST)",
-                "J_Hora": "Hora",
-                "F_N": "N° ",
-                "F_Grado": "Grado/Secc. ",
-                "F_Apellidos": "Apellidos (INJUST)",
-                "F_Nombres": "Nombres (INJUST)",
-                "F_Hora": "Hora ",
-            })
+            df_lado = pd.DataFrame(filas)
         else:
-            df_lado = pd.DataFrame(columns=[
-                "N°", "Grado/Secc.", "Apellidos (JUST)", "Nombres (JUST)", "Hora",
-                "N° ", "Grado/Secc. ", "Apellidos (INJUST)", "Nombres (INJUST)", "Hora ",
-            ])
+            df_lado = pd.DataFrame(columns=["JUSTIFICADAS", "INJUSTIFICADAS"])
 
         titulo_bloque = (
             f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}   "
