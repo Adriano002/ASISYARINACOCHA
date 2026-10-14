@@ -1888,7 +1888,6 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                             est["Normal"]))
         el.append(Spacer(1, 10))
 
-        # ─── SOLO la hoja "ALUMNOS QUE FALTARON" lleva formato especial ───
         es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
 
         for titulo_bloque, df in bloques:
@@ -1901,54 +1900,44 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
 
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
             at = A4[1] - 30
-            n_cols = len(df.columns)
 
             if es_hoja_faltas:
-                # ─── FORMATO ESPECIAL: dos columnas + colores ──────────
-                ac = at / n_cols
-                mitad = n_cols // 2
+                # ─── TABLA DE 4 COLUMNAS: Grado | Alumno | Grado | Alumno ───
+                # Anchura total: 30% 70% 30% 70% -> normalizar
+                # o directamente: 1.5cm | 8cm | 1.5cm | 8cm  (18 cm aprox)
+                ancho_grado = 1.6 * 28.35       # cm -> puntos
+                ancho_alumno = (at - 2 * ancho_grado) / 2
+                col_widths = [ancho_grado, ancho_alumno,
+                              ancho_grado, ancho_alumno]
 
-                t = Table(datos, colWidths=[ac] * n_cols, repeatRows=1)
+                t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
                     ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-                    ("LINEAFTER", (mitad - 1, 0), (mitad - 1, -1), 1.5, colors.black),
-                    ("BACKGROUND", (0, 0), (mitad - 1, 0), colors.HexColor("#E8F5E9")),
-                    ("BACKGROUND", (mitad, 0), (-1, 0), colors.HexColor("#FFEBEE")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    # Línea gruesa entre las mitades (entre col 1 y col 2)
+                    ("LINEAFTER", (1, 0), (1, -1), 1.5, colors.black),
+                    # Encabezados de color
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor("#E8F5E9")),
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor("#FFEBEE")),
                 ]
                 for i in range(1, len(datos)):
                     if i % 2 == 0:
-                        estilos.append(("BACKGROUND", (0, i), (mitad - 1, i),
+                        estilos.append(("BACKGROUND", (0, i), (1, i),
                                         colors.HexColor("#F1F8E9")))
-                        estilos.append(("BACKGROUND", (mitad, i), (-1, i),
+                        estilos.append(("BACKGROUND", (2, i), (3, i),
                                         colors.HexColor("#FFF3E0")))
                 t.setStyle(TableStyle(estilos))
             else:
-                # ─── FORMATO NORMAL (sin colores de fondo) ─────────────
-                anchos = []
-                for col in df.columns:
-                    cl = str(col).lower()
-                    if any(k in cl for k in ["apellido", "nombres", "alumno"]):
-                        anchos.append(3.8)
-                    elif any(k in cl for k in ["motivo", "evento", "observacion"]):
-                        anchos.append(2.8)
-                    elif any(k in cl for k in ["grado", "seccion", "turno"]):
-                        anchos.append(1.1)
-                    elif cl in ("n", "total p", "total f", "faltas en el mes",
-                                "veces que vino", "estado"):
-                        anchos.append(0.8)
-                    else:
-                        anchos.append(1.2)
-                sm = sum(anchos)
-                anchos = [a * at / sm for a in anchos]
-
-                t = Table(datos, colWidths=anchos, repeatRows=1)
+                # ─── FORMATO NORMAL ───────────────────────────────────
+                n_cols = len(df.columns)
+                ac = at / n_cols
+                t = Table(datos, colWidths=[ac] * n_cols, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 10),
@@ -2999,10 +2988,13 @@ def vista_panel_direccion():
 # ─── REPORTES (HELPERS + UI) ───────────────────────────────────────────────
 def _hoja_faltaron_dia(fecha, ids_secs):
     """
-    Por cada seccion: una tabla con DOS columnas:
-    izquierda JUSTIFICADAS, derecha INJUSTIFICADAS.
+    Una sola tabla con dos mitades:
+    - Izquierda: justificados (Grado/Secc | Apellidos | Nombres)
+    - Derecha: injustificados (Grado/Secc | Apellidos | Nombres)
     """
-    bloques = []
+    todos_just = []
+    todos_injust = []
+
     for idsec in ids_secs:
         with cursor() as (con, cur):
             cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
@@ -3013,6 +3005,8 @@ def _hoja_faltaron_dia(fecha, ids_secs):
             sec = cur.fetchone()
         if not sec:
             continue
+
+        grado_secc = f"{sec['grado']} {sec['seccion']}"
 
         df_just = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno
@@ -3030,33 +3024,49 @@ def _hoja_faltaron_dia(fecha, ids_secs):
             ORDER BY a.apellido_paterno, a.apellido_materno
         """, (idsec, to_date(fecha)))
 
-        filas = []
-        n_max = max(len(df_just), len(df_injust))
+        for _, r in df_just.iterrows():
+            todos_just.append({"Grado": grado_secc, "Alumno": r["Alumno"]})
+        for _, r in df_injust.iterrows():
+            todos_injust.append({"Grado": grado_secc, "Alumno": r["Alumno"]})
 
-        for i in range(n_max):
-            fila = {}
-            fila["Apellidos (JUST)"] = (df_just.iloc[i]["Alumno"]
-                                        if i < len(df_just) else "")
-            fila["Apellidos (INJUST)"] = (df_injust.iloc[i]["Alumno"]
-                                          if i < len(df_injust) else "")
-            filas.append(fila)
+    filas = []
+    n_max = max(len(todos_just), len(todos_injust))
 
-        if filas:
-            df_lado = pd.DataFrame(filas)
+    for i in range(n_max):
+        fila = {}
+        if i < len(todos_just):
+            fila["J_Grado"] = todos_just[i]["Grado"]
+            fila["J_Alumno"] = todos_just[i]["Alumno"]
         else:
-            df_lado = pd.DataFrame(columns=["Apellidos (JUST)", "Apellidos (INJUST)"])
+            fila["J_Grado"] = ""
+            fila["J_Alumno"] = ""
 
-        titulo_bloque = (
-            f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}   "
-            f"| JUSTIFICADAS: {len(df_just)}   | INJUSTIFICADAS: {len(df_injust)}"
-        )
-        bloques.append((titulo_bloque, df_lado))
+        if i < len(todos_injust):
+            fila["F_Grado"] = todos_injust[i]["Grado"]
+            fila["F_Alumno"] = todos_injust[i]["Alumno"]
+        else:
+            fila["F_Grado"] = ""
+            fila["F_Alumno"] = ""
 
-    if not bloques:
-        bloques.append(
-            ("Sin secciones asignadas", pd.DataFrame({"Mensaje": []})))
-    return bloques
+        filas.append(fila)
 
+    if filas:
+        df_lado = pd.DataFrame(filas).rename(columns={
+            "J_Grado": "Grado/Secc.",
+            "J_Alumno": "Apellidos y Nombres (JUST)",
+            "F_Grado": "Grado/Secc. ",
+            "F_Alumno": "Apellidos y Nombres (INJUST)",
+        })
+    else:
+        df_lado = pd.DataFrame(columns=[
+            "Grado/Secc.", "Apellidos y Nombres (JUST)",
+            "Grado/Secc. ", "Apellidos y Nombres (INJUST)",
+        ])
+
+    titulo = (f"FALTAS DEL DIA {fecha}   "
+              f"| JUSTIFICADAS: {len(todos_just)}   "
+              f"| INJUSTIFICADAS: {len(todos_injust)}")
+    return [(titulo, df_lado)]
 
 def _generar_hojas_diario(fecha, ids_secs):
     hojas = {}
