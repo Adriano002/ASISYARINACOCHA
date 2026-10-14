@@ -1887,6 +1887,10 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
         el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
                             est["Normal"]))
         el.append(Spacer(1, 10))
+
+        # ─── SOLO la hoja "ALUMNOS QUE FALTARON" lleva formato especial ───
+        es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
+
         for titulo_bloque, df in bloques:
             el.append(Paragraph(f"<b>{titulo_bloque}</b>", est["Heading4"]))
             el.append(Spacer(1, 4))
@@ -1894,65 +1898,93 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 el.append(Paragraph("Sin faltas registradas.", est["Normal"]))
                 el.append(Spacer(1, 10))
                 continue
+
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
             at = A4[1] - 30
-            anchos = []
-            for col in df.columns:
-                cl = str(col).lower()
-                if any(k in cl for k in ["apellido", "nombres", "alumno"]):
-                    anchos.append(3.8)
-                elif any(k in cl for k in ["motivo", "evento", "observacion"]):
-                    anchos.append(2.8)
-                elif any(k in cl for k in ["grado", "seccion", "turno"]):
-                    anchos.append(1.1)
-                elif cl in ("n", "total p", "total f", "faltas en el mes",
-                            "veces que vino", "estado"):
-                    anchos.append(0.8)
-                else:
-                    anchos.append(1.2)
-            sm = sum(anchos)
-            anchos = [a * at / sm for a in anchos]
+            n_cols = len(df.columns)
 
-            t = Table(datos, colWidths=anchos, repeatRows=1)
-            estilos = [
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
-                ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
-                ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ]
-            col_estado = None
-            for j, c in enumerate(df.columns):
-                if str(c).lower() == "estado":
-                    col_estado = j
-                    break
-            if col_estado is not None:
-                mapa = {
-                    "P": colors.HexColor("#22C55E"),
-                    "T": colors.HexColor("#F59E0B"),
-                    "J": colors.HexColor("#EAB308"),
-                    "F": colors.HexColor("#EF4444"),
-                    "PERMISO": colors.HexColor("#3B82F6"),
-                }
+            if es_hoja_faltas:
+                # ─── FORMATO ESPECIAL: dos columnas + colores ──────────
+                ac = at / n_cols
+                mitad = n_cols // 2
+
+                t = Table(datos, colWidths=[ac] * n_cols, repeatRows=1)
+                estilos = [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("LINEAFTER", (mitad - 1, 0), (mitad - 1, -1), 1.5, colors.black),
+                    ("BACKGROUND", (0, 0), (mitad - 1, 0), colors.HexColor("#E8F5E9")),
+                    ("BACKGROUND", (mitad, 0), (-1, 0), colors.HexColor("#FFEBEE")),
+                ]
                 for i in range(1, len(datos)):
-                    val = str(datos[i][col_estado]).strip().upper()
-                    if val in mapa:
-                        estilos.append(
-                            ("TEXTCOLOR", (col_estado, i), (col_estado, i), mapa[val])
-                        )
-                        estilos.append(
-                            ("FONTNAME", (col_estado, i), (col_estado, i), "Helvetica-Bold")
-                        )
-            t.setStyle(TableStyle(estilos))
+                    if i % 2 == 0:
+                        estilos.append(("BACKGROUND", (0, i), (mitad - 1, i),
+                                        colors.HexColor("#F1F8E9")))
+                        estilos.append(("BACKGROUND", (mitad, i), (-1, i),
+                                        colors.HexColor("#FFF3E0")))
+                t.setStyle(TableStyle(estilos))
+            else:
+                # ─── FORMATO NORMAL (sin colores de fondo) ─────────────
+                anchos = []
+                for col in df.columns:
+                    cl = str(col).lower()
+                    if any(k in cl for k in ["apellido", "nombres", "alumno"]):
+                        anchos.append(3.8)
+                    elif any(k in cl for k in ["motivo", "evento", "observacion"]):
+                        anchos.append(2.8)
+                    elif any(k in cl for k in ["grado", "seccion", "turno"]):
+                        anchos.append(1.1)
+                    elif cl in ("n", "total p", "total f", "faltas en el mes",
+                                "veces que vino", "estado"):
+                        anchos.append(0.8)
+                    else:
+                        anchos.append(1.2)
+                sm = sum(anchos)
+                anchos = [a * at / sm for a in anchos]
+
+                t = Table(datos, colWidths=anchos, repeatRows=1)
+                estilos = [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+                col_estado = None
+                for j, c in enumerate(df.columns):
+                    if str(c).lower() == "estado":
+                        col_estado = j
+                        break
+                if col_estado is not None:
+                    mapa = {
+                        "P": colors.HexColor("#22C55E"),
+                        "T": colors.HexColor("#F59E0B"),
+                        "J": colors.HexColor("#EAB308"),
+                        "F": colors.HexColor("#EF4444"),
+                        "PERMISO": colors.HexColor("#3B82F6"),
+                    }
+                    for i in range(1, len(datos)):
+                        val = str(datos[i][col_estado]).strip().upper()
+                        if val in mapa:
+                            estilos.append(
+                                ("TEXTCOLOR", (col_estado, i), (col_estado, i), mapa[val])
+                            )
+                            estilos.append(
+                                ("FONTNAME", (col_estado, i), (col_estado, i), "Helvetica-Bold")
+                            )
+                t.setStyle(TableStyle(estilos))
+
             el.append(t); el.append(Spacer(1, 12))
     doc.build(el); buf.seek(0); return buf.getvalue()
-def generar_qr(dni):
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(str(dni).strip()); qr.make(fit=True)
-    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
 
 def _generar_fotocheck_pil(alumno, escudo_path=None):
