@@ -122,15 +122,6 @@ def confirmar_accion(clave, texto_boton="Confirmar",
         return True
     return False
 
-
-def confirmar_accion_form(clave, texto_boton="Confirmar",
-                          texto_check="¿Estás seguro de hacer esta acción?"):
-  
-    check = st.checkbox(texto_check, key=f"conf_form_{clave}")
-    boton = st.button(texto_boton, type="primary",
-                      key=f"btn_conf_form_{clave}", disabled=not check)
-    return check, boton
-
 # HELPERS: QR
 
 def generar_qr(dni, size=220):
@@ -1061,11 +1052,6 @@ def aplicar_estilos():
         --acento:        #D4A574;
         --acento-soft:   rgba(212,165,116,.15);
 
-        --texto:         #2D2D2D;
-        --texto-suave:   #6B6B6B;
-        --fondo:         #FAF7F4;
-        --sidebar:       #F5F0EB;
-
         --sombra:        0 2px 8px rgba(0,0,0,.06);
         --radius:        12px;
         --radius-sm:     8px;
@@ -1077,10 +1063,17 @@ def aplicar_estilos():
         --fs-h2:         22px;
     }
 
+    @media (prefers-color-scheme: dark){
+        :root{
+            --primario-soft: rgba(184,92,56,.18);
+            --primario-borde:rgba(184,92,56,.45);
+            --acento-soft:   rgba(212,165,116,.20);
+        }
+    }
+
     html, body, [class*="css"], .stApp{
         font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
         font-size: var(--fs-base) !important;
-        color: var(--texto) !important;
     }
 
     h1{
@@ -1103,16 +1096,13 @@ def aplicar_estilos():
 
     p, span, label, .stMarkdown, .stText, div[data-testid="stMarkdownContainer"]{
         font-size: var(--fs-base) !important;
-        color: var(--texto);
     }
 
     .stCaption, small, div[data-testid="stCaptionContainer"]{
         font-size: var(--fs-small) !important;
-        color: var(--texto-suave) !important;
     }
 
     section[data-testid="stSidebar"]{
-        background: var(--sidebar) !important;
         border-right: 1px solid var(--primario-borde);
     }
     section[data-testid="stSidebar"] .stRadio label{
@@ -1184,7 +1174,6 @@ def aplicar_estilos():
         transform: translateY(-1px);
     }
 
-    /* Botones cápsula */
     .capsula .stButton > button{
         padding: 10px 16px !important;
         font-size: 15px !important;
@@ -1206,7 +1195,6 @@ def aplicar_estilos():
     div[data-testid="stMetric"] label{
         font-size: 12px !important; font-weight: 700 !important;
         text-transform: uppercase; letter-spacing: .08em !important;
-        color: var(--texto-suave) !important;
     }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
         font-size: 32px !important; font-weight: 800 !important;
@@ -1250,7 +1238,6 @@ def aplicar_estilos():
     .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
 
     .perfil-bloque{
-        background: #FFF;
         border: 1px solid var(--primario-borde);
         border-radius: 12px;
         padding: 20px 22px;
@@ -1282,7 +1269,7 @@ def aplicar_estilos():
     }
     .kpi-card .kpi-lbl{
         font-size: 11px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: .08em; color: var(--texto-suave); line-height: 1.3;
+        letter-spacing: .08em; line-height: 1.3;
     }
     .kpi-card .kpi-lbl-alerta{ color: #C62828; }
 
@@ -1292,7 +1279,6 @@ def aplicar_estilos():
         margin: 10px 0;
         border: 1px solid rgba(128,128,128,.15);
         border-left: 5px solid #808080;
-        background: #FFF;
         font-size: 15px;
     }
     .qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
@@ -1318,8 +1304,7 @@ def aplicar_estilos():
     }
 
     .alumno-btn .stButton > button{
-        background: #FFF !important;
-        color: var(--texto) !important;
+        color: inherit !important;
         border: 1px solid var(--primario-borde) !important;
         text-align: left !important;
         justify-content: flex-start !important;
@@ -3258,6 +3243,15 @@ def _generar_hojas_mensual(mes, ano, ids_secs):
         ]
     return hojas
 
+def _columnas_responsive(n_items, max_cols=3):
+    """Devuelve columnas según el dispositivo. 1 columna en móvil, N en desktop."""
+    try:
+        ua = st.context.headers.get("User-Agent", "").lower()
+        es_movil = any(x in ua for x in ["mobile", "android", "iphone", "ipad"])
+    except Exception:
+        es_movil = False
+    n = 1 if es_movil else min(max_cols, max(1, n_items))
+    return st.columns(n)
 
 ###############################################################################################################################################################33
 def _selector_grado_seccion(clave, titulo="Elige el grado"):
@@ -3282,9 +3276,9 @@ def _selector_grado_seccion(clave, titulo="Elige el grado"):
             st.info("Sin secciones.")
             return None
         st.markdown('<div class="capsula">', unsafe_allow_html=True)
-        cols = st.columns(3)
+        cols = _columnas_responsive(len(secs))
         for i, s in enumerate(secs):
-            with cols[i % 3]:
+            with cols[i % len(cols)]:
                 n = len(alumnos_de_seccion(s["id"]))
                 if st.button(f"{s['nombre']}  ({n})", width='stretch',
                              key=f"{clave}_s_{s['id']}"):
@@ -3299,16 +3293,17 @@ def _selector_grado_seccion(clave, titulo="Elige el grado"):
         st.info("No hay grados.")
         return None
     st.markdown('<div class="capsula">', unsafe_allow_html=True)
-    cols = st.columns(3)
+    cols = _columnas_responsive(len(grados))
     for i, g in enumerate(grados):
         secs = secciones_por_grado(g["id"])
-        with cols[i % 3]:
+        with cols[i % len(cols)]:
             if st.button(f"{g['nombre']}  ({len(secs)})", width='stretch',
                          key=f"{clave}_g_{g['id']}"):
                 st.session_state[clave + "_grado"] = g["id"]
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     return None
+
 
 
 def _selector_alumno_lista(clave, idsec, on_click_key):
@@ -3341,9 +3336,9 @@ def _selector_alumno_lista(clave, idsec, on_click_key):
 
     st.caption(f"{len(df)} alumnos. Aprieta un nombre para seleccionarlo.")
     st.markdown('<div class="capsula">', unsafe_allow_html=True)
-    cols = st.columns(3)
+    cols = _columnas_responsive(len(df))
     for i, (_, al) in enumerate(df.iterrows()):
-        with cols[i % 3]:
+        with cols[i % len(cols)]:
             if st.button(al["nombre_completo"], width='stretch',
                          key=f"{clave}_al_{al['id']}"):
                 st.session_state[on_click_key] = al["id"]
@@ -3367,13 +3362,6 @@ def _selector_alumno_lista(clave, idsec, on_click_key):
     if not al:
         return None
     return dict(al)
-
-
-def _reset_selector(clave, on_click_key=None):
-    for k in (clave + "_idsec", clave + "_grado"):
-        st.session_state.pop(k, None)
-    if on_click_key:
-        st.session_state.pop(on_click_key, None)
 
 
 # PUERTA
@@ -3421,6 +3409,44 @@ def _puerta_escanear(usuario, fecha):
     escaner_qr_continuo(key="puerta_qr")
 
 
+def _puerta_manual_alumnos(idsec, usuario):
+    """Alumnos con botón 'Marcar' al lado de cada uno."""
+    with cursor() as (con, cur):
+        cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
+                       t.nombre AS turno FROM secciones s
+                       JOIN grados g ON s.grado_id=g.id
+                       JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
+                    (idsec,))
+        sec = cur.fetchone()
+    if not sec:
+        st.warning("Seccion no encontrada.")
+        return
+    if st.button("← Regresar a secciones", key="pm_volver_s"):
+        st.session_state.pop("pm_sel_idsec", None)
+        st.rerun()
+
+    st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+    df = alumnos_de_seccion(idsec)
+    if df.empty:
+        st.info("Sin alumnos activos.")
+        return
+
+    st.caption(f"{len(df)} alumnos. Aprieta MARCAR en cada uno que llegue.")
+    for _, al in df.iterrows():
+        c1, c2 = st.columns([5, 1])
+        with c1:
+            st.markdown(
+                f"<div style='padding: 8px 0; font-size: 15px;'>"
+                f"{al['nombre_completo']}</div>",
+                unsafe_allow_html=True)
+        with c2:
+            if st.button("Marcar", key=f"pm_marcar_{al['id']}",
+                         width='stretch'):
+                _, _, msg, _ = registrar_entrada(
+                    al["dni"], usuario, origen="manual")
+                st.toast(msg)
+                st.rerun()
+
 def _puerta_manual(usuario, fecha):
     ok, msg, _ = _puerta_puede_operar(fecha)
     if not ok:
@@ -3446,22 +3472,7 @@ def _puerta_manual(usuario, fecha):
     idsec = _selector_grado_seccion(clave, "Elige el grado")
     if not idsec:
         return
-    al = _selector_alumno_lista(clave, idsec, "pm_al_sel_id")
-    if not al:
-        return
-
-    st.markdown("---")
-    st.info(f"**{al['apellido_paterno']} {al['apellido_materno'] or ''}, "
-            f"{al['nombres']}** — DNI {al['dni']} — "
-            f"{al['grado']} {al['seccion']}")
-    if st.button("Marcar asistencia", type="primary", key="pm_marcar_btn"):
-        _, _, msg, _ = registrar_entrada(al["dni"], usuario, origen="manual")
-        st.toast(msg)
-        _reset_selector(clave, "pm_al_sel_id")
-        st.rerun()
-    if st.button("Cancelar", key="pm_cancelar_btn"):
-        _reset_selector(clave, "pm_al_sel_id")
-        st.rerun()
+    _puerta_manual_alumnos(idsec, usuario)
 
 
 def vista_puerta():
@@ -3648,91 +3659,32 @@ def vista_panel_direccion():
 
 
 # REPORTES UI
-def _rep_seleccionar_seccion(usuario):
-    rol = usuario["rol"]
-    permitidas = None
-    if rol == "Auxiliar":
-        with cursor() as (con, cur):
-            cur.execute("SELECT seccion_id FROM auxiliar_secciones WHERE usuario_id=?",
-                        (usuario["id"],))
-            permitidas = [f["seccion_id"] for f in cur.fetchall()]
-        if not permitidas:
-            st.info("No tienes secciones asignadas. Contacta al Admin.")
-            return
-
-    if st.session_state.get("rep_idsec"):
-        _rep_pantalla_tipos(st.session_state["rep_idsec"])
+def _puerta_manual(usuario, fecha):
+    ok, msg, _ = _puerta_puede_operar(fecha)
+    if not ok:
+        (st.info if "Feriado" in msg else st.warning)(msg)
         return
-
-    idg = st.session_state.get("rep_grado_sel")
-    if idg:
-        g = next((x for x in listar_grados() if x["id"] == idg), None)
-        if not g:
-            st.session_state.pop("rep_grado_sel", None)
-            st.rerun()
-            return
-        if st.button("← Regresar a grados", key="rep_volver_g"):
-            st.session_state.pop("rep_grado_sel", None)
-            st.rerun()
-        st.subheader(f"Secciones de {g['nombre']}")
-        secs = secciones_por_grado(g["id"])
-        if permitidas is not None:
-            secs = [s for s in secs if s["id"] in permitidas]
-        if not secs:
-            st.info("No hay secciones visibles para este grado.")
-            return
-        st.markdown('<div class="capsula">', unsafe_allow_html=True)
-        cols = st.columns(3)
-        for i, s in enumerate(secs):
-            with cols[i % 3]:
-                n = len(alumnos_de_seccion(s["id"]))
-                if st.button(f"{s['nombre']}  ({n})", width='stretch',
-                             key="rep_s_" + str(s["id"])):
-                    st.session_state["rep_idsec"] = s["id"]
-                    st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+    ha = hora_corta()
+    turnos_activos = []
+    for t in listar_turnos():
+        for v in listar_ventanas(t["id"]):
+            if v["hora_apertura"] <= ha <= v["hora_cierre"]:
+                turnos_activos.append({"turno_id": t["id"], "turno": t["nombre"],
+                                        "ventana": v["nombre"]})
+                break
+    if not turnos_activos:
+        st.info("No hay ventanas activas en este momento.")
         return
+    st.caption("Ventanas activas: " +
+               " | ".join([f"{t['turno']} ({t['ventana']})"
+                            for t in turnos_activos]))
+    st.warning("El modo manual es solo para emergencias.")
 
-    st.markdown("### Elige el grado")
-
-    if rol == "Auxiliar" and permitidas:
-        st.markdown("---")
-        st.markdown("**Descargar Reporte Diario de TODAS mis secciones**")
-        if st.button("Descargar Reporte Diario (todas mis secciones)",
-                     type="primary", width='stretch', key="rep_dl_todas_diario"):
-            hojas = _generar_hojas_diario(hoy_str(), permitidas)
-            if not hojas:
-                st.warning("Sin datos para hoy.")
-            else:
-                pdf = generar_pdf_multilhoja(hojas,
-                                              "Reporte Diario - " + hoy_str())
-                st.download_button("Guardar PDF", pdf,
-                                   f"Reporte_diario_todas_{hoy_str()}.pdf",
-                                   "application/pdf", width='stretch',
-                                   key="rep_dl_todas_diario_pdf")
-        st.markdown("---")
-
-    grados_mostrar = []
-    for g in listar_grados():
-        secs = secciones_por_grado(g["id"])
-        if permitidas is not None:
-            secs = [s for s in secs if s["id"] in permitidas]
-        if secs:
-            grados_mostrar.append({"grado": g, "n": len(secs)})
-    if not grados_mostrar:
-        st.info("No hay secciones disponibles.")
+    clave = "pm_sel"
+    idsec = _selector_grado_seccion(clave, "Elige el grado")
+    if not idsec:
         return
-    st.markdown('<div class="capsula">', unsafe_allow_html=True)
-    cols = st.columns(3)
-    for i, item in enumerate(grados_mostrar):
-        with cols[i % 3]:
-            if st.button(f"{item['grado']['nombre']}  ({item['n']})",
-                         width='stretch',
-                         key="rep_g_" + str(item["grado"]["id"])):
-                st.session_state["rep_grado_sel"] = item["grado"]["id"]
-                st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    _puerta_manual_alumnos(idsec, usuario)
 
 def _rep_pantalla_tipos(idsec):
     with cursor() as (con, cur):
@@ -4622,7 +4574,6 @@ def vista_grados_secciones():
 def vista_carnets():
     st.title("Carnets QR")
 
-    # ─── BOTÓN GLOBAL: DESCARGAR TODOS LOS CARNETS ───
     st.markdown("### Descargar todos los carnets")
     st.caption("Genera un PDF con los carnets de TODOS los alumnos activos "
                "de TODOS los salones.")
@@ -4650,10 +4601,10 @@ def vista_carnets():
         return
     st.caption("Aprieta un grado para ver sus secciones.")
     st.markdown('<div class="capsula">', unsafe_allow_html=True)
-    cols = st.columns(3)
+    cols = _columnas_responsive(len(grados))
     for i, g in enumerate(grados):
         secs = secciones_por_grado(g["id"])
-        with cols[i % 3]:
+        with cols[i % len(cols)]:
             if st.button(f"{g['nombre']}  ({len(secs)})", width='stretch',
                          key="carn_g_" + str(g['id'])):
                 st.session_state["carn_grado_sel"] = g["id"]
@@ -4673,10 +4624,10 @@ def vista_carnets():
         st.info("Sin secciones.")
         return
     st.markdown('<div class="capsula">', unsafe_allow_html=True)
-    cols = st.columns(3)
+    cols = _columnas_responsive(len(secs))
     for i, s in enumerate(secs):
         n = len(alumnos_de_seccion(s["id"]))
-        with cols[i % 3]:
+        with cols[i % len(cols)]:
             if st.button(f"{s['nombre']}  ({n})", width='stretch',
                          key="carn_s_" + str(s['id'])):
                 st.session_state["carn_ver_seccion"] = s["id"]
@@ -4708,9 +4659,9 @@ def _carnets_ver_seccion(idsec):
     if "carn_sel_alumnos" not in st.session_state:
         st.session_state["carn_sel_alumnos"] = set()
     sel = st.session_state["carn_sel_alumnos"]
-    cols = st.columns(4)
+    cols = _columnas_responsive(len(df), max_cols=4)
     for i, (_, al) in enumerate(df.iterrows()):
-        with cols[i % 4]:
+        with cols[i % len(cols)]:
             if al["id"] in sel:
                 st.markdown('<div class="btn-sel">', unsafe_allow_html=True)
                 if st.button(al['nombre_completo'],
@@ -4810,7 +4761,7 @@ def puede_gestionar_usuario(usuario_actual, id_objetivo):
 
 
 def _usuario_form_editar(idu):
-    """Formulario de edición inline para un usuario."""
+    """Formulario de edición inline para un usuario (sin st.form)."""
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
     with cursor() as (con, cur):
@@ -4820,47 +4771,45 @@ def _usuario_form_editar(idu):
         st.error("Usuario no encontrado.")
         return
 
-    with st.form(f"edit_u_{idu}"):
-        c1, c2 = st.columns(2)
-        with c1:
-            u = st.text_input("Usuario", value=datos["usuario"], key=f"eu_u_{idu}")
-            n = st.text_input("Nombres", value=datos["nombres"], key=f"eu_n_{idu}")
-        with c2:
-            p = st.text_input("Nueva contraseña (opcional)", type="password",
-                              key=f"eu_p_{idu}")
-            roles_edit = (["Admin", "Direccion", "Auxiliar"] if soy_principal
-                          else ["Direccion", "Auxiliar"])
-            idx_rol = (roles_edit.index(datos["rol"])
-                       if datos["rol"] in roles_edit else 0)
-            r = st.selectbox("Rol", roles_edit, index=idx_rol, key=f"eu_r_{idu}")
-            act = st.checkbox("Activo", value=bool(datos["activo"]),
-                              key=f"eu_a_{idu}")
+    c1, c2 = st.columns(2)
+    with c1:
+        u = st.text_input("Usuario", value=datos["usuario"], key=f"eu_u_{idu}")
+        n = st.text_input("Nombres", value=datos["nombres"], key=f"eu_n_{idu}")
+    with c2:
+        p = st.text_input("Nueva contraseña (opcional)", type="password",
+                          key=f"eu_p_{idu}")
+        roles_edit = (["Admin", "Direccion", "Auxiliar"] if soy_principal
+                      else ["Direccion", "Auxiliar"])
+        idx_rol = (roles_edit.index(datos["rol"])
+                   if datos["rol"] in roles_edit else 0)
+        r = st.selectbox("Rol", roles_edit, index=idx_rol, key=f"eu_r_{idu}")
+        act = st.checkbox("Activo", value=bool(datos["activo"]),
+                          key=f"eu_a_{idu}")
 
-        check, boton = confirmar_accion_form(
+    if confirmar_accion(
             f"eu_{idu}", "Guardar cambios",
-            "¿Estas seguro de guardar los cambios de este usuario?")
-        if boton:
-            u_norm = u.strip().lower()
-            with cursor() as (con, cur):
-                cur.execute("SELECT id FROM usuarios "
-                            "WHERE LOWER(usuario)=? AND id!=?", (u_norm, idu))
-                if cur.fetchone():
-                    st.error("Ya existe otro usuario con ese nombre.")
+            "¿Estas seguro de guardar los cambios de este usuario?"):
+        u_norm = u.strip().lower()
+        with cursor() as (con, cur):
+            cur.execute("SELECT id FROM usuarios "
+                        "WHERE LOWER(usuario)=? AND id!=?", (u_norm, idu))
+            if cur.fetchone():
+                st.error("Ya existe otro usuario con ese nombre.")
+            else:
+                if p:
+                    cur.execute("UPDATE usuarios SET usuario=?,nombres=?,"
+                                "rol=?,password=?,activo=? WHERE id=?",
+                                (u_norm, n, r, hashear_password(p),
+                                 1 if act else 0, idu))
                 else:
-                    if p:
-                        cur.execute("UPDATE usuarios SET usuario=?,nombres=?,"
-                                    "rol=?,password=?,activo=? WHERE id=?",
-                                    (u_norm, n, r, hashear_password(p),
-                                     1 if act else 0, idu))
-                    else:
-                        cur.execute("UPDATE usuarios SET usuario=?,nombres=?,"
-                                    "rol=?,activo=? WHERE id=?",
-                                    (u_norm, n, r, 1 if act else 0, idu))
-                    auditar(usuario["usuario"], "Edito usuario " + u_norm)
-                    st.session_state["_aviso_usuarios"] = {
-                        "tipo": "ok", "msg": "Usuario editado."}
-                    st.session_state.pop(f"_editando_u_{idu}", None)
-                    st.rerun()
+                    cur.execute("UPDATE usuarios SET usuario=?,nombres=?,"
+                                "rol=?,activo=? WHERE id=?",
+                                (u_norm, n, r, 1 if act else 0, idu))
+                auditar(usuario["usuario"], "Edito usuario " + u_norm)
+                st.session_state["_aviso_usuarios"] = {
+                    "tipo": "ok", "msg": "Usuario editado."}
+                st.session_state.pop(f"_editando_u_{idu}", None)
+                st.rerun()
 
 def _frag_usuarios_botones():
     usuario = st.session_state["user"]
@@ -4937,11 +4886,9 @@ def _frag_usuarios_crear():
         idt = next((x["id"] for x in listar_turnos()
                     if x["nombre"] == t_lbl), None)
 
-    check, boton = confirmar_accion_form(
-        "crear_u", "Crear usuario",
-        "¿Estas seguro de crear este usuario?")
-
-    if boton:
+    if confirmar_accion(
+            "crear_u", "Crear usuario",
+            "¿Estas seguro de crear este usuario?"):
         if not u or not p or not n:
             st.error("Completa usuario, contraseña y nombres.")
         elif len(p) < 6:
@@ -4974,7 +4921,6 @@ def _frag_usuarios_crear():
                             st.error("Ese usuario ya existe.")
                         else:
                             st.error(f"Error: {e}")
-
 
 def _frag_usuarios_asignar():
     usuario = st.session_state["user"]
@@ -5221,22 +5167,21 @@ def vista_auditoria():
         if not desc:
             st.info("Debes descargar el reporte anual antes.")
 
-        with st.form("cerrar_ano"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                nn = st.text_input("Nombre nuevo periodo",
-                                    value=str(ahora().year + 1))
-            with c2:
-                fi = st.date_input("Inicio nuevo",
-                                    date(ahora().year + 1, 3, 1))
-            with c3:
-                ff = st.date_input("Fin nuevo",
-                                    date(ahora().year + 1, 12, 31))
-            conf = st.text_input("Escribe CERRAR para confirmar")
-            check, sub = confirmar_accion_form(
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            nn = st.text_input("Nombre nuevo periodo",
+                                value=str(ahora().year + 1))
+        with c2:
+            fi = st.date_input("Inicio nuevo",
+                                date(ahora().year + 1, 3, 1))
+        with c3:
+            ff = st.date_input("Fin nuevo",
+                                date(ahora().year + 1, 12, 31))
+        conf = st.text_input("Escribe CERRAR para confirmar")
+
+        if confirmar_accion(
                 "cerrar_ano", "Cerrar año escolar",
-                "¿Estas seguro de cerrar el año escolar?")
-        if sub:
+                "¿Estas seguro de cerrar el año escolar?"):
             if not desc:
                 st.error("Primero debes descargar el reporte anual.")
             elif conf.strip() != "CERRAR":
