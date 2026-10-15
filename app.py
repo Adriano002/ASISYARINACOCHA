@@ -4098,11 +4098,9 @@ def _frag_crear_alumno():
     with c4:
         tel = st.text_input("Telefono (opcional)", key="nue_al_tel")
 
-    check, boton = confirmar_accion_form(
-        "nue_al", "Crear alumno",
-        "¿Estas seguro de crear este alumno?")
-
-    if boton:
+    # ⬇️ SIN form, solo checkbox + botón normal
+    if confirmar_accion("nue_al", "Crear alumno",
+                        "¿Estas seguro de crear este alumno?"):
         if not dni or not nom or not pat or not s:
             st.error("Completa obligatorios.")
         elif not re.fullmatch(r"\d{8}", dni.strip()):
@@ -4120,7 +4118,6 @@ def _frag_crear_alumno():
                 st.rerun()
             else:
                 st.error(msg)
-
 
 def _frag_editar_alumno():
     st.subheader("Editar alumno")
