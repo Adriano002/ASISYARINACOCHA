@@ -125,10 +125,10 @@ def confirmar_accion(clave, texto_boton="Confirmar",
 
 def confirmar_accion_form(clave, texto_boton="Confirmar",
                           texto_check="¿Estás seguro de hacer esta acción?"):
-    """Version para usar DENTRO de un st.form(). Devuelve (check_ok, boton)."""
+  
     check = st.checkbox(texto_check, key=f"conf_form_{clave}")
-    boton = st.form_submit_button(texto_boton, type="primary",
-                                  disabled=not check)
+    boton = st.button(texto_boton, type="primary",
+                      key=f"btn_conf_form_{clave}", disabled=not check)
     return check, boton
 
 # HELPERS: QR
