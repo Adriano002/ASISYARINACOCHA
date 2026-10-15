@@ -3364,6 +3364,14 @@ def _selector_alumno_lista(clave, idsec, on_click_key):
     return dict(al)
 
 
+
+def _reset_selector(clave, on_click_key=None):
+    """Limpia el estado del selector grado→sección→alumno."""
+    for k in (clave + "_idsec", clave + "_grado"):
+        st.session_state.pop(k, None)
+    if on_click_key:
+        st.session_state.pop(on_click_key, None)
+
 # PUERTA
 def _puerta_puede_operar(fecha):
     f_d = to_date(fecha)
@@ -3985,7 +3993,390 @@ def _rep_general_por_turno_admin():
             f"Reporte_general_{sel_turno}_{desde}_{hasta}.pdf",
             "application/pdf", width='stretch', key="repgen_dl_p")
 
+def _rep_seleccionar_seccion(usuario):
+    rol = usuario["rol"]
+    permitidas = None
+    if rol == "Auxiliar":
+        with cursor() as (con, cur):
+            cur.execute("SELECT seccion_id FROM auxiliar_secciones WHERE usuario_id=?",
+                        (usuario["id"],))
+            permitidas = [f["seccion_id"] for f in cur.fetchall()]
+        if not permitidas:
+            st.info("No tienes secciones asignadas. Contacta al Admin.")
+            return
 
+    if st.session_state.get("rep_idsec"):
+        _rep_pantalla_tipos(st.session_state["rep_idsec"])
+        return
+
+    idg = st.session_state.get("rep_grado_sel")
+    if idg:
+        g = next((x for x in listar_grados() if x["id"] == idg), None)
+        if not g:
+            st.session_state.pop("rep_grado_sel", None)
+            st.rerun()
+            return
+        if st.button("← Regresar a grados", key="rep_volver_g"):
+            st.session_state.pop("rep_grado_sel", None)
+            st.rerun()
+        st.subheader(f"Secciones de {g['nombre']}")
+        secs = secciones_por_grado(g["id"])
+        if permitidas is not None:
+            secs = [s for s in secs if s["id"] in permitidas]
+        if not secs:
+            st.info("No hay secciones visibles para este grado.")
+            return
+        st.markdown('<div class="capsula">', unsafe_allow_html=True)
+        cols = _columnas_responsive(len(secs))
+        for i, s in enumerate(secs):
+            with cols[i % len(cols)]:
+                n = len(alumnos_de_seccion(s["id"]))
+                if st.button(f"{s['nombre']}  ({n})", width='stretch',
+                             key="rep_s_" + str(s["id"])):
+                    st.session_state["rep_idsec"] = s["id"]
+                    st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+
+    st.markdown("### Elige el grado")
+
+    if rol == "Auxiliar" and permitidas:
+        st.markdown("---")
+        st.markdown("**Descargar Reporte Diario de TODAS mis secciones**")
+        if st.button("Descargar Reporte Diario (todas mis secciones)",
+                     type="primary", width='stretch', key="rep_dl_todas_diario"):
+            hojas = _generar_hojas_diario(hoy_str(), permitidas)
+            if not hojas:
+                st.warning("Sin datos para hoy.")
+            else:
+                pdf = generar_pdf_multilhoja(hojas,
+                                              "Reporte Diario - " + hoy_str())
+                st.download_button("Guardar PDF", pdf,
+                                   f"Reporte_diario_todas_{hoy_str()}.pdf",
+                                   "application/pdf", width='stretch',
+                                   key="rep_dl_todas_diario_pdf")
+        st.markdown("---")
+
+    grados_mostrar = []
+    for g in listar_grados():
+        secs = secciones_por_grado(g["id"])
+        if permitidas is not None:
+            secs = [s for s in secs if s["id"] in permitidas]
+        if secs:
+            grados_mostrar.append({"grado": g, "n": len(secs)})
+    if not grados_mostrar:
+        st.info("No hay secciones disponibles.")
+        return
+    st.markdown('<div class="capsula">', unsafe_allow_html=True)
+    cols = _columnas_responsive(len(grados_mostrar))
+    for i, item in enumerate(grados_mostrar):
+        with cols[i % len(cols)]:
+            if st.button(f"{item['grado']['nombre']}  ({item['n']})",
+                         width='stretch',
+                         key="rep_g_" + str(item["grado"]["id"])):
+                st.session_state["rep_grado_sel"] = item["grado"]["id"]
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _rep_pantalla_tipos(idsec):
+    with cursor() as (con, cur):
+        cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
+                       t.nombre AS turno FROM secciones s
+                       JOIN grados g ON s.grado_id=g.id
+                       JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""", (idsec,))
+        sec = cur.fetchone()
+    if not sec:
+        st.warning("Seccion no encontrada.")
+        st.session_state.pop("rep_idsec", None)
+        st.rerun()
+        return
+    if st.button("← Regresar a secciones", key="rep_volver_secciones"):
+        st.session_state.pop("rep_idsec", None)
+        st.session_state.pop("rep_tipo", None)
+        st.rerun()
+    st.subheader(f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+
+    hoy = ahora().date()
+    ult_dia_mes = date(hoy.year, hoy.month, monthrange(hoy.year, hoy.month)[1])
+    ult_lab = ult_dia_mes
+    while ult_lab.weekday() >= 5:
+        ult_lab -= timedelta(days=1)
+    cierre_activo = hoy >= ult_lab
+
+    st.markdown("### Elige el tipo de reporte")
+    st.markdown('<div class="capsula">', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("Reporte Diario", width='stretch',
+                     key="rep_tipo_btn_diario"):
+            st.session_state["rep_tipo"] = "diario"
+            st.session_state["rep_idsec_val"] = idsec
+            st.rerun()
+    with c2:
+        if cierre_activo:
+            if st.button("Cierre Mensual", width='stretch',
+                         key="rep_tipo_btn_mensual"):
+                st.session_state["rep_tipo"] = "mensual"
+                st.session_state["rep_idsec_val"] = idsec
+                st.rerun()
+        else:
+            st.button("Cierre Mensual", width='stretch', disabled=True,
+                      key="rep_tipo_btn_mensual_disabled",
+                      help=f"Se activa a partir del {ult_lab}.")
+    with c3:
+        if st.button("Reporte General", width='stretch',
+                     key="rep_tipo_btn_general"):
+            st.session_state["rep_tipo"] = "general"
+            st.session_state["rep_idsec_val"] = idsec
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if not cierre_activo:
+        st.caption(f"El Cierre Mensual se activara el **{ult_lab}**.")
+
+    if st.session_state.get("rep_tipo") and \
+            st.session_state.get("rep_idsec_val") == idsec:
+        if st.button("← Regresar a tipos", key="rep_volver_tipos"):
+            st.session_state.pop("rep_tipo", None)
+            st.rerun()
+        st.markdown("---")
+        tipo = st.session_state["rep_tipo"]
+        if tipo == "diario":
+            _rep_mostrar_reporte(idsec, "diario",
+                                  ahora().date() - timedelta(days=30),
+                                  ahora().date())
+        elif tipo == "mensual":
+            _rep_mostrar_reporte(idsec, "mensual",
+                                  ahora().date() - timedelta(days=30),
+                                  ahora().date())
+        elif tipo == "general":
+            _rep_general_por_turno_admin()
+
+
+def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
+    with cursor() as (con, cur):
+        cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
+                       t.nombre AS turno FROM secciones s
+                       JOIN grados g ON s.grado_id=g.id
+                       JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""", (idsec,))
+        sec = cur.fetchone()
+    if not sec:
+        st.warning("Seccion no encontrada.")
+        st.session_state.pop("rep_idsec_val", None)
+        st.session_state.pop("rep_tipo", None)
+        st.rerun()
+        return
+    if st.button("← Regresar a tipos de reporte",
+                 key="rep_volver_tipos_desde_mostrar"):
+        st.session_state.pop("rep_tipo", None)
+        st.session_state.pop("rep_idsec_val", None)
+        st.rerun()
+
+    if tipo == "diario":
+        st.subheader(f"Reporte Diario - {sec['grado']} {sec['seccion']}")
+        st.caption(f"Fecha: {ahora().date()}")
+        hojas = _generar_hojas_diario(hoy_str(), [idsec])
+        if not hojas:
+            st.info("Sin datos para hoy.")
+            return
+        pdf = generar_pdf_multilhoja(hojas,
+                                      "Reporte Diario - " + str(ahora().date()))
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Descargar PDF", pdf,
+                f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{hoy_str()}.pdf",
+                "application/pdf", key="rep_dl_diario_pdf")
+        with c2:
+            hojas_xlsx = {}
+            for nombre, bloques in hojas.items():
+                for titulo_bloque, df in bloques:
+                    hojas_xlsx[(nombre + "_" + titulo_bloque)[:31]] = df
+            if hojas_xlsx:
+                st.download_button(
+                    "Descargar Excel",
+                    df_a_xlsx_multilhoja(hojas_xlsx),
+                    f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{hoy_str()}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="rep_dl_diario_xlsx")
+    elif tipo == "mensual":
+        hoy = ahora().date()
+        st.subheader(f"Cierre Mensual {MESES_ES[hoy.month]} {hoy.year} - "
+                     f"{sec['grado']} {sec['seccion']}")
+        hojas = _generar_hojas_mensual(hoy.month, hoy.year, [idsec])
+        if not hojas:
+            st.info("Sin datos para este mes.")
+            return
+        pdf = generar_pdf_multilhoja(
+            hojas, f"Cierre Mensual {MESES_ES[hoy.month]} {hoy.year}")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Descargar PDF", pdf,
+                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[hoy.month]}.pdf",
+                "application/pdf", key="rep_dl_mensual_pdf")
+        with c2:
+            hojas_xlsx = {}
+            for nombre, bloques in hojas.items():
+                for titulo_bloque, df in bloques:
+                    hojas_xlsx[(nombre + "_" + titulo_bloque)[:31]] = df
+            if hojas_xlsx:
+                st.download_button(
+                    "Descargar Excel",
+                    df_a_xlsx_multilhoja(hojas_xlsx),
+                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="rep_dl_mensual_xlsx")
+    elif tipo == "general":
+        _rep_general_por_turno_admin()
+
+
+def _rep_general_por_turno_admin():
+    st.subheader("Reporte general por auxiliar")
+    st.caption("Muestra TODAS las secciones del turno. Si no hay asistencias, "
+               "aparecen con 0.")
+    turnos = listar_turnos()
+    if not turnos:
+        st.info("Sin turnos configurados.")
+        return
+    ops = {t["nombre"]: t["id"] for t in turnos}
+    sel_turno = st.selectbox("Turno", list(ops.keys()), key="repgen_turno")
+    id_turno = ops[sel_turno]
+    ha = hora_corta()
+    ventana_clases = None
+    for v in listar_ventanas(id_turno):
+        if v["tipo"] == "clases":
+            ventana_clases = v
+            break
+    if not ventana_clases:
+        st.warning("Este turno no tiene ventana de clases configurada.")
+        return
+    if ha < ventana_clases["hora_cierre"]:
+        st.warning(f"**No se puede generar el reporte todavia.** La ventana de "
+                   f"clases de {sel_turno} aun esta abierta (cierra a las "
+                   f"{ventana_clases['hora_cierre']}).")
+        return
+
+    hoy_d = ahora().date()
+    c1, c2 = st.columns(2)
+    with c1:
+        desde = st.date_input("Desde", hoy_d, key="repgen_desde")
+    with c2:
+        hasta = st.date_input("Hasta", hoy_d, key="repgen_hasta")
+    if desde > hasta:
+        st.error("La fecha Desde no puede ser mayor que Hasta.")
+        return
+
+    pid = None
+    dfp = listar_periodos()
+    if not dfp.empty:
+        ops_p = {}
+        for _, r in dfp.iterrows():
+            et = f"{r['nombre']} ({r['fecha_inicio']} - {r['fecha_fin']})"
+            if r["cerrado"]:
+                et += " [CERRADO]"
+            elif r["activo"]:
+                et += " [ACTIVO]"
+            ops_p[et] = r["id"]
+        sel_lbl = st.selectbox("Periodo", list(ops_p.keys()), key="repgen_pid")
+        pid = ops_p[sel_lbl]
+
+    cond_periodo = " AND ast.periodo_id = ?" if pid is not None else ""
+
+    q = f"""
+    SELECT
+        s.id AS seccion_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        COALESCE(u.nombres, '(Sin auxiliar)') AS auxiliar,
+        COALESCE((
+            SELECT COUNT(*) FROM asistencias ast
+            JOIN alumnos a ON ast.alumno_id = a.id
+            WHERE a.seccion_id = s.id AND a.activo = 1
+              AND ast.tipo = 'clases' AND ast.estado = 'Puntual'
+              AND ast.fecha BETWEEN ? AND ? {cond_periodo}
+        ), 0) AS puntuales,
+        COALESCE((
+            SELECT COUNT(*) FROM asistencias ast
+            JOIN alumnos a ON ast.alumno_id = a.id
+            WHERE a.seccion_id = s.id AND a.activo = 1
+              AND ast.tipo = 'clases' AND ast.estado = 'Falta'
+              AND ast.fecha BETWEEN ? AND ? {cond_periodo}
+        ), 0) AS faltas
+    FROM secciones s
+    JOIN grados g ON s.grado_id = g.id
+    LEFT JOIN auxiliar_secciones ause ON ause.seccion_id = s.id
+    LEFT JOIN usuarios u ON u.id = ause.usuario_id
+        AND u.rol = 'Auxiliar' AND u.activo = 1
+    WHERE s.turno_id = ?
+    ORDER BY g.nombre, s.nombre, u.nombres
+    """
+
+    p = [to_date(desde), to_date(hasta)]
+    if pid is not None:
+        p.append(pid)
+    p += [to_date(desde), to_date(hasta)]
+    if pid is not None:
+        p.append(pid)
+    p.append(id_turno)
+
+    df = leer_df(q, p)
+    if df.empty:
+        st.warning("No hay secciones creadas en este turno.")
+        return
+
+    df["total"] = df["puntuales"] + df["faltas"]
+
+    st.markdown("---")
+    st.markdown(f"**Turno {sel_turno}** — del {desde} al {hasta}")
+    st.caption(f"{len(df)} secciones en este turno.")
+
+    filas = []
+    for aux in df["auxiliar"].unique().tolist():
+        df_aux = df[df["auxiliar"] == aux]
+        for _, row in df_aux.iterrows():
+            filas.append({
+                "Auxiliar": aux,
+                "Grado": row["grado"],
+                "Seccion": row["seccion"],
+                "Puntuales": int(row["puntuales"]),
+                "Faltas": int(row["faltas"]),
+                "Total": int(row["total"]),
+            })
+        filas.append({
+            "Auxiliar": f"  >> Subtotal {aux}",
+            "Grado": "", "Seccion": "",
+            "Puntuales": int(df_aux["puntuales"].sum()),
+            "Faltas": int(df_aux["faltas"].sum()),
+            "Total": int(df_aux["total"].sum()),
+        })
+    filas.append({
+        "Auxiliar": "TOTAL GENERAL",
+        "Grado": "", "Seccion": "",
+        "Puntuales": int(df["puntuales"].sum()),
+        "Faltas": int(df["faltas"].sum()),
+        "Total": int(df["total"].sum()),
+    })
+    df_export = pd.DataFrame(filas)
+    st.dataframe(df_export, width='stretch', hide_index=True)
+
+    st.markdown("---")
+    st.markdown("### Descargar")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "Excel", df_a_xlsx(df_export, "General por auxiliar"),
+            f"Reporte_general_{sel_turno}_{desde}_{hasta}.xlsx",
+            width='stretch', key="repgen_dl_x")
+    with c2:
+        st.download_button(
+            "PDF",
+            generar_pdf_tabla_ancha(
+                df_export, f"Reporte general {sel_turno}",
+                f"{desde} a {hasta}"),
+            f"Reporte_general_{sel_turno}_{desde}_{hasta}.pdf",
+            "application/pdf", width='stretch', key="repgen_dl_p")
 def vista_reportes():
     st.title("Reportes y Consultas")
     usuario = st.session_state["user"]
