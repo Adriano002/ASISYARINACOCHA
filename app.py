@@ -1,9 +1,4 @@
-# ═══════════════════════════════════════════════════════════════════════════
 # app.py - Sistema de Asistencia I.E. Yarinacocha
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUE 1/4 de app.py: imports, constantes, CSS, utilidades, helpers,
-# login, cambio password, mi cuenta
-# ═══════════════════════════════════════════════════════════════════════════
 import hashlib
 import logging
 import re
@@ -34,7 +29,7 @@ except ImportError:
     def st_autorefresh(**kwargs):
         pass
 
-# ─── LOGGING ───────────────────────────────────────────────────────────────
+# logueo del usuario
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 logging.basicConfig(
@@ -47,7 +42,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("asistencia")
 
-# ─── CONSTANTES ────────────────────────────────────────────────────────────
+# 
 MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -76,10 +71,8 @@ HORAS_CIERRE_EVENTO = 2
 LIMITE_NUEVO = 3
 LIMITE_REINCIDENTE = 1
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # UTILIDADES DE TIEMPO
-# ═══════════════════════════════════════════════════════════════════════════
+
 def ahora():
     return datetime.now(timezone.utc) - timedelta(hours=5)
 
@@ -116,9 +109,9 @@ def _safe_df(fn, default_cols=None):
         return pd.DataFrame(columns=default_cols or [])
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# HELPERS: CONFIRMACIÓN SIMPLE (reemplaza contraseña crítica)
-# ═══════════════════════════════════════════════════════════════════════════
+
+# helperrss
+
 def confirmar_accion(clave, texto_boton="Confirmar",
                      texto_check="¿Estás seguro de hacer esta acción?",
                      tipo_boton="primary"):
@@ -138,10 +131,8 @@ def confirmar_accion_form(clave, texto_boton="Confirmar",
                                   disabled=not check)
     return check, boton
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # HELPERS: QR
-# ═══════════════════════════════════════════════════════════════════════════
+
 def generar_qr(dni, size=220):
     """Devuelve una imagen PIL con el QR del DNI."""
     qr = qrcode.QRCode(
@@ -164,9 +155,7 @@ def generar_qr_bytes(dni, size=220):
     return buf.getvalue()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # HELPERS: REGLAS DE BLOQUEO
-# ═══════════════════════════════════════════════════════════════════════════
 def calcular_limite(es_reincidente):
     """Cuántas tardanzas permite antes de bloquear al día siguiente."""
     return LIMITE_REINCIDENTE if es_reincidente else LIMITE_NUEVO
@@ -176,9 +165,7 @@ def texto_ultima_oportunidad():
     return "⚠️ ÚLTIMA OPORTUNIDAD — si llega tarde otra vez, mañana no podrá escanear."
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # SEGURIDAD
-# ═══════════════════════════════════════════════════════════════════════════
 def hashear_password(password):
     salt = secrets.token_bytes(16)
     d = hashlib.pbkdf2_hmac(PBK_ALG, password.encode("utf-8"), salt, PBK_ITER)
@@ -279,9 +266,7 @@ def _verificar_admin_activo():
         return cur.fetchone() is not None
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # INICIALIZACIÓN DE BD
-# ═══════════════════════════════════════════════════════════════════════════
 @st.cache_resource
 def inicializar_bd():
     aplicar_schema()
@@ -345,9 +330,7 @@ def _seed():
             log.warning("admin creado, pass temporal: %s", pwd)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # MANTENIMIENTO
-# ═══════════════════════════════════════════════════════════════════════════
 def modo_mantenimiento():
     with cursor() as (con, cur):
         cur.execute("SELECT valor FROM config WHERE clave=?", ("mantenimiento",))
@@ -388,9 +371,7 @@ def vista_mantenimiento():
     st.info("Vuelve a intentarlo mas tarde.")
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # PERIODOS
-# ═══════════════════════════════════════════════════════════════════════════
 def obtener_periodo_activo():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE activo=1 LIMIT 1")
@@ -469,9 +450,8 @@ def info_periodo_con_alumnos():
     """)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# TURNOS / VENTANAS
-# ═══════════════════════════════════════════════════════════════════════════
+
+# TURNOS  
 def listar_turnos():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM turnos ORDER BY id")
@@ -505,10 +485,8 @@ def listar_ventanas(id_turno=None):
         out.append(d)
     return out
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # DÍAS ESPECIALES
-# ═══════════════════════════════════════════════════════════════════════════
+
 def _dia_dict(f):
     d = dict(f)
     d["fecha"] = fmt_date(d.get("fecha"))
@@ -587,10 +565,8 @@ def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
             }
     return None
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # GRADOS / SECCIONES / ALUMNOS
-# ═══════════════════════════════════════════════════════════════════════════
+
 def listar_grados():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM grados ORDER BY nombre")
@@ -763,9 +739,7 @@ def reactivar_alumno(idal, dni, usuario):
     return True, "Alumno reactivado."
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # IMPORTACIÓN EXCEL
-# ═══════════════════════════════════════════════════════════════════════════
 def _normalizar_grado(n):
     n = (n or "").strip().title()
     r = {"1°": "1ro", "2°": "2do", "3°": "3ro", "4°": "4to", "5°": "5to",
@@ -955,9 +929,7 @@ def insertar_alumnos_validos(val):
     return ins, reac, errs
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# LOGIN / CAMBIO PASSWORD / MI CUENTA
-# ═══════════════════════════════════════════════════════════════════════════
+# LOGIN 
 def vista_login():
     st.markdown("""
     <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
@@ -1076,10 +1048,8 @@ def vista_mi_cuenta():
         cerrar_sesion()
         st.rerun()
 
+# ESTILOS CSS 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ESTILOS CSS (paleta terracota suave + fuente +2px)
-# ═══════════════════════════════════════════════════════════════════════════
 def aplicar_estilos():
     st.markdown("""
     <style>
@@ -1399,16 +1369,8 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
             s["id"] if (g and g["id"] and s) else None,
             t.strip())
 
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUE 2/4 de app.py: LÓGICA DE NEGOCIO
-# registrar_entrada, bloqueos, tardanzas, justificaciones, permisos,
-# escáner QR, perfil de alumno
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # BLOQUEOS
-# ═══════════════════════════════════════════════════════════════════════════
+
 def _fecha_ultimo_desbloqueo(idal):
     with cursor() as (con, cur):
         cur.execute("""
@@ -1510,10 +1472,7 @@ def obtener_auditoria(limite=500):
     return leer_df("SELECT id,usuario,accion,fecha,ip FROM auditoria "
                    "ORDER BY id DESC LIMIT ?", (int(limite),))
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # JUSTIFICACIONES Y PERMISOS
-# ═══════════════════════════════════════════════════════════════════════════
 def _aplicar_just_prev(cur, idal, fecha, tipo):
     cur.execute("SELECT id FROM justificaciones_previas "
                 "WHERE alumno_id=? AND fecha_objetivo=? AND tipo=? AND aplicada=0",
@@ -1738,9 +1697,8 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
     return True, f"Justificacion de {just['alumno']} reactivada (pendiente)."
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# REGISTRAR ENTRADA (lógica con nueva regla de bloqueo)
-# ═══════════════════════════════════════════════════════════════════════════
+# REGISTRAR ENTRADA 
+
 def registrar_entrada(dni, usuario, origen="qr"):
     """
     Nueva lógica de bloqueo:
@@ -1758,7 +1716,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
     if not al:
         return False, "ERROR", "DNI no encontrado", {}
 
-    # ── 1. Bloqueo activo → retener ───────────────────────────────────────
+    #  retener
     bloq = alumno_bloqueado(al["id"])
     if bloq:
         auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni,
@@ -1767,7 +1725,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
             _nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"
         ), {"alumno": al, "motivo": bloq["motivo"]}
 
-    # ── 2. Verificar si ya alcanzó el límite de tardanzas (bloqueo pendiente) ──
+    #  Verificar si ya alcanzó el límite de tardanzas
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
     n_previas = contar_tardanzas_desde_ultimo_desbloqueo(al["id"])
@@ -1785,7 +1743,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
             " | BLOQUEADO (alcanzó el limite de tardanzas) - retener"
         ), {"alumno": al, "motivo": "limite alcanzado"}
 
-    # ── 3. Verificar día especial / ventana activa ────────────────────────
+    #  Verificar día especial 
     fecha_str = hoy_str()
     fecha_d = hoy_date()
     ha = hora_corta()
@@ -1811,7 +1769,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
     dia_id = v.get("dia_especial_id")
     ev_nombre = v.get("evento_nombre")
 
-    # ── 4. Verificar duplicado ────────────────────────────────────────────
+    #  Verificar duplicado
     with cursor() as (con, cur):
         cur.execute("SELECT id,estado FROM asistencias "
                     "WHERE alumno_id=? AND fecha=? AND tipo=?",
@@ -1822,7 +1780,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                 _nombre_completo(al) + f" ya registro {tipo_real} hoy ({ex['estado']})"
             ), {}
 
-        # ── 5. Reforzamiento ──────────────────────────────────────────────
+        # Reforzamiento
         if v["tipo"] == VENT_REF:
             try:
                 cur.execute("""
@@ -1858,7 +1816,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                    al["seccion"] + " | Asistio a reforzamiento " + ha)
             return True, "REFORZAMIENTO", msg, {"alumno": al, "evento_nombre": None}
 
-        # ── 6. Turno Tarde: verificar duplicado ───────────────────────────
+        #  Turno Tarde: verificar duplicado 
         if al["turno"] == "Tarde":
             cur.execute("SELECT id,estado,hora FROM asistencias "
                         "WHERE alumno_id=? AND fecha=? AND tipo IN ('clases','evento')",
@@ -1886,7 +1844,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                 ), {}
             raise
 
-        # ── 7. Registrar tardanza si aplica ───────────────────────────────
+        # Registrar tardanza si aplica 
         n = 0
         acc = None
         if est == TARDANZA:
@@ -1903,7 +1861,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                 if "unique" not in str(e).lower() and "duplicate" not in str(e).lower():
                     log.warning("tardanza: %s", e)
 
-    # ── 8. Resultado ──────────────────────────────────────────────────────
+    # Resultado 
     if est == TARDANZA:
         auditar(usuario["usuario"],
                 f"Tardanza {n}a DNI {dni} -> {acc}", tb="tardanzas")
@@ -1934,10 +1892,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
         " | " + tipo_real.upper() + " Puntual " + ha
     ), {"alumno": al, "evento_nombre": ev_nombre}
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # MARCAR FALTAS AL CIERRE
-# ═══════════════════════════════════════════════════════════════════════════
 def marcar_faltas_al_cierre():
     fecha_d = hoy_date()
     fecha_str = hoy_str()
@@ -2030,10 +1985,8 @@ def marcar_faltas_al_cierre():
                     """, (al["id"], fecha_d, v["id"], tipo, h_str, est,
                           1 if jp else 0, "auto", pid))
 
+# JUSTIFICAR ASISTENCIA 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# JUSTIFICAR ASISTENCIA (individual)
-# ═══════════════════════════════════════════════════════════════════════════
 def justificar_asistencia(ida, obs, usuario):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM asistencias WHERE id=?", (ida,))
@@ -2071,10 +2024,7 @@ def quitar_justificacion(ida, usuario):
             tb="asistencias", rid=ida)
     return True, "Justificacion eliminada."
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # ESCÁNER QR
-# ═══════════════════════════════════════════════════════════════════════════
 def _procesar_escaneo(dni):
     u = st.session_state.get("user")
     if not u:
@@ -2191,10 +2141,7 @@ def _render_mensaje_qr(msg):
     html += f'<div class="qr-texto">{mensaje}</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PERFIL ALUMNO (datos)
-# ═══════════════════════════════════════════════════════════════════════════
+# PERFIL ALUMNO 
 def perfil_alumno_datos(idal):
     """Cada query protegida: si una falla, las demas siguen."""
     try:
@@ -2281,15 +2228,8 @@ def perfil_alumno_datos(idal):
             "limite": calcular_limite(_es_reincidente(idal)),
             "bloqueado": alumno_bloqueado(idal) is not None}
 
+# MÉTRICAS 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUE 3/4 de app.py: REPORTES, PDF, EXCEL, CARNETS
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# MÉTRICAS Y CONSULTAS
-# ═══════════════════════════════════════════════════════════════════════════
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -2388,11 +2328,8 @@ def _turnos_para_panel():
             else:
                 resultado.append({"turno": t, "ventana": v, "estado": "cerrado"})
     return resultado
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # CIERRE ANUAL
-# ═══════════════════════════════════════════════════════════════════════════
+
 def reporte_cierre_anual(pid):
     return leer_df("""
         SELECT g.nombre AS grado,s.nombre AS seccion,t.nombre AS turno,
@@ -2500,10 +2437,7 @@ def listar_cierres_anuales():
         ORDER BY c.id DESC
     """)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # GENERACIÓN DE PDF
-# ═══════════════════════════════════════════════════════════════════════════
 def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
@@ -2664,10 +2598,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     buf.seek(0)
     return buf.getvalue()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# CARNETS / FOTOCHECK
-# ═══════════════════════════════════════════════════════════════════════════
+# CARNETS 
 def _generar_fotocheck_pil(alumno, escudo_path=None):
     from PIL import Image, ImageDraw, ImageFont
     ANCHO_PX = 817
@@ -3059,11 +2990,7 @@ def pdf_resumen_alumno(idal):
     doc.build(el)
     buf.seek(0)
     return buf.getvalue()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # EXCEL
-# ═══════════════════════════════════════════════════════════════════════════
 def df_a_xlsx(df, hoja="Datos"):
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
@@ -3080,10 +3007,7 @@ def df_a_xlsx_multilhoja(hojas):
     buf.seek(0)
     return buf.getvalue()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# HOJAS DE REPORTE (diario / mensual)
-# ═══════════════════════════════════════════════════════════════════════════
+# HOJAS DE REPORTE
 def _hoja_faltaron_dia(fecha, ids_secs):
     todos_just = []
     todos_injust = []
@@ -3335,14 +3259,7 @@ def _generar_hojas_mensual(mes, ano, ids_secs):
     return hojas
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUE 4/4 de app.py: VISTAS UI, MENÚ, MAIN
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SELECTOR REUTILIZABLE (grado -> sección -> alumno, en vista separada)
-# ═══════════════════════════════════════════════════════════════════════════
+###############################################################################################################################################################33
 def _selector_grado_seccion(clave, titulo="Elige el grado"):
     """Selector grado -> sección. Devuelve idsec o None."""
     idsec = st.session_state.get(clave + "_idsec")
@@ -3459,9 +3376,7 @@ def _reset_selector(clave, on_click_key=None):
         st.session_state.pop(on_click_key, None)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # PUERTA
-# ═══════════════════════════════════════════════════════════════════════════
 def _puerta_puede_operar(fecha):
     f_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -3567,10 +3482,8 @@ def vista_puerta():
     else:
         _puerta_manual(usuario, fecha)
 
+# BLOQUEADOS 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUEADOS (rediseñado con flujo botones grado->seccion->alumno)
-# ═══════════════════════════════════════════════════════════════════════════
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
     st.caption(
@@ -3581,7 +3494,7 @@ def vista_bloqueados():
     )
     usuario = st.session_state["user"]
 
-    # ─── LISTA DE BLOQUEADOS (con total) ───
+    # LISTA DE BLOQUEADOS 
     df = listar_bloqueados()
     st.metric("Total bloqueados", len(df))
 
@@ -3591,7 +3504,7 @@ def vista_bloqueados():
 
     st.dataframe(df, width='stretch', hide_index=True)
 
-    # ─── FLUJO DE DESBLOQUEO CON BOTONES ───
+    # FLUJO DE DESBLOQUEO CON BOTONES
     st.markdown("---")
     st.subheader("Desbloquear alumno")
 
@@ -3612,7 +3525,7 @@ def vista_bloqueados():
             st.rerun()
         return
 
-    # ─── VISTA SEPARADA CON INFO Y DESBLOQUEO ───
+    #  VISTA SEPARADA CON INFO Y DESBLOQUEO 
     st.markdown("---")
     st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
                 f"{(al['apellido_materno'] or '')}, {al['nombres']}")
@@ -3670,10 +3583,7 @@ def vista_bloqueados():
         _reset_selector(clave, "bloq_al_sel_id")
         st.rerun()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # PANEL DIRECCION
-# ═══════════════════════════════════════════════════════════════════════════
 def vista_panel_direccion():
     try:
         st_autorefresh(interval=15000, key="panel_dir_refresh")
@@ -3737,9 +3647,7 @@ def vista_panel_direccion():
         st.dataframe(df, width='stretch')
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # REPORTES UI
-# ═══════════════════════════════════════════════════════════════════════════
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
     permitidas = None
@@ -4161,10 +4069,7 @@ def vista_reportes():
         return
     _rep_seleccionar_seccion(usuario)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # ALUMNOS UI
-# ═══════════════════════════════════════════════════════════════════════════
 def _frag_crear_alumno():
     st.subheader("Crear alumno manualmente")
     grados = listar_grados()
@@ -4556,7 +4461,7 @@ def _perfil_alumno(idal):
                 if not activo:
                     estado_txt = "🔴 Anulado"
                 elif aplicado:
-                    estado_txt = "🔒 Aplicado (no anulable)"
+                    estado_txt = "🔒 Aplicado"
                 else:
                     estado_txt = "🟢 Pendiente"
                 c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
@@ -4597,7 +4502,7 @@ def _perfil_alumno(idal):
                 except (ValueError, TypeError):
                     v = 0
                 if v == 1:
-                    return "🔒 Aplicada (no anulable)"
+                    return "🔒 Aplicada"
                 if v == -1:
                     return "🔴 Anulada"
                 return "🟡 Pendiente"
@@ -4678,9 +4583,8 @@ def vista_alumnos():
         _frag_editar_alumno()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# GRADOS Y SECCIONES (solo lectura con totales)
-# ═══════════════════════════════════════════════════════════════════════════
+# GRADOS Y SECCIONES 
+
 def vista_grados_secciones():
     st.title("Grados y Secciones")
     st.caption("Vista de referencia. Las secciones se crean automaticamente "
@@ -4717,11 +4621,7 @@ def vista_grados_secciones():
 
     st.metric("Total de secciones", len(df))
     st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # CARNETS
-# ═══════════════════════════════════════════════════════════════════════════
 def vista_carnets():
     st.title("Carnets QR")
 
@@ -4859,10 +4759,7 @@ def _carnets_ver_seccion(idsec):
             st.session_state["carn_sel_alumnos"] = set()
             st.rerun()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# VENTANAS (sin contraseña, solo checkbox)
-# ═══════════════════════════════════════════════════════════════════════════
+# VENTANAS 
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Configura apertura, limite puntual y cierre por turno y tipo.")
@@ -4897,10 +4794,7 @@ def vista_ventanas():
                     st.toast("Ventana actualizada")
                     st.rerun()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # USUARIOS (botones por usuario + tabs separados)
-# ═══════════════════════════════════════════════════════════════════════════
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
         cur.execute("SELECT id,rol,es_principal,usuario FROM usuarios WHERE id=?",
@@ -4970,7 +4864,6 @@ def _usuario_form_editar(idu):
                         "tipo": "ok", "msg": "Usuario editado."}
                     st.session_state.pop(f"_editando_u_{idu}", None)
                     st.rerun()
-
 
 def _frag_usuarios_botones():
     usuario = st.session_state["user"]
@@ -5182,9 +5075,7 @@ def vista_usuarios():
         _frag_usuarios_mantenimiento()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 # AUDITORÍA (sin crear periodo, solo info)
-# ═══════════════════════════════════════════════════════════════════════════
 def _frag_importar_excel():
     st.subheader("Cargar alumnos al periodo")
     st.info("Columnas: DNI, Nombres, Apellido Paterno, Apellido Materno, Grado, "
@@ -5375,10 +5266,7 @@ def vista_auditoria():
         if not dfp.empty:
             st.dataframe(dfp, width='stretch')
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # DÍAS ESPECIALES
-# ═══════════════════════════════════════════════════════════════════════════
 def vista_dias_especiales():
     st.title("Dias especiales")
     usuario = st.session_state["user"]
@@ -5530,10 +5418,7 @@ def vista_dias_especiales():
                     "tipo": "ok", "msg": "Dia especial eliminado."}
                 st.rerun()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# JUSTIFICACIONES PREVIAS + PERMISOS (historial global primero)
-# ═══════════════════════════════════════════════════════════════════════════
+# JUSTIFICACIONES PREVIAS + PERMISOS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
@@ -5543,7 +5428,6 @@ def _frag_justificacion_previa(usuario):
         _render_historial_global_jp(usuario)
     with tabs[1]:
         _render_registrar_jp(usuario)
-
 
 def _render_registrar_jp(usuario):
     clave = "jp_sel"
@@ -6057,19 +5941,13 @@ def vista_justificaciones_permisos():
     with tabs[1]:
         _frag_permisos(usuario)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # BACKUP
-# ═══════════════════════════════════════════════════════════════════════════
 def vista_backup():
     st.title("Backup de base de datos")
     from sync import boton_backup
     boton_backup()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
+    
 # MENÚ Y RUTAS
-# ═══════════════════════════════════════════════════════════════════════════
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     if rol == "Admin":
@@ -6150,10 +6028,7 @@ def _control_faltas():
     st.session_state["_ultimo_control_faltas"] = t
     marcar_faltas_al_cierre()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
 # MAIN
-# ═══════════════════════════════════════════════════════════════════════════
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
@@ -6196,7 +6071,6 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
 
 if __name__ == "__main__":
     main()
