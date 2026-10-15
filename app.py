@@ -5209,7 +5209,7 @@ def _frag_usuarios_botones():
     if soy_principal:
         df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
                      "es_principal FROM usuarios "
-                     "ORDER BY apellidos, nombres, usuario")
+                     "ORDER BY nombres, usuario")
     else:
         df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
                      "es_principal FROM usuarios WHERE id=? OR rol!='Admin' "
