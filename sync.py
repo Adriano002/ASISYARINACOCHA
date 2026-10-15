@@ -1,8 +1,12 @@
-# sincronizacion con cloudflare
+# sync.py - Sincronización con Cloudflare R2
 import logging
-import streamlit as st
 from pathlib import Path
+
+import streamlit as st
+
 log = logging.getLogger("sync")
+
+
 def _client():
     """Crea cliente boto3 apuntando a Cloudflare R2."""
     import boto3
@@ -20,18 +24,20 @@ def _client():
         region_name="auto",
         config=cfg,
     )
+
+
 def descargar_bd(destino: Path):
-    """Descarga la base de datos local"""
+    """Descarga la base de datos desde R2."""
     try:
         cliente = _client()
         bucket = st.secrets["r2"]["bucket"]
         key = st.secrets["r2"].get("key", "asistencia.db")
         destino.parent.mkdir(parents=True, exist_ok=True)
         cliente.download_file(bucket, key, str(destino))
-        log.info(f"BD descargada: {destino} ({destino.stat().st_size} bytes)")
+        log.info("BD descargada: %s (%s bytes)", destino, destino.stat().st_size)
         return True
     except Exception as e:
-        log.warning(f"descargar_bd: {e}")
+        log.warning("descargar_bd: %s", e)
         return False
 
 
@@ -45,33 +51,33 @@ def subir_bd(origen: Path):
         bucket = st.secrets["r2"]["bucket"]
         key = st.secrets["r2"].get("key", "asistencia.db")
         cliente.upload_file(str(origen), bucket, key)
-        log.info(f"BD subida a R2: {origen.stat().st_size} bytes")
+        log.info("BD subida a R2: %s bytes", origen.stat().st_size)
         return True
     except Exception as e:
-        log.error(f"subir_bd: {e}")
+        log.error("subir_bd: %s", e)
         return False
 
 
 def boton_backup():
-    """SUBIR ASISYARINA MANUALMENTE"""
-    import streamlit as st
+    """Backup manual: subir / descargar desde R2. (Sin descarga .db local)."""
     from db import DB_PATH, reset_pool
 
     st.markdown("### Backup manual")
 
     if DB_PATH.exists():
         tam = DB_PATH.stat().st_size / 1024
-        st.success(f"BD local: {DB_PATH} ({tam:.1f} KB)")
+        st.success(f"BD local: {DB_PATH.name} ({tam:.1f} KB)")
     else:
-        st.error("No hay Bade de Datos local")
+        st.error("No hay base de datos local.")
 
     c1, c2 = st.columns(2)
 
     with c1:
-        if st.button("Subir base de datos al almacenamiento", type="primary", width="stretch"):
+        if st.button("⬆️ Subir base de datos al almacenamiento",
+                     type="primary", width="stretch"):
             with st.spinner("Subiendo..."):
                 if subir_bd(DB_PATH):
-                    st.success("Asisyarinasubido correctamente")
+                    st.success("Base de datos subida correctamente.")
                 else:
                     st.error("Error al subir. Revisa los logs.")
 
@@ -90,13 +96,3 @@ def boton_backup():
         "⚠️ En Streamlit Cloud el filesystem es efímero. "
         "Haz backup periódicamente o al terminar la jornada."
     )
-
-    if DB_PATH.exists():
-        with open(DB_PATH, "rb") as f:
-            st.download_button(
-                "📥 Descargar BD local (.db)",
-                f.read(),
-                file_name="asistencia_backup.db",
-                mime="application/octet-stream",
-                width="stretch",
-            )
