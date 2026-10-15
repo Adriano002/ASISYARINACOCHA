@@ -5657,19 +5657,21 @@ def vista_dias_especiales():
         if tipo == "Evento" and alcance == "Solo algunas secciones":
             st.markdown("**Alcance del dia especial:**")
             with st.expander("Seleccionar grados y secciones", expanded=True):
-                grados = sorted(listar_grados(), key=lambda g: g["nombre"])
+                grados = listar_grados()
                 for g in grados:
                     k_grado = "dia_grado_" + str(g["id"])
                     keys_actuales.add(k_grado)
                     st.checkbox("Todo " + g["nombre"], key=k_grado)
-                    secs = sorted(secciones_por_grado(g["id"]),
-                                  key=lambda s: s["nombre"])
-                    for s in secs:
-                        k_sec = f"dia_sec_{g['id']}_{s['id']}"
-                        keys_actuales.add(k_sec)
-                        if st.checkbox(f"   {g['nombre']} {s['nombre']}",
-                                       key=k_sec):
-                            selecciones_secciones.append(s["id"])
+                    secs = secciones_por_grado(g["id"])
+                    if secs:
+                        cols = st.columns(3)
+                        for i, s in enumerate(secs):
+                            k_sec = f"dia_sec_{g['id']}_{s['id']}"
+                            keys_actuales.add(k_sec)
+                            with cols[i % 3]:
+                                if st.checkbox(f"{g['nombre']} {s['nombre']}",
+                                               key=k_sec):
+                                    selecciones_secciones.append(s["id"])
 
         st.session_state["_dia_keys_actuales"] = keys_actuales
 
