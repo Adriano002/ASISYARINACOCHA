@@ -5513,6 +5513,9 @@ def vista_backup():
 def aplicar_estilos():
     st.markdown("""
     <style>
+    /* ══════════════════════════════════════════════════════════════════
+       VARIABLES GLOBALES (se adaptan a modo claro/oscuro automáticamente)
+       ══════════════════════════════════════════════════════════════════ */
     :root{
         --primario:      #B85C38;
         --primario-dark: #8C4525;
@@ -5521,9 +5524,9 @@ def aplicar_estilos():
         --acento:        #D4A574;
         --acento-soft:   rgba(212,165,116,.15);
 
-        --sombra:        0 2px 8px rgba(0,0,0,.06);
         --radius:        12px;
         --radius-sm:     8px;
+        --sombra:        0 2px 8px rgba(0,0,0,.06);
 
         --fs-base:       16px;
         --fs-small:      14px;
@@ -5534,12 +5537,19 @@ def aplicar_estilos():
 
     @media (prefers-color-scheme: dark){
         :root{
-            --primario-soft: rgba(184,92,56,.18);
-            --primario-borde:rgba(184,92,56,.45);
-            --acento-soft:   rgba(212,165,116,.20);
+            --primario:      #D68A66;
+            --primario-dark: #E5A182;
+            --primario-soft: rgba(214,138,102,.15);
+            --primario-borde:rgba(214,138,102,.40);
+            --acento:        #E5C09A;
+            --acento-soft:   rgba(229,192,154,.20);
+            --sombra:        0 2px 8px rgba(0,0,0,.3);
         }
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       TIPOGRAFÍA
+       ══════════════════════════════════════════════════════════════════ */
     html, body, [class*="css"], .stApp{
         font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
         font-size: var(--fs-base) !important;
@@ -5569,8 +5579,12 @@ def aplicar_estilos():
 
     .stCaption, small, div[data-testid="stCaptionContainer"]{
         font-size: var(--fs-small) !important;
+        opacity: 0.75;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       SIDEBAR
+       ══════════════════════════════════════════════════════════════════ */
     section[data-testid="stSidebar"]{
         border-right: 1px solid var(--primario-borde);
     }
@@ -5591,7 +5605,7 @@ def aplicar_estilos():
     section[data-testid="stSidebar"] .stRadio input{display:none;}
 
     .encabezado-sidebar{
-        background: var(--primario);
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 20px 16px;
         margin: 8px 10px 18px 10px;
         border-radius: var(--radius);
@@ -5617,14 +5631,24 @@ def aplicar_estilos():
         letter-spacing: .10em; color: #FFF !important;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       INPUTS
+       ══════════════════════════════════════════════════════════════════ */
     .stTextInput input, .stNumberInput input, .stDateInput input,
     .stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
         border-radius: var(--radius-sm) !important;
         min-height: 46px;
         font-size: var(--fs-base) !important;
-        border: 2px solid rgba(128,128,128,.18) !important;
+        border: 2px solid var(--primario-borde) !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus{
+        border-color: var(--primario) !important;
+        box-shadow: 0 0 0 3px var(--primario-soft) !important;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       BOTONES (color primario institucional)
+       ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
         color: #FFF !important;
@@ -5643,6 +5667,22 @@ def aplicar_estilos():
         transform: translateY(-1px);
     }
 
+    /* Botones cápsula (para selectores) */
+    .capsula .stButton > button{
+        padding: 10px 16px !important;
+        font-size: 15px !important;
+        min-height: 44px;
+        border-radius: 22px !important;
+        width: 100%;
+    }
+    .capsula .stButton > button p{
+        font-size: 15px !important;
+        font-weight: 600 !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MÉTRICAS
+       ══════════════════════════════════════════════════════════════════ */
     div[data-testid="stMetric"]{
         background: var(--primario-soft);
         border: 1px solid var(--primario-borde);
@@ -5658,6 +5698,9 @@ def aplicar_estilos():
         color: var(--primario) !important;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       TABS
+       ══════════════════════════════════════════════════════════════════ */
     .stTabs [data-baseweb="tab-list"]{
         gap: 4px;
         border-bottom: 2px solid var(--primario-borde);
@@ -5666,13 +5709,18 @@ def aplicar_estilos():
         font-weight: 600 !important;
         padding: 12px 18px !important;
         font-size: var(--fs-small) !important;
+        opacity: 0.7;
     }
     .stTabs [aria-selected="true"]{
         font-weight: 800 !important;
         color: var(--primario) !important;
         border-bottom: 3px solid var(--primario) !important;
+        opacity: 1;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       EXPANDERS
+       ══════════════════════════════════════════════════════════════════ */
     .streamlit-expanderHeader, details summary{
         border: 1px solid var(--primario-borde) !important;
         border-radius: var(--radius-sm) !important;
@@ -5680,9 +5728,15 @@ def aplicar_estilos():
         padding: 14px 16px !important;
         font-size: var(--fs-base) !important;
     }
+    .streamlit-expanderHeader:hover{
+        border-color: var(--primario) !important;
+    }
 
-    .scan-header, .puerta-header, .perfil-hero{
-        background: var(--primario);
+    /* ══════════════════════════════════════════════════════════════════
+       HEADERS DE PÁGINA
+       ══════════════════════════════════════════════════════════════════ */
+    .scan-header, .puerta-header{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 24px 28px;
         border-radius: var(--radius);
         margin-bottom: 20px;
@@ -5694,9 +5748,55 @@ def aplicar_estilos():
     .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
     .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
 
+    /* ══════════════════════════════════════════════════════════════════
+       PERFIL HERO
+       ══════════════════════════════════════════════════════════════════ */
+    .perfil-hero{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        border-radius: 14px;
+        padding: 26px 30px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        flex-wrap: wrap;
+        color: #FFF;
+        box-shadow: 0 4px 16px rgba(184,92,56,.20);
+    }
+    .perfil-hero .hero-avatar{
+        width: 84px; height: 84px; border-radius: 50%;
+        background: rgba(255,255,255,.20);
+        border: 2px solid rgba(255,255,255,.45);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 34px; font-weight: 800; color: #FFF;
+        flex-shrink: 0;
+    }
+    .perfil-hero .hero-info{ flex: 1; min-width: 240px; }
+    .perfil-hero .hero-nombre{
+        font-size: 24px; font-weight: 800; color: #FFF !important;
+        margin-bottom: 4px;
+    }
+    .perfil-hero .hero-meta{
+        font-size: 14px; opacity: .92; color: #FFF !important;
+        line-height: 1.5;
+    }
+    .perfil-hero .hero-badge{
+        display: inline-block; margin-top: 10px;
+        padding: 4px 14px; border-radius: 20px;
+        font-size: 10px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .12em;
+        background: rgba(255,255,255,.25);
+        border: 1px solid rgba(255,255,255,.45);
+        color: #FFF !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       BLOQUES / CARDS (se adaptan al tema)
+       ══════════════════════════════════════════════════════════════════ */
     .perfil-bloque{
+        background: var(--secondary-background-color);
         border: 1px solid var(--primario-borde);
-        border-radius: 12px;
+        border-radius: var(--radius);
         padding: 20px 22px;
         margin-bottom: 20px;
         box-shadow: var(--sombra);
@@ -5707,7 +5807,23 @@ def aplicar_estilos():
         margin-bottom: 14px; padding-bottom: 8px;
         border-bottom: 1px solid var(--primario-borde);
     }
+    .info-linea{
+        display: flex; padding: 6px 0;
+        font-size: 14px;
+        border-bottom: 1px solid var(--primario-soft);
+    }
+    .info-linea:last-child{ border-bottom: none; }
+    .info-label{
+        font-size: 12px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .05em;
+        opacity: 0.65;
+        min-width: 130px;
+    }
+    .info-valor{ font-weight: 500; }
 
+    /* ══════════════════════════════════════════════════════════════════
+       KPI CARDS
+       ══════════════════════════════════════════════════════════════════ */
     .kpi-grid{
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -5719,6 +5835,11 @@ def aplicar_estilos():
         border-radius: 10px;
         padding: 16px 12px;
         text-align: center;
+        transition: all .15s ease;
+    }
+    .kpi-card:hover{
+        border-color: var(--primario);
+        box-shadow: var(--sombra);
     }
     .kpi-card .kpi-num{
         font-size: 30px; font-weight: 800; color: var(--primario);
@@ -5727,10 +5848,23 @@ def aplicar_estilos():
     .kpi-card .kpi-lbl{
         font-size: 11px; font-weight: 700; text-transform: uppercase;
         letter-spacing: .08em; line-height: 1.3;
+        opacity: 0.75;
     }
-    .kpi-card .kpi-lbl-alerta{ color: #C62828; }
+    .kpi-card .kpi-lbl-alerta{ color: #C62828; opacity: 1; }
+    @media (prefers-color-scheme: dark){
+        .kpi-card .kpi-lbl-alerta{ color: #FC8181; }
+    }
 
+    /* ══════════════════════════════════════════════════════════════════
+       MENSAJES QR
+       ══════════════════════════════════════════════════════════════════ */
+    .scan-ultimos{
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
+        border-bottom: 2px solid var(--primario-borde); color: var(--primario);
+    }
     .qr-msg{
+        background: var(--secondary-background-color);
         padding: 16px 20px;
         border-radius: var(--radius-sm);
         margin: 10px 0;
@@ -5755,11 +5889,26 @@ def aplicar_estilos():
     .qr-ultima    { border-left-color:#B85C38; font-weight:800; background: var(--acento-soft); }
     .qr-error     { border-left-color:#888888; }
 
+    @media (prefers-color-scheme: dark){
+        .qr-puntual   { background: rgba(34,197,94,.10); }
+        .qr-tardanza  { background: rgba(245,158,11,.10); }
+        .qr-derivado  { background: rgba(255,152,0,.12); }
+        .qr-retenido  { background: rgba(255,112,67,.12); }
+        .qr-refuerzo  { background: rgba(66,165,245,.10); }
+        .qr-bloqueado { background: rgba(239,68,68,.15); }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       BOTÓN SELECCIONADO
+       ══════════════════════════════════════════════════════════════════ */
     .btn-sel .stButton > button{
         background: #43A047 !important;
         color: #FFF !important;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       SEPARADORES
+       ══════════════════════════════════════════════════════════════════ */
     hr{
         border: none;
         height: 1px;
@@ -5767,17 +5916,23 @@ def aplicar_estilos():
         margin: 20px 0;
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       RESPONSIVE
+       ══════════════════════════════════════════════════════════════════ */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
         h2{ font-size: 1.2rem !important; }
         .stButton > button{ width: 100% !important; }
-        .perfil-hero{ padding: 20px; }
+        .perfil-hero{ padding: 20px; gap: 16px; }
+        .perfil-hero .hero-avatar{ width: 64px; height: 64px; font-size: 26px; }
+        .perfil-hero .hero-nombre{ font-size: 19px; }
         .kpi-grid{ grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .kpi-card .kpi-num{ font-size: 24px; }
+        .info-linea{ flex-direction: column; }
+        .info-label{ min-width: auto; margin-bottom: 2px; }
     }
     </style>
     """, unsafe_allow_html=True)
-
 
 def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
     grados = listar_grados()
