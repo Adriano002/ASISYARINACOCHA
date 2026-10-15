@@ -5514,36 +5514,53 @@ def aplicar_estilos():
     st.markdown("""
     <style>
     /* ══════════════════════════════════════════════════════════════════
-       VARIABLES GLOBALES (se adaptan a modo claro/oscuro automáticamente)
+       VARIABLES GLOBALES (terracota claro + texto oscuro)
        ══════════════════════════════════════════════════════════════════ */
     :root{
-        --primario:      #B85C38;
-        --primario-dark: #8C4525;
-        --primario-soft: rgba(184,92,56,.10);
-        --primario-borde:rgba(184,92,56,.30);
-        --acento:        #D4A574;
-        --acento-soft:   rgba(212,165,116,.15);
+        /* Terracota más claro */
+        --primario:       #E8A87C;
+        --primario-dark:  #D68A66;
+        --primario-hover: #D68A66;
+        --primario-soft:  rgba(232,168,124,.18);
+        --primario-borde: rgba(184,92,56,.35);
 
-        --radius:        12px;
-        --radius-sm:     8px;
-        --sombra:        0 2px 8px rgba(0,0,0,.06);
+        /* Acento */
+        --acento:         #F5D3B3;
+        --acento-soft:    rgba(245,211,179,.30);
 
-        --fs-base:       16px;
-        --fs-small:      14px;
-        --fs-label:      12px;
-        --fs-titulo:     30px;
-        --fs-h2:         22px;
+        /* Texto */
+        --texto-btn:      #1A1A1A;   /* Texto NEGRO en botones */
+        --texto-titulo:   #8C4525;   /* Títulos terracota oscuro */
+        --texto-suave:    #4A4A4A;
+
+        --radius:         12px;
+        --radius-sm:      8px;
+        --sombra:         0 2px 8px rgba(0,0,0,.06);
+
+        --fs-base:        16px;
+        --fs-small:       14px;
+        --fs-label:       12px;
+        --fs-titulo:      30px;
+        --fs-h2:          22px;
     }
 
     @media (prefers-color-scheme: dark){
         :root{
-            --primario:      #D68A66;
-            --primario-dark: #E5A182;
-            --primario-soft: rgba(214,138,102,.15);
-            --primario-borde:rgba(214,138,102,.40);
-            --acento:        #E5C09A;
-            --acento-soft:   rgba(229,192,154,.20);
-            --sombra:        0 2px 8px rgba(0,0,0,.3);
+            /* Terracota más claro para modo oscuro */
+            --primario:       #F0B890;
+            --primario-dark:  #E8A87C;
+            --primario-hover: #E8A87C;
+            --primario-soft:  rgba(240,184,144,.20);
+            --primario-borde: rgba(232,168,124,.45);
+
+            --acento:         #F5D3B3;
+            --acento-soft:    rgba(245,211,179,.25);
+
+            --texto-btn:      #1A1A1A;
+            --texto-titulo:   #F0B890;
+            --texto-suave:    #B8B8B8;
+
+            --sombra:         0 2px 8px rgba(0,0,0,.30);
         }
     }
 
@@ -5558,19 +5575,19 @@ def aplicar_estilos():
     h1{
         font-size: var(--fs-titulo) !important;
         font-weight: 800 !important;
-        color: var(--primario) !important;
-        -webkit-text-fill-color: var(--primario) !important;
+        color: var(--texto-titulo) !important;
+        -webkit-text-fill-color: var(--texto-titulo) !important;
         letter-spacing: -0.5px;
     }
     h2{
         font-size: var(--fs-h2) !important;
         font-weight: 700 !important;
-        color: var(--primario) !important;
+        color: var(--texto-titulo) !important;
     }
     h3{
         font-size: 19px !important;
         font-weight: 700 !important;
-        color: var(--primario-dark) !important;
+        color: var(--texto-titulo) !important;
     }
 
     p, span, label, .stMarkdown, .stText, div[data-testid="stMarkdownContainer"]{
@@ -5600,7 +5617,7 @@ def aplicar_estilos():
     }
     section[data-testid="stSidebar"] .stRadio label:hover{
         background: var(--primario-soft) !important;
-        border-left-color: var(--primario);
+        border-left-color: var(--primario-dark);
     }
     section[data-testid="stSidebar"] .stRadio input{display:none;}
 
@@ -5610,25 +5627,25 @@ def aplicar_estilos():
         margin: 8px 10px 18px 10px;
         border-radius: var(--radius);
         text-align: center;
-        color: #FFF;
+        color: #1A1A1A;
         box-shadow: var(--sombra);
     }
     .encabezado-sidebar .avatar{
         width: 58px; height: 58px; border-radius: 50%;
-        background: rgba(255,255,255,.25);
+        background: rgba(26,26,26,.15);
         display: flex; align-items: center; justify-content: center;
-        font-size: 24px; font-weight: 800; color: #FFF;
+        font-size: 24px; font-weight: 800; color: #1A1A1A;
         margin: 0 auto 10px auto;
-        border: 2px solid rgba(255,255,255,.5);
+        border: 2px solid rgba(26,26,26,.25);
     }
     .encabezado-sidebar .nombre{
-        font-size: 16px; font-weight: 700; color: #FFF !important;
+        font-size: 16px; font-weight: 800; color: #1A1A1A !important;
     }
     .encabezado-sidebar .rol{
         display: inline-block; margin-top: 8px; padding: 4px 12px;
-        background: rgba(255,255,255,.25); border-radius: 20px;
+        background: rgba(26,26,26,.15); border-radius: 20px;
         font-size: 11px; font-weight: 800; text-transform: uppercase;
-        letter-spacing: .10em; color: #FFF !important;
+        letter-spacing: .10em; color: #1A1A1A !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -5642,16 +5659,16 @@ def aplicar_estilos():
         border: 2px solid var(--primario-borde) !important;
     }
     .stTextInput input:focus, .stTextArea textarea:focus{
-        border-color: var(--primario) !important;
+        border-color: var(--primario-dark) !important;
         box-shadow: 0 0 0 3px var(--primario-soft) !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       BOTONES (color primario institucional)
+       BOTONES (terracota claro + TEXTO NEGRO)
        ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
-        color: #FFF !important;
+        color: var(--texto-btn) !important;
         border-radius: var(--radius-sm) !important;
         font-weight: 700 !important;
         border: none !important;
@@ -5661,13 +5678,18 @@ def aplicar_estilos():
         box-shadow: 0 2px 6px rgba(184,92,56,.20);
         transition: all .15s ease;
     }
+    .stButton > button p,
+    .stFormSubmitButton > button p,
+    .stDownloadButton > button p{
+        color: var(--texto-btn) !important;
+    }
     .stButton > button:hover, .stFormSubmitButton > button:hover,
     .stDownloadButton > button:hover{
         background: var(--primario-dark) !important;
         transform: translateY(-1px);
     }
 
-    /* Botones cápsula (para selectores) */
+    /* Botones cápsula */
     .capsula .stButton > button{
         padding: 10px 16px !important;
         font-size: 15px !important;
@@ -5678,6 +5700,7 @@ def aplicar_estilos():
     .capsula .stButton > button p{
         font-size: 15px !important;
         font-weight: 600 !important;
+        color: var(--texto-btn) !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -5695,7 +5718,7 @@ def aplicar_estilos():
     }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
         font-size: 32px !important; font-weight: 800 !important;
-        color: var(--primario) !important;
+        color: var(--texto-titulo) !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -5713,8 +5736,8 @@ def aplicar_estilos():
     }
     .stTabs [aria-selected="true"]{
         font-weight: 800 !important;
-        color: var(--primario) !important;
-        border-bottom: 3px solid var(--primario) !important;
+        color: var(--texto-titulo) !important;
+        border-bottom: 3px solid var(--primario-dark) !important;
         opacity: 1;
     }
 
@@ -5729,27 +5752,27 @@ def aplicar_estilos():
         font-size: var(--fs-base) !important;
     }
     .streamlit-expanderHeader:hover{
-        border-color: var(--primario) !important;
+        border-color: var(--primario-dark) !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       HEADERS DE PÁGINA
+       HEADERS DE PÁGINA (texto NEGRO)
        ══════════════════════════════════════════════════════════════════ */
     .scan-header, .puerta-header{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 24px 28px;
         border-radius: var(--radius);
         margin-bottom: 20px;
-        color: #FFF;
+        color: #1A1A1A;
         box-shadow: var(--sombra);
     }
-    .scan-header .scan-titulo{ font-size: 26px; font-weight: 800; color:#FFF; }
-    .scan-header .scan-sub{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
-    .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
-    .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
+    .scan-header .scan-titulo{ font-size: 26px; font-weight: 800; color:#1A1A1A; }
+    .scan-header .scan-sub{ font-size: 15px; opacity:.85; margin-top:4px; color:#1A1A1A; }
+    .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#1A1A1A; }
+    .puerta-header .fecha{ font-size: 15px; opacity:.85; margin-top:4px; color:#1A1A1A; }
 
     /* ══════════════════════════════════════════════════════════════════
-       PERFIL HERO
+       PERFIL HERO (texto NEGRO)
        ══════════════════════════════════════════════════════════════════ */
     .perfil-hero{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
@@ -5760,24 +5783,24 @@ def aplicar_estilos():
         align-items: center;
         gap: 22px;
         flex-wrap: wrap;
-        color: #FFF;
+        color: #1A1A1A;
         box-shadow: 0 4px 16px rgba(184,92,56,.20);
     }
     .perfil-hero .hero-avatar{
         width: 84px; height: 84px; border-radius: 50%;
-        background: rgba(255,255,255,.20);
-        border: 2px solid rgba(255,255,255,.45);
+        background: rgba(26,26,26,.15);
+        border: 2px solid rgba(26,26,26,.25);
         display: flex; align-items: center; justify-content: center;
-        font-size: 34px; font-weight: 800; color: #FFF;
+        font-size: 34px; font-weight: 800; color: #1A1A1A;
         flex-shrink: 0;
     }
     .perfil-hero .hero-info{ flex: 1; min-width: 240px; }
     .perfil-hero .hero-nombre{
-        font-size: 24px; font-weight: 800; color: #FFF !important;
+        font-size: 24px; font-weight: 800; color: #1A1A1A !important;
         margin-bottom: 4px;
     }
     .perfil-hero .hero-meta{
-        font-size: 14px; opacity: .92; color: #FFF !important;
+        font-size: 14px; opacity: .90; color: #1A1A1A !important;
         line-height: 1.5;
     }
     .perfil-hero .hero-badge{
@@ -5785,13 +5808,13 @@ def aplicar_estilos():
         padding: 4px 14px; border-radius: 20px;
         font-size: 10px; font-weight: 800;
         text-transform: uppercase; letter-spacing: .12em;
-        background: rgba(255,255,255,.25);
-        border: 1px solid rgba(255,255,255,.45);
-        color: #FFF !important;
+        background: rgba(26,26,26,.18);
+        border: 1px solid rgba(26,26,26,.30);
+        color: #1A1A1A !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       BLOQUES / CARDS (se adaptan al tema)
+       BLOQUES / CARDS
        ══════════════════════════════════════════════════════════════════ */
     .perfil-bloque{
         background: var(--secondary-background-color);
@@ -5803,7 +5826,7 @@ def aplicar_estilos():
     }
     .perfil-bloque .titulo-seccion{
         font-size: 12px; font-weight: 800; text-transform: uppercase;
-        letter-spacing: .12em; color: var(--primario);
+        letter-spacing: .12em; color: var(--texto-titulo);
         margin-bottom: 14px; padding-bottom: 8px;
         border-bottom: 1px solid var(--primario-borde);
     }
@@ -5838,11 +5861,11 @@ def aplicar_estilos():
         transition: all .15s ease;
     }
     .kpi-card:hover{
-        border-color: var(--primario);
+        border-color: var(--primario-dark);
         box-shadow: var(--sombra);
     }
     .kpi-card .kpi-num{
-        font-size: 30px; font-weight: 800; color: var(--primario);
+        font-size: 30px; font-weight: 800; color: var(--texto-titulo);
         line-height: 1; margin-bottom: 6px;
     }
     .kpi-card .kpi-lbl{
@@ -5861,7 +5884,7 @@ def aplicar_estilos():
     .scan-ultimos{
         font-size: 11px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
-        border-bottom: 2px solid var(--primario-borde); color: var(--primario);
+        border-bottom: 2px solid var(--primario-borde); color: var(--texto-titulo);
     }
     .qr-msg{
         background: var(--secondary-background-color);
@@ -5877,7 +5900,7 @@ def aplicar_estilos():
     .qr-evento{
         font-size: 12px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .10em; margin-bottom: 5px;
-        color: var(--primario); display: inline-block;
+        color: var(--texto-titulo); display: inline-block;
         padding: 3px 10px; background: var(--primario-soft); border-radius: 6px;
     }
     .qr-puntual   { border-left-color:#22C55E; background: rgba(34,197,94,.06); }
@@ -5903,6 +5926,9 @@ def aplicar_estilos():
        ══════════════════════════════════════════════════════════════════ */
     .btn-sel .stButton > button{
         background: #43A047 !important;
+        color: #FFF !important;
+    }
+    .btn-sel .stButton > button p{
         color: #FFF !important;
     }
 
