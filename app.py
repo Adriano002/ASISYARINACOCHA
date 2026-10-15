@@ -5514,22 +5514,27 @@ def aplicar_estilos():
     st.markdown("""
     <style>
     /* ══════════════════════════════════════════════════════════════════
-       VARIABLES GLOBALES (terracota neutro + texto blanco)
+       IMPORTAR FUENTE NUNITO DESDE GOOGLE FONTS
+       ══════════════════════════════════════════════════════════════════ */
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&display=swap');
+
+    /* ══════════════════════════════════════════════════════════════════
+       VARIABLES GLOBALES (naranja brillante + Nunito)
        ══════════════════════════════════════════════════════════════════ */
     :root{
-        /* Terracota neutro (ni claro ni oscuro, sin brillo) */
-        --primario:       #C97B5A;
-        --primario-dark:  #B06847;
-        --primario-soft:  rgba(201,123,90,.15);
-        --primario-borde: rgba(201,123,90,.35);
+        /* Naranja terracota brillante */
+        --primario:       #E87B4A;
+        --primario-dark:  #D66535;
+        --primario-soft:  rgba(232,123,74,.15);
+        --primario-borde: rgba(232,123,74,.35);
 
-        /* Acento cálido suave */
-        --acento:         #E5B896;
-        --acento-soft:    rgba(229,184,150,.25);
+        /* Acento */
+        --acento:         #F5B896;
+        --acento-soft:    rgba(245,184,150,.25);
 
         /* Texto */
         --texto-btn:      #FFFFFF;
-        --texto-titulo:   #A0522D;
+        --texto-titulo:   #C4562A;
         --texto-suave:    #4A4A4A;
 
         --radius:         12px;
@@ -5541,32 +5546,39 @@ def aplicar_estilos():
         --fs-label:       12px;
         --fs-titulo:      30px;
         --fs-h2:          22px;
+
+        --fuente:         'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     @media (prefers-color-scheme: dark){
         :root{
-            /* Terracota un poco más claro para modo oscuro */
-            --primario:       #D68A66;
-            --primario-dark:  #C97B5A;
-            --primario-soft:  rgba(214,138,102,.20);
-            --primario-borde: rgba(214,138,102,.45);
-
-            --acento:         #E5B896;
-            --acento-soft:    rgba(229,184,150,.20);
-
+            --primario:       #F08A5C;
+            --primario-dark:  #E87B4A;
+            --primario-soft:  rgba(240,138,92,.20);
+            --primario-borde: rgba(240,138,92,.45);
+            --acento:         #F5B896;
+            --acento-soft:    rgba(245,184,150,.20);
             --texto-btn:      #FFFFFF;
-            --texto-titulo:   #E8A87C;
+            --texto-titulo:   #F5A582;
             --texto-suave:    #B8B8B8;
-
             --sombra:         0 2px 8px rgba(0,0,0,.30);
         }
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       TIPOGRAFÍA
+       TIPOGRAFÍA (Nunito en TODO)
        ══════════════════════════════════════════════════════════════════ */
+    html, body, [class*="css"], .stApp,
+    .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
+    .stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
+    .stNumberInput, .stRadio, .stCheckbox, .stSlider,
+    .stTabs, .stExpander, div[data-testid="stSidebar"],
+    div[data-testid="stMetric"], button, input, textarea, select,
+    h1, h2, h3, h4, h5, h6, p, span, a, label, div{
+        font-family: var(--fuente) !important;
+    }
+
     html, body, [class*="css"], .stApp{
-        font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
         font-size: var(--fs-base) !important;
     }
 
@@ -5606,7 +5618,7 @@ def aplicar_estilos():
     section[data-testid="stSidebar"] .stRadio label{
         border-radius: var(--radius-sm) !important;
         padding: 12px 15px !important;
-        font-weight: 500 !important;
+        font-weight: 600 !important;
         font-size: var(--fs-small) !important;
         margin: 2px 0 !important;
         cursor: pointer;
@@ -5662,7 +5674,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       BOTONES (terracota neutro + texto BLANCO)
+       BOTONES (naranja brillante + texto BLANCO)
        ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
@@ -5673,7 +5685,7 @@ def aplicar_estilos():
         padding: 12px 22px !important;
         font-size: var(--fs-small) !important;
         min-height: 46px;
-        box-shadow: 0 2px 6px rgba(201,123,90,.25);
+        box-shadow: 0 2px 6px rgba(232,123,74,.25);
         transition: all .15s ease;
     }
     .stButton > button p,
@@ -5697,7 +5709,7 @@ def aplicar_estilos():
     }
     .capsula .stButton > button p{
         font-size: 15px !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         color: #FFFFFF !important;
     }
 
@@ -5711,7 +5723,7 @@ def aplicar_estilos():
         padding: 20px 22px !important;
     }
     div[data-testid="stMetric"] label{
-        font-size: 12px !important; font-weight: 700 !important;
+        font-size: 12px !important; font-weight: 800 !important;
         text-transform: uppercase; letter-spacing: .08em !important;
     }
     div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
@@ -5727,7 +5739,7 @@ def aplicar_estilos():
         border-bottom: 2px solid var(--primario-borde);
     }
     .stTabs [data-baseweb="tab"]{
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         padding: 12px 18px !important;
         font-size: var(--fs-small) !important;
         opacity: 0.7;
@@ -5745,7 +5757,7 @@ def aplicar_estilos():
     .streamlit-expanderHeader, details summary{
         border: 1px solid var(--primario-borde) !important;
         border-radius: var(--radius-sm) !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         padding: 14px 16px !important;
         font-size: var(--fs-base) !important;
     }
@@ -5782,7 +5794,7 @@ def aplicar_estilos():
         gap: 22px;
         flex-wrap: wrap;
         color: #FFF;
-        box-shadow: 0 4px 16px rgba(201,123,90,.20);
+        box-shadow: 0 4px 16px rgba(232,123,74,.20);
     }
     .perfil-hero .hero-avatar{
         width: 84px; height: 84px; border-radius: 50%;
@@ -5835,12 +5847,12 @@ def aplicar_estilos():
     }
     .info-linea:last-child{ border-bottom: none; }
     .info-label{
-        font-size: 12px; font-weight: 700;
+        font-size: 12px; font-weight: 800;
         text-transform: uppercase; letter-spacing: .05em;
         opacity: 0.65;
         min-width: 130px;
     }
-    .info-valor{ font-weight: 500; }
+    .info-valor{ font-weight: 600; }
 
     /* ══════════════════════════════════════════════════════════════════
        KPI CARDS
@@ -5867,7 +5879,7 @@ def aplicar_estilos():
         line-height: 1; margin-bottom: 6px;
     }
     .kpi-card .kpi-lbl{
-        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .08em; line-height: 1.3;
         opacity: 0.75;
     }
@@ -5894,7 +5906,7 @@ def aplicar_estilos():
         font-size: 15px;
     }
     .qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
-    .qr-texto{ font-size: 15px; font-weight: 500; line-height: 1.4; }
+    .qr-texto{ font-size: 15px; font-weight: 600; line-height: 1.4; }
     .qr-evento{
         font-size: 12px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .10em; margin-bottom: 5px;
@@ -5907,7 +5919,7 @@ def aplicar_estilos():
     .qr-retenido  { border-left-color:#FF7043; font-weight:700; background: rgba(255,112,67,.08); }
     .qr-refuerzo  { border-left-color:#42A5F5; background: rgba(66,165,245,.06); }
     .qr-bloqueado { border-left-color:#EF4444; border:2px solid #EF4444; font-weight:800; background: rgba(239,68,68,.10); }
-    .qr-ultima    { border-left-color:#C97B5A; font-weight:800; background: var(--acento-soft); }
+    .qr-ultima    { border-left-color:#E87B4A; font-weight:800; background: var(--acento-soft); }
     .qr-error     { border-left-color:#888888; }
 
     @media (prefers-color-scheme: dark){
