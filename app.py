@@ -5209,11 +5209,11 @@ def _frag_usuarios_botones():
     if soy_principal:
         df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
                      "es_principal FROM usuarios "
-                     "ORDER BY es_principal DESC, usuario")
+                     "ORDER BY apellidos, nombres, usuario")
     else:
         df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
                      "es_principal FROM usuarios WHERE id=? OR rol!='Admin' "
-                     "ORDER BY usuario", (usuario["id"],))
+                     "ORDER BY nombres, usuario", (usuario["id"],))
 
     if df.empty:
         st.info("Sin usuarios.")
@@ -5246,7 +5246,6 @@ def _frag_usuarios_botones():
             else:
                 _usuario_form_editar(int(u["id"]))
             st.markdown("---")
-
 
 def _frag_usuarios_crear():
     usuario = st.session_state["user"]
@@ -5319,7 +5318,7 @@ def _frag_usuarios_asignar():
     st.caption("Cada seccion solo puede estar asignada a un auxiliar.")
 
     dfa = leer_df("SELECT id,usuario,nombres,turno_asignado FROM usuarios "
-                  "WHERE rol='Auxiliar' AND activo=1")
+                  "WHERE rol='Auxiliar' AND activo=1 ORDER BY nombres")
     if dfa.empty:
         st.info("Sin auxiliares.")
         return
@@ -5336,6 +5335,9 @@ def _frag_usuarios_asignar():
         return
 
     secs = secciones_por_turno(ta["turno_asignado"])
+    # Ordenar alfabéticamente por grado, luego sección
+    secs = sorted(secs, key=lambda s: (s["grado"], s["nombre"]))
+
     with cursor() as (con, cur):
         cur.execute("SELECT seccion_id FROM auxiliar_secciones "
                     "WHERE usuario_id!=?", (ida,))
@@ -5349,8 +5351,8 @@ def _frag_usuarios_asignar():
     for s in secs:
         if s["id"] in asignadas_a_otros:
             continue
-        if st.checkbox(f"{s['grado']} {s['nombre']}",
-                       value=s["id"] in asig,
+        etiqueta = f"{s['grado']} {s['nombre']}"
+        if st.checkbox(etiqueta, value=s["id"] in asig,
                        key=f"asig_{ida}_{s['id']}"):
             sel_s.append(s["id"])
 
@@ -5372,7 +5374,6 @@ def _frag_usuarios_asignar():
         st.session_state["_aviso_usuarios"] = {
             "tipo": "ok", "msg": "Asignaciones guardadas."}
         st.rerun()
-
 
 def _frag_usuarios_mantenimiento():
     usuario = st.session_state["user"]
@@ -5656,21 +5657,19 @@ def vista_dias_especiales():
         if tipo == "Evento" and alcance == "Solo algunas secciones":
             st.markdown("**Alcance del dia especial:**")
             with st.expander("Seleccionar grados y secciones", expanded=True):
-                grados = listar_grados()
+                grados = sorted(listar_grados(), key=lambda g: g["nombre"])
                 for g in grados:
                     k_grado = "dia_grado_" + str(g["id"])
                     keys_actuales.add(k_grado)
                     st.checkbox("Todo " + g["nombre"], key=k_grado)
-                    secs = secciones_por_grado(g["id"])
-                    if secs:
-                        cols = st.columns(3)
-                        for i, s in enumerate(secs):
-                            k_sec = f"dia_sec_{g['id']}_{s['id']}"
-                            keys_actuales.add(k_sec)
-                            with cols[i % 3]:
-                                if st.checkbox(f"{g['nombre']} {s['nombre']}",
-                                               key=k_sec):
-                                    selecciones_secciones.append(s["id"])
+                    secs = sorted(secciones_por_grado(g["id"]),
+                                  key=lambda s: s["nombre"])
+                    for s in secs:
+                        k_sec = f"dia_sec_{g['id']}_{s['id']}"
+                        keys_actuales.add(k_sec)
+                        if st.checkbox(f"   {g['nombre']} {s['nombre']}",
+                                       key=k_sec):
+                            selecciones_secciones.append(s["id"])
 
         st.session_state["_dia_keys_actuales"] = keys_actuales
 
