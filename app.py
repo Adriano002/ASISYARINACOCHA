@@ -5519,34 +5519,26 @@ def aplicar_estilos():
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&display=swap');
 
     /* ══════════════════════════════════════════════════════════════════
-       VARIABLES GLOBALES (naranja brillante + Nunito)
+       VARIABLES GLOBALES
        ══════════════════════════════════════════════════════════════════ */
     :root{
-        /* Naranja terracota brillante */
         --primario:       #E87B4A;
         --primario-dark:  #D66535;
         --primario-soft:  rgba(232,123,74,.15);
         --primario-borde: rgba(232,123,74,.35);
-
-        /* Acento */
         --acento:         #F5B896;
         --acento-soft:    rgba(245,184,150,.25);
-
-        /* Texto */
         --texto-btn:      #FFFFFF;
         --texto-titulo:   #C4562A;
         --texto-suave:    #4A4A4A;
-
         --radius:         12px;
         --radius-sm:      8px;
         --sombra:         0 2px 8px rgba(0,0,0,.06);
-
         --fs-base:        16px;
         --fs-small:       14px;
         --fs-label:       12px;
         --fs-titulo:      30px;
         --fs-h2:          22px;
-
         --fuente:         'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
@@ -5566,7 +5558,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       TIPOGRAFÍA (Nunito en TODO)
+       TIPOGRAFÍA (Nunito) — SIN !important para no romper iconos
        ══════════════════════════════════════════════════════════════════ */
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
@@ -5575,11 +5567,36 @@ def aplicar_estilos():
     .stTabs, .stExpander, div[data-testid="stSidebar"],
     div[data-testid="stMetric"], button, input, textarea, select,
     h1, h2, h3, h4, h5, h6, p, span, a, label, div{
-        font-family: var(--fuente) !important;
+        font-family: var(--fuente);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       FIX: ICONOS MATERIAL SYMBOLS (NO tocar)
+       ══════════════════════════════════════════════════════════════════ */
+    span[data-testid="stIconMaterial"],
+    span[data-testid="stIconMaterial"] *,
+    .material-symbols-rounded,
+    .material-symbols-rounded *,
+    [class*="material-symbols"],
+    [class*="material-icons"],
+    [class*="MaterialIcon"]{
+        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+        font-weight: normal !important;
+        font-style: normal !important;
+        font-size: 24px !important;
+        line-height: 1 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        word-wrap: normal !important;
+        direction: ltr !important;
+        -webkit-font-feature-settings: 'liga' !important;
+        -webkit-font-smoothing: antialiased !important;
     }
 
     html, body, [class*="css"], .stApp{
-        font-size: var(--fs-base) !important;
+        font-size: var(--fs-base);
     }
 
     h1{
@@ -5601,7 +5618,7 @@ def aplicar_estilos():
     }
 
     p, span, label, .stMarkdown, .stText, div[data-testid="stMarkdownContainer"]{
-        font-size: var(--fs-base) !important;
+        font-size: var(--fs-base);
     }
 
     .stCaption, small, div[data-testid="stCaptionContainer"]{
@@ -5674,7 +5691,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       BOTONES (naranja brillante + texto BLANCO)
+       BOTONES
        ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
@@ -5697,20 +5714,6 @@ def aplicar_estilos():
     .stDownloadButton > button:hover{
         background: var(--primario-dark) !important;
         transform: translateY(-1px);
-    }
-
-    /* Botones cápsula */
-    .capsula .stButton > button{
-        padding: 10px 16px !important;
-        font-size: 15px !important;
-        min-height: 44px;
-        border-radius: 22px !important;
-        width: 100%;
-    }
-    .capsula .stButton > button p{
-        font-size: 15px !important;
-        font-weight: 700 !important;
-        color: #FFFFFF !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -5969,7 +5972,6 @@ def aplicar_estilos():
     }
     </style>
     """, unsafe_allow_html=True)
-
 def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
     grados = listar_grados()
     c1, c2, c3 = st.columns([2, 2, 3])
