@@ -9,47 +9,20 @@ from datetime import datetime, date, time
 
 log = logging.getLogger("db")
 
-# ─── CONFIGURACIÓN DINÁMICA POR PERIODO ────────────────────────────────────
-# Definimos un archivo "maestro" temporal para leer cuál es el periodo activo.
-# Este archivo NO guarda asistencias, solo sirve para consultar la tabla de periodos.
-BASE_DB = Path("data/asistencia_base.db")
-BASE_DB.parent.mkdir(parents=True, exist_ok=True)
-
-def _obtener_nombre_archivo_por_periodo():
-    """Consulta el archivo base para saber cuál es el periodo activo y genera el nombre del archivo."""
-    try:
-        # Nos conectamos al archivo base
-        con = sqlite3.connect(str(BASE_DB))
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        
-        # Buscamos el periodo activo
-        cur.execute("SELECT nombre FROM periodos WHERE activo = 1 LIMIT 1")
-        row = cur.fetchone()
-        con.close()
-        
-        if row and row["nombre"]:
-            # Limpiamos el nombre para que sea apto para un archivo
-            nombre_limpio = row["nombre"].strip().replace(" ", "_").replace("/", "-").replace("\\", "-")
-            # Ej: "Año Escolar 2026" -> "Año_Escolar_2026"
-            return f"asistencia_{nombre_limpio}.db"
-    except Exception as e:
-        log.warning(f"No se pudo leer el periodo activo: {e}")
-    
-    # Si no hay periodo activo o falla, usamos el año actual por defecto
-    return f"asistencia_{datetime.now().year}.db"
-
-# Calculamos el nombre del archivo al iniciar
-NOMBRE_ARCHIVO = _obtener_nombre_archivo_por_periodo()
-DB_PATH = Path(f"data/{NOMBRE_ARCHIVO}")
+# ─── CONFIGURACIÓN FIJA ────────────────────────────────────────────────────
+# Volvemos al nombre original para recuperar los datos
+DB_PATH = Path("data/asistencia.db")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# A partir de aquí, el resto del código es idéntico, pero usa DB_PATH dinámico.
 _local = threading.local()
 
+
+# ─── CONVERSIÓN %s → ? PARA SQLITE ─────────────────────────────────────────
 def _q(sql: str) -> str:
     return sql.replace("%s", "?")
 
+
+# ─── CONEXIÓN ──────────────────────────────────────────────────────────────
 def obtener_conexion():
     con = getattr(_local, "con", None)
     if con is None:
@@ -68,6 +41,7 @@ def obtener_conexion():
         _local.con = con
     return con
 
+
 def liberar_conexion(con):
     try:
         if con.in_transaction:
@@ -75,7 +49,10 @@ def liberar_conexion(con):
     except Exception:
         pass
 
+
+# ─── WRAPPER DE CURSOR (traduce %s → ?) ────────────────────────────────────
 class CursorWrapper:
+    """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
     def __init__(self, cursor):
         self._cur = cursor
         self.lastrowid = None
@@ -108,6 +85,7 @@ class CursorWrapper:
     def __iter__(self):
         return iter(self._cur)
 
+
 @contextmanager
 def cursor(dict_rows=True):
     con = obtener_conexion()
@@ -127,12 +105,14 @@ def cursor(dict_rows=True):
         except Exception:
             pass
 
+
 def escribir(sql, params=()):
     # La subida automática a R2 fue eliminada.
     # Ahora el backup se hace manualmente desde la vista de Configuración.
     with cursor() as (con, cur):
         cur.execute(sql, params)
         con.commit()
+
 
 def leer_df(sql, params=(), con=None):
     import pandas as pd
@@ -145,51 +125,78 @@ def leer_df(sql, params=(), con=None):
         return pd.DataFrame(columns=cols)
     return pd.DataFrame([dict(r) for r in filas])
 
-# ─── HELPERS DE CONVERSIÓN (Igual que antes) ─────────────────────────────
+
+# ─── HELPERS DE CONVERSIÓN ─────────────────────────────────────────────────
 def to_time(v):
-    if v is None or v == "": return None
-    if isinstance(v, time): return v.strftime("%H:%M")
-    if isinstance(v, datetime): return v.strftime("%H:%M")
+    if v is None or v == "":
+        return None
+    if isinstance(v, time):
+        return v.strftime("%H:%M")
+    if isinstance(v, datetime):
+        return v.strftime("%H:%M")
     return str(v)[:5]
 
+
 def to_date(v):
-    if v is None or v == "": return None
-    if isinstance(v, datetime): return v.strftime("%Y-%m-%d")
-    if isinstance(v, date): return v.strftime("%Y-%m-%d")
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d")
+    if isinstance(v, date):
+        return v.strftime("%Y-%m-%d")
     return str(v)[:10]
 
+
 def to_ts(v):
-    if v is None or v == "": return None
-    if isinstance(v, datetime): return v.strftime("%Y-%m-%d %H:%M:%S")
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
     return str(v)[:19]
 
+
 def fmt_time(v, con_seg=False):
-    if v is None: return ""
-    if isinstance(v, time): return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
-    if isinstance(v, datetime): return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
+    if v is None:
+        return ""
+    if isinstance(v, time):
+        return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
+    if isinstance(v, datetime):
+        return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
     s = str(v)
     return s[:8] if con_seg else (s[:5] if len(s) >= 5 else s)
 
+
 def fmt_date(v):
-    if v is None: return ""
-    if isinstance(v, datetime): return v.strftime("%Y-%m-%d")
-    if isinstance(v, date): return v.strftime("%Y-%m-%d")
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d")
+    if isinstance(v, date):
+        return v.strftime("%Y-%m-%d")
     return str(v)[:10]
 
+
 def fmt_ts(v):
-    if v is None: return ""
-    if isinstance(v, datetime): return v.strftime("%Y-%m-%d %H:%M:%S")
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
     return str(v)[:19]
+
 
 def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
     out = dict(d)
     for k in campos_time:
-        if k in out: out[k] = fmt_time(out[k])
+        if k in out:
+            out[k] = fmt_time(out[k])
     for k in campos_date:
-        if k in out: out[k] = fmt_date(out[k])
+        if k in out:
+            out[k] = fmt_date(out[k])
     for k in campos_ts:
-        if k in out: out[k] = fmt_ts(out[k])
+        if k in out:
+            out[k] = fmt_ts(out[k])
     return out
+
 
 # ─── PING / RESET ──────────────────────────────────────────────────────────
 def ping():
@@ -207,17 +214,24 @@ def ping():
         except Exception:
             return False
 
+
 def reset_pool():
     con = getattr(_local, "con", None)
     if con is not None:
-        try: con.close()
-        except Exception: pass
+        try:
+            con.close()
+        except Exception:
+            pass
         _local.con = None
+
 
 # ─── DESCARGA INICIAL DESDE R2 ─────────────────────────────────────────────
 def descargar_bd_si_no_existe():
+    # Si el archivo local ya existe y no está vacío, NO descargues de R2
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
         return True
+    
+    # Si no existe, intenta descargarlo de R2
     try:
         from sync import descargar_bd
         ok = descargar_bd(DB_PATH)
@@ -228,6 +242,7 @@ def descargar_bd_si_no_existe():
     except Exception as e:
         log.warning(f"No se pudo descargar BD desde R2: {e}")
         return False
+
 
 def subir_bd_a_r2():
     try:
