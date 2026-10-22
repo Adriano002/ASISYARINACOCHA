@@ -4,6 +4,8 @@ from pathlib import Path
 
 import streamlit as st
 
+from db import DB_PATH, reset_pool, ANIO_ACTUAL
+
 log = logging.getLogger("sync")
 
 
@@ -31,7 +33,8 @@ def descargar_bd(destino: Path):
     try:
         cliente = _client()
         bucket = st.secrets["r2"]["bucket"]
-        key = st.secrets["r2"].get("key", "asistencia.db")
+        # Nombre dinámico: asistencia_2024.db, asistencia_2025.db, etc.
+        key = f"asistencia_{ANIO_ACTUAL}.db"
         destino.parent.mkdir(parents=True, exist_ok=True)
         cliente.download_file(bucket, key, str(destino))
         log.info("BD descargada: %s (%s bytes)", destino, destino.stat().st_size)
@@ -49,7 +52,8 @@ def subir_bd(origen: Path):
             return False
         cliente = _client()
         bucket = st.secrets["r2"]["bucket"]
-        key = st.secrets["r2"].get("key", "asistencia.db")
+        # Nombre dinámico: asistencia_2024.db, asistencia_2025.db, etc.
+        key = f"asistencia_{ANIO_ACTUAL}.db"
         cliente.upload_file(str(origen), bucket, key)
         log.info("BD subida a R2: %s bytes", origen.stat().st_size)
         return True
@@ -59,9 +63,7 @@ def subir_bd(origen: Path):
 
 
 def boton_backup():
-    """Backup manual: subir / descargar desde R2. (Sin descarga .db local)."""
-    from db import DB_PATH, reset_pool
-
+    """Backup manual: subir / descargar desde R2."""
     st.markdown("### Backup manual")
 
     if DB_PATH.exists():
