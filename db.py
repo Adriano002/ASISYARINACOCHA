@@ -9,13 +9,12 @@ from datetime import datetime, date, time
 
 log = logging.getLogger("db")
 
-# ─── CONFIGURACIÓN ─────────────────────────────────────────────────────────
-DB_PATH = Path("data/asistencia.db")
+# ─── CONFIGURACIÓN DINÁMICA POR AÑO ────────────────────────────────────────
+ANIO_ACTUAL = datetime.now().year
+DB_PATH = Path(f"data/asistencia_{ANIO_ACTUAL}.db")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 _local = threading.local()
-_escrituras_contador = 0
-UMBRAL_SYNC = 20
 
 
 # ─── CONVERSIÓN %s → ? PARA SQLITE ─────────────────────────────────────────
@@ -108,19 +107,11 @@ def cursor(dict_rows=True):
 
 
 def escribir(sql, params=()):
-    global _escrituras_contador
+    # La subida automática a R2 fue eliminada.
+    # Ahora el backup se hace manualmente desde la vista de Configuración.
     with cursor() as (con, cur):
         cur.execute(sql, params)
         con.commit()
-
-    _escrituras_contador += 1
-    if _escrituras_contador >= UMBRAL_SYNC:
-        _escrituras_contador = 0
-        try:
-            from sync import subir_bd
-            subir_bd(DB_PATH)
-        except Exception as e:
-            log.debug(f"Sync auto falló: {e}")
 
 
 def leer_df(sql, params=(), con=None):
@@ -236,8 +227,11 @@ def reset_pool():
 
 # ─── DESCARGA INICIAL DESDE R2 ─────────────────────────────────────────────
 def descargar_bd_si_no_existe():
+    # Si el archivo local ya existe y no está vacío, NO descargues de R2
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
         return True
+    
+    # Si no existe, intenta descargarlo de R2
     try:
         from sync import descargar_bd
         ok = descargar_bd(DB_PATH)
