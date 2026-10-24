@@ -9,20 +9,17 @@ from datetime import datetime, date, time
 
 log = logging.getLogger("db")
 
-# ─── CONFIGURACIÓN FIJA ────────────────────────────────────────────────────
 # Volvemos al nombre original para recuperar los datos
 DB_PATH = Path("data/asistencia.db")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 _local = threading.local()
 
-
-# ─── CONVERSIÓN %s → ? PARA SQLITE ─────────────────────────────────────────
 def _q(sql: str) -> str:
     return sql.replace("%s", "?")
 
 
-# ─── CONEXIÓN ──────────────────────────────────────────────────────────────
+# 
 def obtener_conexion():
     con = getattr(_local, "con", None)
     if con is None:
@@ -48,9 +45,6 @@ def liberar_conexion(con):
             con.commit()
     except Exception:
         pass
-
-
-# ─── WRAPPER DE CURSOR (traduce %s → ?) ────────────────────────────────────
 class CursorWrapper:
     """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
     def __init__(self, cursor):
@@ -107,8 +101,7 @@ def cursor(dict_rows=True):
 
 
 def escribir(sql, params=()):
-    # La subida automática a R2 fue eliminada.
-    # Ahora el backup se hace manualmente desde la vista de Configuración.
+  
     with cursor() as (con, cur):
         cur.execute(sql, params)
         con.commit()
@@ -126,7 +119,6 @@ def leer_df(sql, params=(), con=None):
     return pd.DataFrame([dict(r) for r in filas])
 
 
-# ─── HELPERS DE CONVERSIÓN ─────────────────────────────────────────────────
 def to_time(v):
     if v is None or v == "":
         return None
@@ -198,7 +190,7 @@ def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
     return out
 
 
-# ─── PING / RESET ──────────────────────────────────────────────────────────
+
 def ping():
     try:
         with cursor() as (con, cur):
@@ -225,7 +217,6 @@ def reset_pool():
         _local.con = None
 
 
-# ─── DESCARGA INICIAL DESDE R2 ─────────────────────────────────────────────
 def descargar_bd_si_no_existe():
     # Si el archivo local ya existe y no está vacío, NO descargues de R2
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
