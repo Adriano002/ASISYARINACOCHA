@@ -95,6 +95,6 @@ def boton_backup():
 
     st.markdown("---")
     st.caption(
-        "⚠️ En Streamlit Cloud el filesystem es efímero. "
+        " En Streamlit Cloud el filesystem es efímero. "
         "Haz backup periódicamente o al terminar la jornada."
     )
