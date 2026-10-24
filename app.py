@@ -711,7 +711,7 @@ def reactivar_alumno(idal, dni, usuario):
     return True, "Alumno reactivado."
 
 
-# ─── IMPORTACIÓN EXCEL ─────────────────────────────────────────────────────
+# IMPORTACIÓN
 def _normalizar_grado(n):
     n = (n or "").strip().title()
     r = {"1°": "1ro", "2°": "2do", "3°": "3ro", "4°": "4to", "5°": "5to",
@@ -901,7 +901,7 @@ def insertar_alumnos_validos(val):
     return ins, reac, errs
 
 
-# ─── BLOQUEOS ──────────────────────────────────────────────────────────────
+#  BLOQUEOS
 def _fecha_ultimo_desbloqueo(idal):
     with cursor() as (con, cur):
         cur.execute("""
@@ -1003,7 +1003,7 @@ def obtener_auditoria(limite=500):
                    "ORDER BY id DESC LIMIT ?", (int(limite),))
 
 
-# ─── JUSTIFICACIONES Y PERMISOS ────────────────────────────────────────────
+# JUSTIFICACIONES Y PERMISOS 
 def _aplicar_just_prev(cur, idal, fecha, tipo):
     cur.execute("SELECT id FROM justificaciones_previas "
                 "WHERE alumno_id=? AND fecha_objetivo=? AND tipo=? AND aplicada=0",
@@ -1215,7 +1215,7 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
             tb="justificaciones_previas", rid=id_just)
     return True, f"Justificacion de {just['alumno']} reactivada (pendiente)."
 
-# ─── REGISTRAR ENTRADA ─────────────────────────────────────────────────────
+#REGISTRAR ENTRADA
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
