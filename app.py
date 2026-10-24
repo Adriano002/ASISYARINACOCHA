@@ -1391,7 +1391,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
     ), {"alumno": al, "evento_nombre": ev_nombre}
 
 
-# ─── MARCAR FALTAS AL CIERRE ───────────────────────────────────────────────
+# MARCAR FALTAS AL CIERRE 
 def marcar_faltas_al_cierre():
     fecha_d = hoy_date()
     fecha_str = hoy_str()
