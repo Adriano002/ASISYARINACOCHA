@@ -28,8 +28,6 @@ try:
 except ImportError:
     def st_autorefresh(**kwargs):
         pass
-
-# ─── LOGGING ───────────────────────────────────────────────────────────────
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 logging.basicConfig(
@@ -42,7 +40,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("asistencia")
 
-# ─── CONSTANTES ────────────────────────────────────────────────────────────
+
 MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -71,7 +69,6 @@ LIMITE_NUEVO = 3
 LIMITE_REINCIDENTE = 1
 
 
-# ─── UTILIDADES DE TIEMPO ──────────────────────────────────────────────────
 def ahora():
     return datetime.now(timezone.utc) - timedelta(hours=5)
 
@@ -107,7 +104,7 @@ def _safe_df(fn, default_cols=None):
         return pd.DataFrame(columns=default_cols or [])
 
 
-# ─── HELPERS ───────────────────────────────────────────────────────────────
+
 def confirmar_accion(clave, texto_boton="Confirmar",
                      texto_check="¿Estás seguro de hacer esta acción?",
                      tipo_boton="primary"):
@@ -166,8 +163,6 @@ def _botones_lista(items, etiqueta_fn, key_fn, max_cols=3):
             clickeado = item
     return clickeado
 
-
-# ─── SEGURIDAD ─────────────────────────────────────────────────────────────
 def hashear_password(password):
     salt = secrets.token_bytes(16)
     d = hashlib.pbkdf2_hmac(PBK_ALG, password.encode("utf-8"), salt, PBK_ITER)
@@ -268,7 +263,6 @@ def _verificar_admin_activo():
         return cur.fetchone() is not None
 
 
-# ─── INICIALIZACIÓN BD ─────────────────────────────────────────────────────
 @st.cache_resource
 def inicializar_bd():
     aplicar_schema()
@@ -332,7 +326,6 @@ def _seed():
             log.warning("admin creado, pass temporal: %s", pwd)
 
 
-# ─── MANTENIMIENTO ─────────────────────────────────────────────────────────
 def modo_mantenimiento():
     with cursor() as (con, cur):
         cur.execute("SELECT valor FROM config WHERE clave=?", ("mantenimiento",))
@@ -372,8 +365,6 @@ def vista_mantenimiento():
         st.warning(msg)
     st.info("Vuelve a intentarlo mas tarde.")
 
-
-# ─── PERIODOS ──────────────────────────────────────────────────────────────
 def obtener_periodo_activo():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE activo=1 LIMIT 1")
@@ -434,7 +425,6 @@ def info_periodo_con_alumnos():
     """)
 
 
-# ─── TURNOS / VENTANAS ─────────────────────────────────────────────────────
 def listar_turnos():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM turnos ORDER BY id")
@@ -469,7 +459,7 @@ def listar_ventanas(id_turno=None):
     return out
 
 
-# ─── DÍAS ESPECIALES ───────────────────────────────────────────────────────
+
 def _dia_dict(f):
     d = dict(f)
     d["fecha"] = fmt_date(d.get("fecha"))
@@ -549,7 +539,6 @@ def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
     return None
 
 
-# ─── GRADOS / SECCIONES / ALUMNOS ──────────────────────────────────────────
 def listar_grados():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM grados ORDER BY nombre")
