@@ -116,15 +116,36 @@ def confirmar_accion(clave, texto_boton="Confirmar",
 
 
 def generar_qr(dni, size=220):
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
-        border=2,
-    )
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
+                        box_size=10, border=2)
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
-    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
+
+    escudo_path = Path("escudo.png")
+    if escudo_path.exists():
+        try:
+            from PIL import Image, ImageDraw
+            logo = Image.open(str(escudo_path)).convert("RGBA")
+            qr_width, qr_height = img.size
+            logo_size = int(qr_width * 0.28)
+            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
+
+            fondo_logo = Image.new("RGBA", (logo_size + 6, logo_size + 6),
+                                   (255, 255, 255, 255))
+            draw_logo = ImageDraw.Draw(fondo_logo)
+            draw_logo.rectangle(
+                [0, 0, fondo_logo.width - 1, fondo_logo.height - 1],
+                outline=(0, 0, 0, 255), width=3
+            )
+            fondo_logo.paste(logo, (3, 3), logo)
+
+            pos = ((qr_width - fondo_logo.width) // 2,
+                   (qr_height - fondo_logo.height) // 2)
+            img.paste(fondo_logo, pos, fondo_logo)
+        except Exception:
+            pass
+    return img.convert("RGB")
 
 
 def generar_qr_bytes(dni, size=220):
@@ -1559,12 +1580,10 @@ def _procesar_escaneo(dni):
 
 def escaner_qr_continuo(key="qr_scanner"):
     st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
-                '<div class="scan-sub">Apunta al codigo del alumno</div></div>',
+                '<div class="scan-sub">Apunta al código del alumno</div></div>',
                 unsafe_allow_html=True)
-
     mount_id = st.session_state.get("_qr_mount_id", 0)
     result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
-
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
@@ -1586,16 +1605,19 @@ def escaner_qr_continuo(key="qr_scanner"):
                     </script>
                 """, height=0)
                 st.session_state.pop("_qr_sonido_pendiente", None)
+            st.rerun()
 
-            pendientes = st.session_state.get("_qr_pendientes_rerun", 0) + 1
-            st.session_state["_qr_pendientes_rerun"] = pendientes
-            ult_rerun = st.session_state.get("_qr_ultimo_rerun", 0)
-            ahora_ts = time.time()
-
-            if pendientes >= 10 or (ahora_ts - ult_rerun) >= 2.0:
-                st.session_state["_qr_pendientes_rerun"] = 0
-                st.session_state["_qr_ultimo_rerun"] = ahora_ts
-                st.rerun()
+    # 🆕 Mensaje de desbloqueo exitoso
+    desbloq = st.session_state.get("_qr_desbloqueo_exitoso")
+    if desbloq:
+        st.success(
+            f"✅ **{desbloq['nombre']}** desbloqueado con éxito. "
+            f"**Vuelve a escanear su QR** para registrar su asistencia."
+        )
+        if st.button("OK, entendido", key="ok_desbloq_msg",
+                     type="secondary"):
+            st.session_state.pop("_qr_desbloqueo_exitoso", None)
+            st.rerun()
 
     mensajes = st.session_state.get("_qr_mensajes", [])
     if mensajes:
@@ -1603,7 +1625,7 @@ def escaner_qr_continuo(key="qr_scanner"):
         if (time.time() - m.get("ts", 0)) < 8:
             _render_mensaje_qr(m)
         if len(mensajes) > 1:
-            st.markdown('<div class="scan-ultimos">Ultimos escaneos</div>',
+            st.markdown('<div class="scan-ultimos">Últimos escaneos</div>',
                         unsafe_allow_html=True)
             for msg in mensajes[1:6]:
                 _render_mensaje_qr(msg)
@@ -2172,56 +2194,32 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             return
         texto_base = texto.replace("Ñ", "N").replace("ñ", "n")
         draw.text((x, y), texto_base, fill=color, font=font)
-        try:
-            bbox = draw.textbbox((0, 0), "N", font=font)
-            alto_letra = bbox[3] - bbox[1]
-        except Exception:
-            alto_letra = getattr(font, "size", 30)
-        try:
-            ancho_N = draw.textlength("N", font=font)
-        except Exception:
-            ancho_N = getattr(font, "size", 30) * 0.6
-        grosor = max(2, int(alto_letra * 0.10))
-        for i, ch in enumerate(texto):
-            if ch in ("Ñ", "ñ"):
-                prefijo = texto_base[:i]
-                try:
-                    x_actual = x + draw.textlength(prefijo, font=font)
-                except Exception:
-                    x_actual = x + i * ancho_N
-                centro_x = x_actual + ancho_N / 2
-                tilde_y = y + max(0, int(alto_letra * 0.05))
-                tilde_w = ancho_N * 0.85
-                tilde_h = max(3, int(alto_letra * 0.18))
-                x1 = centro_x - tilde_w / 2
-                x2 = centro_x + tilde_w / 2
-                puntos = [
-                    (x1, tilde_y + tilde_h),
-                    (x1 + tilde_w * 0.25, tilde_y),
-                    (x1 + tilde_w * 0.5, tilde_y + tilde_h * 0.5),
-                    (x1 + tilde_w * 0.75, tilde_y + tilde_h),
-                    (x2, tilde_y + tilde_h * 0.2),
-                ]
-                try:
-                    draw.line(puntos, fill=color, width=grosor, joint="curve")
-                except TypeError:
-                    draw.line(puntos, fill=color, width=grosor)
 
-    f_colegio = _font(20, bold=True)
+    f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
-    esc_size = 80
+
+    # 🎨 ESCUDO MÁS GRANDE pero SIN llenar el recuadro
+    esc_size = int(FRANJA_W * 0.75)   # ≈ 162 px (75% del ancho de la franja)
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
-    alto_bloque = esc_size + 70
-    esc_y = max(8, (espacio - alto_bloque) // 2 + 10)
+    alto_bloque_texto = 3 * 18
+    alto_bloque_total = esc_size + 8 + alto_bloque_texto
+    esc_y = max(8, (espacio - alto_bloque_total) // 2 + 6)
+
     if escudo_path and Path(escudo_path).exists():
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (esc_size, esc_size), Image.LANCZOS)
-            img.paste(esc, (esc_x, esc_y), esc)
+            margen = 6
+            fondo_esc = Image.new("RGBA",
+                                  (esc_size + margen * 2,
+                                   esc_size + margen * 2),
+                                  (255, 255, 255, 255))
+            fondo_esc.paste(esc, (margen, margen), esc)
+            img.paste(fondo_esc, (esc_x - margen, esc_y - margen), fondo_esc)
         except Exception:
             pass
 
@@ -2236,7 +2234,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     y_txt = esc_y + esc_size + 6
     for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
         _txt_centrado(lbl, y_txt, f_colegio, BLANCO)
-        y_txt += 20
+        y_txt += 18
 
     foto_x = 0
     foto_y = ALTO_PX - FOTO_H
@@ -2265,13 +2263,13 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
                    f_titulo, NEGRO)
 
-    ap_p = alumno['apellido_paterno'].upper()
-    ap_m = (alumno['apellido_materno'] or "").upper()
-    nombres = alumno['nombres'].upper()
+    ap_p = (alumno.get('apellido_paterno') or "").upper()
+    ap_m = (alumno.get('apellido_materno') or "").upper()
+    nombres = (alumno.get('nombres') or "").upper()
     dni = alumno["dni"]
-    grado = alumno['grado'].upper()
-    seccion = alumno['seccion'].upper()
-    turno = alumno['turno'].upper()
+    grado = grado_a_ui(alumno.get('grado')).upper()
+    seccion = (alumno.get('seccion') or "").upper()
+    turno = (alumno.get('turno') or "").upper()
     ano = str(datetime.now().year)
     info_x = DER_X
     QR_SIZE = 215
@@ -2412,19 +2410,18 @@ def pdf_carnets_por_seccion(idsec):
 def pdf_carnets_seleccionados(ids, titulo=None):
     if not ids:
         return None
-    ph = ",".join("?" * len(ids))
+    ph = ",".join(["%s"] * len(ids))
     with cursor() as (con, cur):
         cur.execute(f"""
-            SELECT a.*,s.nombre AS seccion,g.nombre AS grado,t.nombre AS turno
-            FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
-            JOIN grados g ON s.grado_id=g.id
-            JOIN turnos t ON s.turno_id=t.id
-            WHERE a.id IN ({ph}) AND a.activo=1
-            ORDER BY a.apellido_paterno,a.apellido_materno
-        """, ids)
+            SELECT a.*, au.grado, au.seccion, t.nombre AS turno
+            FROM alumnos a
+            JOIN aulas au ON a.aula_id=au.id
+            JOIN turnos t ON au.turno_id=t.id
+            WHERE a.id IN ({ph}) AND a.activo=TRUE
+            ORDER BY a.apellido_paterno, a.apellido_materno
+        """, tuple(ids))
         filas = [dict(r) for r in cur.fetchall()]
     return _render_carnets(filas, titulo) if filas else None
-
 
 def pdf_carnets_todos():
     with cursor() as (con, cur):
