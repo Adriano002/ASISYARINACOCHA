@@ -2620,8 +2620,10 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    INFO_Y = 135
-    alto_linea = 65
+    # AJUSTE DE ALTURA (Subir bloque completo)
+    INFO_Y = 100        # Antes 135, ahora inicia más arriba alineado al QR
+    alto_linea = 58     # Antes 65, espacio más compacto para que respire abajo
+
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
                    _ajustar(ap_full, 46, ancho_info, True), NEGRO)
@@ -2640,8 +2642,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    
-    # MODIFICACIÓN: Cambiado "AÑO:" por "PERIODO:" para remover la Ñ de la nube
     _linea(y2 + 4 * alto_linea, "PERIODO:", AÑO)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
