@@ -1663,6 +1663,34 @@ def _render_mensaje_qr(msg):
     html += f'<div class="qr-texto">{mensaje}</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
+    # 🆕 Botones Sí/No al escanear un alumno BLOQUEADO
+    if tipo == "BLOQUEADO" and alumno and alumno.get("id"):
+        alumno_id = alumno.get("id")
+        dni = alumno.get("dni")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ Sí, desbloquear ahora",
+                         key=f"desbloq_si_{alumno_id}",
+                         type="primary", width='stretch'):
+                liberar_bloqueo(alumno_id,
+                                st.session_state["user"],
+                                "Desbloqueo inmediato desde escaneo QR")
+                st.session_state["_qr_desbloqueo_exitoso"] = {
+                    "dni": dni,
+                    "nombre": (alumno.get("apellido_paterno", "") + " " +
+                               (alumno.get("apellido_materno") or "") + ", " +
+                               alumno.get("nombres", "")).strip(", "),
+                }
+                st.session_state.pop("_qr_mensajes", None)
+                st.rerun()
+        with c2:
+            if st.button("❌ No, dejarlo bloqueado",
+                         key=f"desbloq_no_{alumno_id}",
+                         width='stretch'):
+                if st.session_state.get("_qr_mensajes"):
+                    st.session_state["_qr_mensajes"] = \
+                        st.session_state["_qr_mensajes"][1:]
+                st.rerun()
 
 # ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
 def perfil_alumno_datos(idal):
@@ -2410,14 +2438,15 @@ def pdf_carnets_por_seccion(idsec):
 def pdf_carnets_seleccionados(ids, titulo=None):
     if not ids:
         return None
-    ph = ",".join(["%s"] * len(ids))
+    ph = ",".join(["?"] * len(ids))
     with cursor() as (con, cur):
         cur.execute(f"""
-            SELECT a.*, au.grado, au.seccion, t.nombre AS turno
+            SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
             FROM alumnos a
-            JOIN aulas au ON a.aula_id=au.id
-            JOIN turnos t ON au.turno_id=t.id
-            WHERE a.id IN ({ph}) AND a.activo=TRUE
+            JOIN secciones s ON a.seccion_id=s.id
+            JOIN grados g ON s.grado_id=g.id
+            JOIN turnos t ON s.turno_id=t.id
+            WHERE a.id IN ({ph}) AND a.activo=1
             ORDER BY a.apellido_paterno, a.apellido_materno
         """, tuple(ids))
         filas = [dict(r) for r in cur.fetchall()]
