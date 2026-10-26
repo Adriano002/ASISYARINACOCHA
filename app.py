@@ -2466,8 +2466,10 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     from datetime import datetime
     import qrcode
 
-    ANCHO_PX = 817
-    ALTO_PX = 550
+    # DIMENSIONES EXACTAS: 8.3 cm x 5.3 cm (a 300 DPI)
+    ANCHO_PX = 980
+    ALTO_PX = 626
+    
     NARANJA_OSCURO = (184, 92, 56)
     NARANJA_CLARO = (212, 132, 96)
     NARANJA_FRANJA = (184, 92, 56)
@@ -2490,17 +2492,18 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     if escudo_path and Path(escudo_path).exists():
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
-                (280, 280), Image.LANCZOS)
+                (300, 300), Image.LANCZOS)
             a = esc.split()[3]
             a = a.point(lambda p: int(p * 0.15))
             esc.putalpha(a)
-            img.paste(esc, ((ANCHO_PX - 280) // 2 + 100, (ALTO_PX - 280) // 2),
+            img.paste(esc, ((ANCHO_PX - 300) // 2 + 110, (ALTO_PX - 300) // 2),
                       esc)
         except Exception:
             pass
 
-    FOTO_W = 216
-    FOTO_H = 280
+    # Medidas proporcionales de la foto para el nuevo alto
+    FOTO_W = 240
+    FOTO_H = 310
     FRANJA_W = FOTO_W
     for y in range(ALTO_PX):
         t = y / ALTO_PX
@@ -2533,18 +2536,18 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     def _dibujar_texto(x, y, texto, font, color):
         draw.text((x, y), texto, fill=color, font=font)
 
-    f_colegio = _font(18, bold=True)
-    f_foto = _font(24, bold=True)
-    f_titulo = _font(32, bold=True)
+    f_colegio = _font(19, bold=True)
+    f_foto = _font(25, bold=True)
+    f_titulo = _font(34, bold=True)
     f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
 
     esc_size = int(FRANJA_W * 0.75)
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
-    alto_bloque_texto = 3 * 18
+    alto_bloque_texto = 3 * 19
     alto_bloque_total = esc_size + 8 + alto_bloque_texto
-    esc_y = max(8, (espacio - alto_bloque_total) // 2 + 6)
+    esc_y = max(10, (espacio - alto_bloque_total) // 2 + 6)
 
     if escudo_path and Path(escudo_path).exists():
         try:
@@ -2559,13 +2562,13 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             bbox = draw.textbbox((0, 0), texto, font=font)
             tw = bbox[2] - bbox[0]
         except Exception:
-            tw = len(texto) * 7
+            tw = len(texto) * 7.5
         _dibujar_texto((FRANJA_W - tw) // 2, y, texto, font, color)
 
-    y_txt = esc_y + esc_size + 6
+    y_txt = esc_y + esc_size + 7
     for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
         _txt_centrado(lbl, y_txt, f_colegio, BLANCO)
-        y_txt += 18
+        y_txt += 19
 
     foto_x = 0
     foto_y = ALTO_PX - FOTO_H
@@ -2578,20 +2581,20 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
     except Exception:
-        tw = 40
-        th = 12
+        tw = 42
+        th = 13
     draw.text((foto_x + (FOTO_W - tw) // 2, foto_y + (FOTO_H - th) // 2),
               "FOTO", fill=GRIS_TXT, font=f_foto)
 
-    DER_X = FRANJA_W + 14
+    DER_X = FRANJA_W + 18
     titulo_txt = "FOTOCHECK DEL ESTUDIANTE"
     try:
         bbox = draw.textbbox((0, 0), titulo_txt, font=f_titulo)
         tw = bbox[2] - bbox[0]
     except Exception:
-        tw = 280
+        tw = 300
     espacio_d = ANCHO_PX - DER_X
-    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
+    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 12, titulo_txt,
                    f_titulo, NEGRO)
 
     ap_p = (alumno.get('apellido_paterno') or "").upper()
@@ -2603,7 +2606,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     turno = (alumno.get('turno') or "").upper()
     AÑO = str(datetime.now().year)
     info_x = DER_X
-    QR_SIZE = 215
+    
+    # QR ajustado para la medida de 8.3 cm
+    QR_SIZE = 225
     qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
@@ -2620,16 +2625,16 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    # AJUSTE DE ALTURA (Subir bloque completo)
-    INFO_Y = 100        # Antes 135, ahora inicia más arriba alineado al QR
-    alto_linea = 58     # Antes 65, espacio más compacto para que respire abajo
+    # COORDENADAS REAJUSTADAS: Todo más arriba y compacto
+    INFO_Y = 110        # Altura de inicio alta para limpiar la base
+    alto_linea = 66     # Salto de línea equilibrado para las dimensiones de 5.3 cm
 
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
-                   _ajustar(ap_full, 46, ancho_info, True), NEGRO)
+                   _ajustar(ap_full, 48, ancho_info, True), NEGRO)
     y2 = INFO_Y + alto_linea
     _dibujar_texto(info_x, y2, nombres,
-                   _ajustar(nombres, 46, ancho_info, True), NEGRO)
+                   _ajustar(nombres, 48, ancho_info, True), NEGRO)
 
     def _linea(y, label, valor, size=42):
         _dibujar_texto(info_x, y, label, f_label, GRIS_LABEL)
@@ -2650,19 +2655,18 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_img_pil = qr.make_image(fill_color="black",
                                back_color="white").convert("RGB").resize(
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
-    img.paste(qr_img_pil, (qr_x, 60))
+    img.paste(qr_img_pil, (qr_x, 70))
 
     frase = '"Ser del CNY, es ser mejor"'
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
-        fw = 250
-    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 46, frase,
+        fw = 280
+    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 50, frase,
                    f_frase, NARANJA_FRANJA)
 
     return img
-
 
 def _render_carnets(filas, titulo=None):
     buf = BytesIO()
