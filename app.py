@@ -2021,6 +2021,90 @@ def _perfil_alumno(idal):
                 if st.button("Cancelar", key=f"reac_jp_cancel_{jid}"):
                     st.session_state.pop("_reactivar_jp_id", None)
                     st.rerun()
+def perfil_alumno_datos(idal):
+    try:
+        with cursor() as (con, cur):
+            cur.execute("""
+                SELECT a.*,g.nombre AS grado,s.nombre AS seccion,t.nombre AS turno,
+                       s.id AS seccion_id,t.id AS turno_id
+                FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+                JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id
+                WHERE a.id=?
+            """, (idal,))
+            a = cur.fetchone()
+            if not a:
+                return {}
+            a = dict(a)
+            a["retirado_en"] = fmt_ts(a.get("retirado_en"))
+    except Exception as e:
+        log.exception("perfil_alumno_datos: alumno_id=%s", idal)
+        return {}
+
+    da = _safe_df(lambda: leer_df("""
+        SELECT a.id,a.fecha,a.hora,a.tipo,a.estado,
+               COALESCE(a.justificada,0) AS justificada,
+               COALESCE(a.observacion,'') AS observacion,
+               COALESCE(a.origen,'qr') AS origen,
+               COALESCE(a.justificado_por,'') AS justificado_por,
+               COALESCE(a.justificado_en,'') AS justificado_en,
+               COALESCE(d.descripcion,'') AS evento_nombre,
+               a.ventana_id
+        FROM asistencias a
+        LEFT JOIN dias_especiales d ON a.dia_especial_id=d.id
+        WHERE a.alumno_id=? ORDER BY a.fecha DESC,a.hora DESC
+    """, (idal,)), default_cols=["id","fecha","hora","tipo","estado",
+                                  "justificada","observacion","origen",
+                                  "justificado_por","justificado_en",
+                                  "evento_nombre","ventana_id"])
+
+    dt = _safe_df(lambda: leer_df("""
+        SELECT fecha,hora,numero AS "N",accion,
+               COALESCE(justificada,0) AS justificada,
+               COALESCE(origen,'qr') AS origen
+        FROM tardanzas WHERE alumno_id=? ORDER BY fecha DESC,hora DESC
+    """, (idal,)), default_cols=["fecha","hora","N","accion","justificada","origen"])
+
+    db = _safe_df(lambda: leer_df("""
+        SELECT fecha_inicio,COALESCE(fecha_fin,'-') AS fecha_fin,
+               COALESCE(motivo,'') AS motivo,
+               COALESCE(activo,0) AS activo
+        FROM bloqueos WHERE alumno_id=? ORDER BY fecha_inicio DESC
+    """, (idal,)), default_cols=["fecha_inicio","fecha_fin","motivo","activo"])
+
+    dp = _safe_df(lambda: leer_df("""
+        SELECT id,fecha_inicio,fecha_fin,COALESCE(motivo,'') AS motivo,
+               COALESCE(activo,0) AS activo,
+               COALESCE(creado_por,'') AS creado_por
+        FROM permisos WHERE alumno_id=? ORDER BY fecha_inicio DESC
+    """, (idal,)), default_cols=["id","fecha_inicio","fecha_fin","motivo",
+                                  "activo","creado_por"])
+
+    dj = _safe_df(lambda: leer_df("""
+        SELECT id,fecha_objetivo,tipo,COALESCE(motivo,'') AS motivo,
+               COALESCE(aplicada,0) AS aplicada,
+               COALESCE(creado_por,'') AS creado_por
+        FROM justificaciones_previas WHERE alumno_id=?
+        ORDER BY fecha_objetivo DESC
+    """, (idal,)), default_cols=["id","fecha_objetivo","tipo","motivo",
+                                  "aplicada","creado_por"])
+
+    tp = int((da["estado"] == PUNTUAL).sum()) if (not da.empty and "estado" in da.columns) else 0
+    tf = int((da["estado"] == FALTA).sum()) if (not da.empty and "estado" in da.columns) else 0
+    tt = int((da["estado"] == TARDANZA).sum()) if (not da.empty and "estado" in da.columns) else 0
+    tr = 0
+    if not da.empty and "tipo" in da.columns and "estado" in da.columns:
+        tr = int(((da["tipo"] == "reforzamiento") &
+                  (da["estado"] == REF_ASISTIO)).sum())
+
+    return {"alumno": a, "asistencias": da, "tardanzas": dt, "bloqueos": db,
+            "permisos": dp, "justificaciones_previas": dj,
+            "total_puntuales": tp, "total_faltas": tf,
+            "total_tardanzas": tt, "total_ref_asistio": tr,
+            "tard_injust": contar_tardanzas_injustificadas(idal),
+            "n_ciclo": contar_tardanzas_desde_ultimo_desbloqueo(idal),
+            "reincidente": _es_reincidente(idal),
+            "limite": calcular_limite(_es_reincidente(idal)),
+            "bloqueado": alumno_bloqueado(idal) is not None}
 
 
 # ─── MÉTRICAS ──────────────────────────────────────────────────────────────
