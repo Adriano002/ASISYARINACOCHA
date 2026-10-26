@@ -1,4 +1,4 @@
-# app.py - Sistema de Asistencia I.E. Yarinacocha
+# Sistema de Asistencia I.E. Yarinacocha V.1.01
 import hashlib
 import logging
 import re
@@ -427,7 +427,6 @@ def info_periodo_con_alumnos():
         FROM periodos p ORDER BY p.id DESC
     """)
 
-
 def listar_turnos():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM turnos ORDER BY id")
@@ -439,7 +438,6 @@ def listar_turnos():
         d["hora_salida"] = fmt_time(d.get("hora_salida"))
         out.append(d)
     return out
-
 
 def listar_ventanas(id_turno=None):
     with cursor() as (con, cur):
@@ -460,8 +458,6 @@ def listar_ventanas(id_turno=None):
         d["hora_cierre"] = fmt_time(d.get("hora_cierre"))
         out.append(d)
     return out
-
-
 
 def _dia_dict(f):
     d = dict(f)
@@ -1488,7 +1484,7 @@ def marcar_faltas_al_cierre():
                           1 if jp else 0, "auto", pid))
 
 
-# ─── JUSTIFICAR ASISTENCIA ─────────────────────────────────────────────────
+#JUSTIFICAR ASISTENCIA 
 def justificar_asistencia(ida, obs, usuario):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM asistencias WHERE id=?", (ida,))
@@ -1526,8 +1522,7 @@ def quitar_justificacion(ida, usuario):
             tb="asistencias", rid=ida)
     return True, "Justificacion eliminada."
 
-
-# ─── ESCÁNER QR ────────────────────────────────────────────────────────────
+#ESCÁNER QR
 def _procesar_escaneo(dni):
     u = st.session_state.get("user")
     if not u:
@@ -1593,7 +1588,7 @@ def escaner_qr_continuo(key="qr_scanner"):
     desbloq = st.session_state.get("_qr_desbloqueo_exitoso")
     if desbloq:
         st.success(
-            f"✅ **{desbloq['nombre']}** desbloqueado con éxito. "
+            f" **{desbloq['nombre']}** desbloqueado con éxito. "
             f"**Vuelve a escanear su QR** para registrar su asistencia."
         )
         if st.button("OK, entendido", key="ok_desbloq_msg",
@@ -1651,7 +1646,7 @@ def _render_mensaje_qr(msg):
         dni = alumno.get("dni")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("✅ Sí, desbloquear ahora",
+            if st.button("Sí, desbloquear ahora",
                          key=f"desbloq_si_{alumno_id}",
                          type="primary", width='stretch'):
                 liberar_bloqueo(alumno_id,
@@ -1666,7 +1661,7 @@ def _render_mensaje_qr(msg):
                 st.session_state.pop("_qr_mensajes", None)
                 st.rerun()
         with c2:
-            if st.button("❌ No, dejarlo bloqueado",
+            if st.button( "No, dejarlo bloqueado",
                          key=f"desbloq_no_{alumno_id}",
                          width='stretch'):
                 if st.session_state.get("_qr_mensajes"):
@@ -1674,7 +1669,7 @@ def _render_mensaje_qr(msg):
                         st.session_state["_qr_mensajes"][1:]
                 st.rerun()
 
-# ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
+#PERFIL ALUMNO
 def _perfil_alumno(idal):
     d = perfil_alumno_datos(idal)
     if not d:
@@ -1896,11 +1891,11 @@ def _perfil_alumno(idal):
                           to_date(perm['fecha_fin'])))
                     aplicado = (cur.fetchone()["n"] or 0) > 0
                 if not activo:
-                    estado_txt = "🔴 Anulado"
+                    estado_txt = "Anulado"
                 elif aplicado:
                     estado_txt = "🔒 Aplicado"
                 else:
-                    estado_txt = "🟢 Pendiente"
+                    estado_txt = "Pendiente"
                 c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
                 c2.write(estado_txt)
                 if activo and not aplicado:
@@ -1941,8 +1936,8 @@ def _perfil_alumno(idal):
                 if v == 1:
                     return "🔒 Aplicada"
                 if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
+                    return "Anulada"
+                return "Pendiente"
 
             dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
             st.caption(f"{len(dj)} justificacion(es) previa(s). "
@@ -2089,7 +2084,7 @@ def perfil_alumno_datos(idal):
             "bloqueado": alumno_bloqueado(idal) is not None}
 
 
-# ─── MÉTRICAS ──────────────────────────────────────────────────────────────
+#MÉTRICAS 
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -2190,7 +2185,7 @@ def _turnos_para_panel():
     return resultado
 
 
-# ─── CIERRE ANUAL ──────────────────────────────────────────────────────────
+#CIERRE ANUAL 
 def reporte_cierre_anual(pid):
     return leer_df("""
         SELECT g.nombre AS grado,s.nombre AS seccion,t.nombre AS turno,
@@ -2297,7 +2292,7 @@ def listar_cierres_anuales():
         ORDER BY c.id DESC
     """)
 
-# ─── GENERACIÓN DE PDF ─────────────────────────────────────────────────────
+# GENERACIÓN DE PDF 
 def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
@@ -2458,8 +2453,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     buf.seek(0)
     return buf.getvalue()
 
-
-# ─── CARNETS ───────────────────────────────────────────────────────────────
+# CARNETS 
 def _generar_fotocheck_pil(alumno, escudo_path=None):
     from PIL import Image, ImageDraw, ImageFont
     from pathlib import Path
@@ -2821,7 +2815,7 @@ def pdf_resumen_alumno(idal):
     return buf.getvalue()
 
 
-# ─── EXCEL ─────────────────────────────────────────────────────────────────
+# EXCEL 
 def df_a_xlsx(df, hoja="Datos"):
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
@@ -2839,7 +2833,7 @@ def df_a_xlsx_multilhoja(hojas):
     return buf.getvalue()
 
 
-# ─── HOJAS DE REPORTE ──────────────────────────────────────────────────────
+# HOJAS DE REPORTE
 def _hoja_faltaron_dia(fecha, ids_secs):
     todos_just = []
     todos_injust = []
@@ -3090,7 +3084,7 @@ def _generar_hojas_mensual(mes, AÑO, ids_secs):
         ]
     return hojas
 
-# ─── SELECTORES REUTILIZABLES ──────────────────────────────────────────────
+# SELECTORES REUTILIZABLES 
 def _selector_grado_seccion(clave, titulo="Elige el grado"):
     idsec = st.session_state.get(clave + "_idsec")
     if idsec:
@@ -3254,7 +3248,7 @@ def _reset_selector(clave, on_click_key=None):
         st.session_state.pop(on_click_key, None)
 
 
-# ─── PUERTA ────────────────────────────────────────────────────────────────
+#PUERTA
 def _puerta_puede_operar(fecha):
     f_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -3364,7 +3358,6 @@ def _puerta_manual(usuario, fecha):
         return
     _puerta_manual_alumnos(idsec, usuario)
 
-
 def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
@@ -3383,8 +3376,7 @@ def vista_puerta():
     else:
         _puerta_manual(usuario, fecha)
 
-
-# ─── BLOQUEADOS ────────────────────────────────────────────────────────────
+# BLOQUEADOS 
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
     st.caption(
@@ -3486,7 +3478,7 @@ def vista_bloqueados():
         st.rerun()
 
 
-# ─── PANEL DIRECCION ───────────────────────────────────────────────────────
+# PANEL DIRECCION
 def vista_panel_direccion():
     try:
         st_autorefresh(interval=15000, key="panel_dir_refresh")
@@ -3549,7 +3541,7 @@ def vista_panel_direccion():
     else:
         st.dataframe(df, width='stretch')
 
-# ─── REPORTES ──────────────────────────────────────────────────────────────
+#REPORTES
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
     permitidas = None
@@ -3962,7 +3954,7 @@ def vista_reportes():
     _rep_seleccionar_seccion(usuario)
 
 
-# ─── ALUMNOS UI ────────────────────────────────────────────────────────────
+# ALUMNOS UI 
 def _frag_crear_alumno():
     st.subheader("Crear alumno manualmente")
     grados = listar_grados()
@@ -4010,7 +4002,6 @@ def _frag_crear_alumno():
                 st.rerun()
             else:
                 st.error(msg)
-
 
 def _frag_editar_alumno():
     st.subheader("Editar alumno")
@@ -4345,11 +4336,11 @@ def _perfil_alumno(idal):
                           to_date(perm['fecha_fin'])))
                     aplicado = (cur.fetchone()["n"] or 0) > 0
                 if not activo:
-                    estado_txt = "🔴 Anulado"
+                    estado_txt = "Anulado"
                 elif aplicado:
                     estado_txt = "🔒 Aplicado"
                 else:
-                    estado_txt = "🟢 Pendiente"
+                    estado_txt = "Pendiente"
                 c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
                 c2.write(estado_txt)
                 if activo and not aplicado:
@@ -4390,8 +4381,8 @@ def _perfil_alumno(idal):
                 if v == 1:
                     return "🔒 Aplicada"
                 if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
+                    return "Anulada"
+                return "Pendiente"
 
             dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
             st.caption(f"{len(dj)} justificacion(es) previa(s). "
@@ -4469,7 +4460,7 @@ def vista_alumnos():
         _frag_editar_alumno()
 
 
-# ─── GRADOS Y SECCIONES ────────────────────────────────────────────────────
+#GRADOS Y SECCIONES
 def vista_grados_secciones():
     st.title("Grados y Secciones")
     st.caption("Vista de referencia. Las secciones se crean automaticamente "
@@ -4505,7 +4496,7 @@ def vista_grados_secciones():
     st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
 
 
-# ─── CARNETS ───────────────────────────────────────────────────────────────
+#CARNETS
 def vista_carnets():
     st.title("Carnets QR")
 
@@ -4633,7 +4624,7 @@ def _carnets_ver_seccion(idsec):
             st.rerun()
 
 
-# ─── VENTANAS ──────────────────────────────────────────────────────────────
+# VENTANAS
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Configura apertura, limite puntual y cierre por turno y tipo.")
@@ -4668,7 +4659,7 @@ def vista_ventanas():
                     st.toast("Ventana actualizada")
                     st.rerun()
 
-# ─── USUARIOS ──────────────────────────────────────────────────────────────
+# USUARIOS 
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
         cur.execute("SELECT id,rol,es_principal,usuario FROM usuarios WHERE id=?",
@@ -4848,7 +4839,6 @@ def _frag_usuarios_crear():
                         else:
                             st.error(f"Error: {e}")
 
-
 def _frag_usuarios_asignar():
     usuario = st.session_state["user"]
     st.subheader("Asignar secciones a Auxiliares")
@@ -4947,7 +4937,7 @@ def vista_usuarios():
         _frag_usuarios_mantenimiento()
 
 
-# ─── AUDITORÍA ─────────────────────────────────────────────────────────────
+#AUDITORÍA
 def _frag_importar_excel():
     st.subheader("Cargar alumnos al periodo")
     st.info("Columnas: DNI, Nombres, Apellido Paterno, Apellido Materno, Grado, "
@@ -5138,7 +5128,7 @@ def vista_auditoria():
             st.dataframe(dfp, width='stretch')
 
 
-# ─── DÍAS ESPECIALES ───────────────────────────────────────────────────────
+# DÍAS ESPECIALES
 def vista_dias_especiales():
     st.title("Dias especiales")
     usuario = st.session_state["user"]
@@ -5288,7 +5278,7 @@ def vista_dias_especiales():
                 st.rerun()
 
 
-# ─── JUSTIFICACIONES PREVIAS ───────────────────────────────────────────────
+#JUSTIFICACIONES PREVIAS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
@@ -5420,7 +5410,6 @@ def _render_registrar_jp(usuario):
                     st.rerun()
                 else:
                     st.error(msg)
-
 
 def _render_historial_global_jp(usuario):
     hoy_s = hoy_str()
@@ -5561,7 +5550,7 @@ def _render_historial_global_jp(usuario):
                 st.rerun()
 
 
-# ─── PERMISOS ──────────────────────────────────────────────────────────────
+#PERMISOS
 def _frag_permisos(usuario):
     st.subheader("Permisos de inasistencia")
     st.caption(f"Permisos para dias FUTUROS (desde mañana, maximo "
@@ -5820,25 +5809,18 @@ def vista_justificaciones_permisos():
         _frag_permisos(usuario)
 
 
-# ─── BACKUP ────────────────────────────────────────────────────────────────
+#BACKUP 
 def vista_backup():
     st.title("Backup de base de datos")
     from sync import boton_backup
     boton_backup()
 
-
-# ─── ESTILOS CSS ───────────────────────────────────────────────────────────
+#ESTILOS CSS 
 def aplicar_estilos():
     st.markdown("""
     <style>
-    /* ══════════════════════════════════════════════════════════════════
-       IMPORTAR FUENTE NUNITO DESDE GOOGLE FONTS
-       ══════════════════════════════════════════════════════════════════ */
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&display=swap');
 
-    /* ══════════════════════════════════════════════════════════════════
-       VARIABLES GLOBALES
-       ══════════════════════════════════════════════════════════════════ */
     :root{
         --primario:       #E87B4A;
         --primario-dark:  #D66535;
@@ -5875,9 +5857,6 @@ def aplicar_estilos():
         }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       TIPOGRAFÍA (Nunito) — SIN !important para no romper iconos
-       ══════════════════════════════════════════════════════════════════ */
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
     .stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
@@ -5888,9 +5867,6 @@ def aplicar_estilos():
         font-family: var(--fuente);
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       FIX: ICONOS MATERIAL SYMBOLS (NO tocar)
-       ══════════════════════════════════════════════════════════════════ */
     span[data-testid="stIconMaterial"],
     span[data-testid="stIconMaterial"] *,
     .material-symbols-rounded,
@@ -5944,9 +5920,6 @@ def aplicar_estilos():
         opacity: 0.75;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       SIDEBAR
-       ══════════════════════════════════════════════════════════════════ */
     section[data-testid="stSidebar"]{
         border-right: 1px solid var(--primario-borde);
     }
@@ -5993,9 +5966,6 @@ def aplicar_estilos():
         letter-spacing: .10em; color: #FFF !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       INPUTS
-       ══════════════════════════════════════════════════════════════════ */
     .stTextInput input, .stNumberInput input, .stDateInput input,
     .stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
         border-radius: var(--radius-sm) !important;
@@ -6008,9 +5978,6 @@ def aplicar_estilos():
         box-shadow: 0 0 0 3px var(--primario-soft) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       BOTONES
-       ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
         color: #FFFFFF !important;
@@ -6034,9 +6001,6 @@ def aplicar_estilos():
         transform: translateY(-1px);
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       MÉTRICAS
-       ══════════════════════════════════════════════════════════════════ */
     div[data-testid="stMetric"]{
         background: var(--primario-soft);
         border: 1px solid var(--primario-borde);
@@ -6052,9 +6016,6 @@ def aplicar_estilos():
         color: var(--texto-titulo) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       TABS
-       ══════════════════════════════════════════════════════════════════ */
     .stTabs [data-baseweb="tab-list"]{
         gap: 4px;
         border-bottom: 2px solid var(--primario-borde);
@@ -6071,10 +6032,6 @@ def aplicar_estilos():
         border-bottom: 3px solid var(--primario) !important;
         opacity: 1;
     }
-
-    /* ══════════════════════════════════════════════════════════════════
-       EXPANDERS
-       ══════════════════════════════════════════════════════════════════ */
     .streamlit-expanderHeader, details summary{
         border: 1px solid var(--primario-borde) !important;
         border-radius: var(--radius-sm) !important;
@@ -6086,9 +6043,6 @@ def aplicar_estilos():
         border-color: var(--primario) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       HEADERS DE PÁGINA
-       ══════════════════════════════════════════════════════════════════ */
     .scan-header, .puerta-header{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 24px 28px;
@@ -6102,9 +6056,6 @@ def aplicar_estilos():
     .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
     .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
 
-    /* ══════════════════════════════════════════════════════════════════
-       PERFIL HERO
-       ══════════════════════════════════════════════════════════════════ */
     .perfil-hero{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         border-radius: 14px;
@@ -6144,9 +6095,6 @@ def aplicar_estilos():
         color: #FFF !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       BLOQUES / CARDS
-       ══════════════════════════════════════════════════════════════════ */
     .perfil-bloque{
         background: var(--secondary-background-color);
         border: 1px solid var(--primario-borde);
@@ -6174,10 +6122,6 @@ def aplicar_estilos():
         min-width: 130px;
     }
     .info-valor{ font-weight: 600; }
-
-    /* ══════════════════════════════════════════════════════════════════
-       KPI CARDS
-       ══════════════════════════════════════════════════════════════════ */
     .kpi-grid{
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -6209,9 +6153,7 @@ def aplicar_estilos():
         .kpi-card .kpi-lbl-alerta{ color: #FC8181; }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       MENSAJES QR
-       ══════════════════════════════════════════════════════════════════ */
+  
     .scan-ultimos{
         font-size: 11px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
@@ -6252,9 +6194,6 @@ def aplicar_estilos():
         .qr-bloqueado { background: rgba(239,68,68,.15); }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       BOTÓN SELECCIONADO
-       ══════════════════════════════════════════════════════════════════ */
     .btn-sel .stButton > button{
         background: #43A047 !important;
         color: #FFF !important;
@@ -6262,10 +6201,6 @@ def aplicar_estilos():
     .btn-sel .stButton > button p{
         color: #FFF !important;
     }
-
-    /* ══════════════════════════════════════════════════════════════════
-       SEPARADORES
-       ══════════════════════════════════════════════════════════════════ */
     hr{
         border: none;
         height: 1px;
@@ -6273,9 +6208,6 @@ def aplicar_estilos():
         margin: 20px 0;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       RESPONSIVE
-       ══════════════════════════════════════════════════════════════════ */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
         h2{ font-size: 1.2rem !important; }
@@ -6309,7 +6241,7 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
             t.strip())
 
 
-# ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
+#LOGIN / CAMBIO PASSWORD / MI CUENTA 
 def vista_login():
     st.markdown("""
     <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
@@ -6334,7 +6266,6 @@ def vista_login():
                 else:
                     st.error(err or "Credenciales incorrectas")
 
-
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
@@ -6358,7 +6289,6 @@ def vista_cambio_password_obligatorio():
                 st.session_state["user"]["password"] = nuevo_hash
                 auditar(usuario["usuario"], "Cambio pwd obligatorio")
                 st.rerun()
-
 
 def vista_mi_cuenta():
     st.title("Mi cuenta")
@@ -6429,7 +6359,7 @@ def vista_mi_cuenta():
         st.rerun()
 
 
-# ─── MENÚ Y RUTAS ──────────────────────────────────────────────────────────
+#MENÚ Y RUTAS 
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     if rol == "Admin":
@@ -6463,7 +6393,6 @@ RUTAS = {
     "Justificaciones y Permisos": vista_justificaciones_permisos,
 }
 
-
 def menu_lateral():
     usuario = st.session_state["user"]
     rol = usuario["rol"]
@@ -6486,7 +6415,6 @@ def menu_lateral():
             cerrar_sesion()
             st.rerun()
     return op
-
 
 def _enrutar(op, usuario):
     v = RUTAS.get(op)
@@ -6511,7 +6439,7 @@ def _control_faltas():
     marcar_faltas_al_cierre()
 
 
-# ─── MAIN ──────────────────────────────────────────────────────────────────
+#MAIN 
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
@@ -6554,7 +6482,6 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
 
 if __name__ == "__main__":
     main()
