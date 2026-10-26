@@ -2493,7 +2493,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (300, 300), Image.LANCZOS)
-            a = esc.split()[3]
+            a = esc.split()
             a = a.point(lambda p: int(p * 0.15))
             esc.putalpha(a)
             img.paste(esc, ((ANCHO_PX - 300) // 2 + 110, (ALTO_PX - 300) // 2),
@@ -2501,37 +2501,33 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         except Exception:
             pass
 
-    # Medidas proporcionales de la foto para el nuevo alto
     FOTO_W = 240
     FOTO_H = 310
     FRANJA_W = FOTO_W
     for y in range(ALTO_PX):
         t = y / ALTO_PX
-        r = int(NARANJA_OSCURO[0] + (NARANJA_CLARO[0] - NARANJA_OSCURO[0]) * t)
-        g = int(NARANJA_OSCURO[1] + (NARANJA_CLARO[1] - NARANJA_OSCURO[1]) * t)
-        b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
+        r = int(NARANJA_OSCURO + (NARANJA_CLARO - NARANJA_OSCURO) * t)
+        g = int(NARANJA_OSCURO + (NARANJA_CLARO - NARANJA_OSCURO) * t)
+        b = int(NARANJA_OSCURO + (NARANJA_CLARO - NARANJA_OSCURO) * t)
         draw.line([(0, y), (FRANJA_W, y)], fill=(r, g, b))
 
+    # CORRECCIÓN DEFINITIVA: Carga el archivo arial.ttf que subiste a GitHub
     def _font(size, bold=False, italic=False):
-        nombres = []
-        if bold and italic:
-            nombres = ["arialbi.ttf", "DejaVuSans-BoldOblique.ttf"]
-        elif bold:
-            nombres = ["arialbd.ttf", "DejaVuSans-Bold.ttf", "Helvetica-Bold"]
-        elif italic:
-            nombres = ["ariali.ttf", "DejaVuSans-Oblique.ttf"]
-        else:
-            nombres = ["arial.ttf", "DejaVuSans.ttf", "Helvetica"]
-        for n in nombres:
-            try:
-                return ImageFont.truetype(n, size)
-            except Exception:
-                continue
+        from pathlib import Path
+        DIRECTORIO_BASE = Path(__file__).parent
+        
+        # Apunta al archivo arial.ttf en la raíz de tu proyecto
+        ruta_fuente = DIRECTORIO_BASE / "arial.ttf"
+        
         try:
-            base_font = ImageFont.load_default()
-            return base_font.font_variant(size=size)
+            return ImageFont.truetype(str(ruta_fuente), size)
         except Exception:
-            return ImageFont.load_default()
+            # Respaldo por si acaso
+            try:
+                base_font = ImageFont.load_default()
+                return base_font.font_variant(size=size)
+            except Exception:
+                return ImageFont.load_default()
 
     def _dibujar_texto(x, y, texto, font, color):
         draw.text((x, y), texto, fill=color, font=font)
@@ -2560,7 +2556,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     def _txt_centrado(texto, y, font, color):
         try:
             bbox = draw.textbbox((0, 0), texto, font=font)
-            tw = bbox[2] - bbox[0]
+            tw = bbox - bbox
         except Exception:
             tw = len(texto) * 7.5
         _dibujar_texto((FRANJA_W - tw) // 2, y, texto, font, color)
@@ -2578,8 +2574,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                    outline=NARANJA_FRANJA, width=1)
     try:
         bbox = draw.textbbox((0, 0), "FOTO", font=f_foto)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
+        tw = bbox - bbox
+        th = bbox - bbox
     except Exception:
         tw = 42
         th = 13
@@ -2590,7 +2586,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     titulo_txt = "FOTOCHECK DEL ESTUDIANTE"
     try:
         bbox = draw.textbbox((0, 0), titulo_txt, font=f_titulo)
-        tw = bbox[2] - bbox[0]
+        tw = bbox - bbox
     except Exception:
         tw = 300
     espacio_d = ANCHO_PX - DER_X
@@ -2607,7 +2603,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     AÑO = str(datetime.now().year)
     info_x = DER_X
     
-    # QR ajustado para la medida de 8.3 cm
     QR_SIZE = 225
     qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
@@ -2625,9 +2620,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    # COORDENADAS REAJUSTADAS: Todo más arriba y compacto
-    INFO_Y = 110        # Altura de inicio alta para limpiar la base
-    alto_linea = 66     # Salto de línea equilibrado para las dimensiones de 5.3 cm
+    # COORDENADAS: Altura de inicio alta y compacta
+    INFO_Y = 110        
+    alto_linea = 66     
 
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
@@ -2660,7 +2655,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     frase = '"Ser del CNY, es ser mejor"'
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
-        fw = bbox[2] - bbox[0]
+        fw = bbox - bbox
     except Exception:
         fw = 280
     _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 50, frase,
