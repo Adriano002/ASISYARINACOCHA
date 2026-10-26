@@ -2530,7 +2530,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         except Exception:
             return ImageFont.load_default()
 
-    # CORRECCIÓN: Se eliminó el .replace() para permitir la Ñ y acentos
     def _dibujar_texto(x, y, texto, font, color):
         draw.text((x, y), texto, fill=color, font=font)
 
@@ -2608,7 +2607,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
-    # CORRECCIÓN: Se eliminó el .replace() también del cálculo de tamaño
     def _ajustar(texto, size_ini, max_ancho, bold):
         size = size_ini
         while size > 10:
@@ -2642,7 +2640,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "AÑO:", AÑO)
+    
+    # MODIFICACIÓN: Cambiado "AÑO:" por "PERIODO:" para remover la Ñ de la nube
+    _linea(y2 + 4 * alto_linea, "PERIODO:", AÑO)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(str(alumno["dni"]).strip())
@@ -2662,6 +2662,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                    f_frase, NARANJA_FRANJA)
 
     return img
+
 
 def _render_carnets(filas, titulo=None):
     buf = BytesIO()
