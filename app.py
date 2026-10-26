@@ -114,7 +114,12 @@ def confirmar_accion(clave, texto_boton="Confirmar",
         return True
     return False
 
-
+def grado_a_ui(g):
+    if g is None:
+        return ""
+    mapa = {"1": "1ro", "2": "2do", "3": "3ro", "4": "4to", "5": "5to"}
+    return mapa.get(str(g).strip(), g)
+  
 def generar_qr(dni, size=220):
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
                         box_size=10, border=2)
@@ -2798,8 +2803,9 @@ def pdf_carnets_todos():
 def pdf_carnet_alumno(dni):
     with cursor() as (con, cur):
         cur.execute("""
-            SELECT a.*,s.nombre AS seccion,g.nombre AS grado,t.nombre AS turno
-            FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+            SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
+            FROM alumnos a
+            JOIN secciones s ON a.seccion_id=s.id
             JOIN grados g ON s.grado_id=g.id
             JOIN turnos t ON s.turno_id=t.id
             WHERE a.dni=? AND a.activo=1
