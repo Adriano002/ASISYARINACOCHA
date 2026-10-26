@@ -125,32 +125,9 @@ def generar_qr(dni, size=220):
                         box_size=10, border=2)
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
-
-    escudo_path = Path("escudo.png")
-    if escudo_path.exists():
-        try:
-            from PIL import Image, ImageDraw
-            logo = Image.open(str(escudo_path)).convert("RGBA")
-            qr_width, qr_height = img.size
-            logo_size = int(qr_width * 0.28)
-            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
-
-            fondo_logo = Image.new("RGBA", (logo_size + 6, logo_size + 6),
-                                   (255, 255, 255, 255))
-            draw_logo = ImageDraw.Draw(fondo_logo)
-            draw_logo.rectangle(
-                [0, 0, fondo_logo.width - 1, fondo_logo.height - 1],
-                outline=(0, 0, 0, 255), width=3
-            )
-            fondo_logo.paste(logo, (3, 3), logo)
-
-            pos = ((qr_width - fondo_logo.width) // 2,
-                   (qr_height - fondo_logo.height) // 2)
-            img.paste(fondo_logo, pos, fondo_logo)
-        except Exception:
-            pass
-    return img.convert("RGB")
+    # Genera el QR directo, SIN escudo en el medio
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    return img
 
 
 def generar_qr_bytes(dni, size=220):
@@ -2562,8 +2539,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
 
-    # 🎨 ESCUDO MÁS GRANDE pero SIN llenar el recuadro
-    esc_size = int(FRANJA_W * 0.75)   # ≈ 162 px (75% del ancho de la franja)
+    # ESCUDO GRANDE SIN FONDO BLANCO
+    esc_size = int(FRANJA_W * 0.75)
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
     alto_bloque_texto = 3 * 18
@@ -2574,13 +2551,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (esc_size, esc_size), Image.LANCZOS)
-            margen = 6
-            fondo_esc = Image.new("RGBA",
-                                  (esc_size + margen * 2,
-                                   esc_size + margen * 2),
-                                  (255, 255, 255, 255))
-            fondo_esc.paste(esc, (margen, margen), esc)
-            img.paste(fondo_esc, (esc_x - margen, esc_y - margen), fondo_esc)
+            # Lo pegamos directo, respetando su transparencia original (sin fondo blanco)
+            img.paste(esc, (esc_x, esc_y), esc)
         except Exception:
             pass
 
@@ -2691,8 +2663,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                    f_frase, NARANJA_FRANJA)
 
     return img
-
-
 def _render_carnets(filas, titulo=None):
     buf = BytesIO()
     m = 5
