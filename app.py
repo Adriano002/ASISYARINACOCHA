@@ -2462,6 +2462,10 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
 # ─── CARNETS ───────────────────────────────────────────────────────────────
 def _generar_fotocheck_pil(alumno, escudo_path=None):
     from PIL import Image, ImageDraw, ImageFont
+    from pathlib import Path
+    from datetime import datetime
+    import qrcode
+
     ANCHO_PX = 817
     ALTO_PX = 550
     NARANJA_OSCURO = (184, 92, 56)
@@ -2526,12 +2530,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         except Exception:
             return ImageFont.load_default()
 
+    # CORRECCIÓN: Se eliminó el .replace() para permitir la Ñ y acentos
     def _dibujar_texto(x, y, texto, font, color):
-        if "Ñ" not in texto and "ñ" not in texto:
-            draw.text((x, y), texto, fill=color, font=font)
-            return
-        texto_base = texto.replace("Ñ", "N").replace("ñ", "n")
-        draw.text((x, y), texto_base, fill=color, font=font)
+        draw.text((x, y), texto, fill=color, font=font)
 
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
@@ -2539,7 +2540,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
 
-    # ESCUDO GRANDE SIN FONDO BLANCO
     esc_size = int(FRANJA_W * 0.75)
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
@@ -2551,7 +2551,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (esc_size, esc_size), Image.LANCZOS)
-            # Lo pegamos directo, respetando su transparencia original (sin fondo blanco)
             img.paste(esc, (esc_x, esc_y), esc)
         except Exception:
             pass
@@ -2609,13 +2608,13 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
+    # CORRECCIÓN: Se eliminó el .replace() también del cálculo de tamaño
     def _ajustar(texto, size_ini, max_ancho, bold):
         size = size_ini
         while size > 10:
             f = _font(size, bold=bold)
             try:
-                ancho = draw.textlength(
-                    texto.replace("Ñ", "N").replace("ñ", "n"), font=f)
+                ancho = draw.textlength(texto, font=f)
             except Exception:
                 ancho = len(texto) * size * 0.55
             if ancho <= max_ancho:
@@ -2663,6 +2662,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                    f_frase, NARANJA_FRANJA)
 
     return img
+
 def _render_carnets(filas, titulo=None):
     buf = BytesIO()
     m = 5
