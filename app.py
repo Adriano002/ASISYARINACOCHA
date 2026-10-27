@@ -2537,7 +2537,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     f_frase = _font(28, bold=True, italic=True)
-    f_label = _font(30, bold=True)
+    f_label = _font(26, bold=True)
 
     # ESCUDO GRANDE SIN FONDO BLANCO
     esc_size = int(FRANJA_W * 0.75)
@@ -2603,7 +2603,14 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     grado = grado_a_ui(alumno.get('grado')).upper()
     seccion = (alumno.get('seccion') or "").upper()
     turno = (alumno.get('turno') or "").upper()
-    ano = str(datetime.now().year)
+
+    # ── Periodo: usar el nombre del periodo activo, fallback al año ──
+    try:
+        per = obtener_periodo_activo()
+        periodo_txt = per["nombre"] if per else str(datetime.now().year)
+    except Exception:
+        periodo_txt = str(datetime.now().year)
+
     info_x = DER_X
     QR_SIZE = 215
     qr_x = ANCHO_PX - QR_SIZE - 12
@@ -2643,7 +2650,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _linea(y2 + alto_linea, "DNI:", dni)
     _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
     _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "AÑO:", ano)
+    _linea(y2 + 4 * alto_linea, "PERIODO:", periodo_txt)
 
     qr = qrcode.QRCode(version=1, box_size=10, border=1)
     qr.add_data(str(alumno["dni"]).strip())
