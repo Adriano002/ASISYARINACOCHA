@@ -6410,17 +6410,14 @@ def main():
     try:
         inicializar_bd()
         aplicar_estilos()
-        inicializar_sesion()
         
+        # Si no hay usuario, mostramos login
         if not st.session_state.get("user"):
             vista_login()
             return
             
-        refrescar_sesion_si_necesario()
-        
         if not _verificar_admin_activo():
             st.error("No hay Admin principal activo en el sistema.")
-            st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
             
         if st.session_state["user"].get("debe_cambiar_password"):
@@ -6431,13 +6428,12 @@ def main():
             vista_mantenimiento()
             return
             
-        # --- AQUI ESTABA EL BUCLE ASESINO, YA LO QUITAMOS ---
+        # --- AQUI ESTABA EL BUCLE, YA NO ESTÁ ---
         if sistema_bloqueado():
             st.warning("⚠️ El sistema no está configurado. No hay periodo activo con alumnos cargados.")
             if st.session_state["user"]["rol"] == "Admin":
                 st.info("Ve a Auditoria -> Periodos para crear un periodo y subir el Excel de alumnos.")
-                # Solo dibujamos el menú para que puedas navegar, sin forzar la vista
-                menu_lateral()
+                menu_lateral() # Solo dibuja el menú
             else:
                 st.info("Contacta al Administrador.")
             return
@@ -6447,13 +6443,8 @@ def main():
         if op:
             _enrutar(op, st.session_state["user"])
             
-    except sqlite3.OperationalError as e:
-        st.error("Error de base de datos: " + str(e))
-        st.info("Verifica que el archivo asistencia.db no esté bloqueado.")
-        log.exception("Error de BD en main")
     except Exception as e:
-        st.error("Error inesperado: " + str(e))
-        st.info("El error quedó registrado en logs/app.log.")
+        st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
 
 if __name__ == "__main__":
