@@ -4451,13 +4451,17 @@ def vista_alumnos():
     if pid:
         _perfil_alumno(pid)
         return
-    tabs = st.tabs(["Listar", "Crear", "Editar"])
+        
+    tabs = st.tabs(["Listar", "Crear", "Editar", "Importar Excel"])
+    
     with tabs[0]:
         _frag_listar_alumnos()
     with tabs[1]:
         _frag_crear_alumno()
     with tabs[2]:
         _frag_editar_alumno()
+    with tabs[3]:
+        _frag_importar_excel()
 
 
 #GRADOS Y SECCIONES
@@ -4943,6 +4947,12 @@ def _frag_importar_excel():
     st.info("Columnas: DNI, Nombres, Apellido Paterno, Apellido Materno, Grado, "
             "Seccion, Turno, Apoderado, Telefono.")
     st.caption("Si un DNI ya existe, se reactiva y actualiza.")
+    
+    periodo = obtener_periodo_activo()
+    if not periodo:
+        st.error("⚠️ Primero debes crear un Periodo Activo en la pestaña 'Auditoría -> Periodos'.")
+        return
+        
     arch = st.file_uploader("Sube el Excel", type=["xlsx", "xls"],
                             key="import_excel_periodo")
     if not arch:
@@ -4950,6 +4960,7 @@ def _frag_importar_excel():
     df = pd.read_excel(arch)
     st.write(f"{len(df)} filas detectadas.")
     cols = list(df.columns)
+    
     with st.form("mapeo_periodo"):
         c1, c2 = st.columns(2)
         with c1:
@@ -4964,6 +4975,7 @@ def _frag_importar_excel():
             m_apo_n = st.selectbox("Nombre Apoderado", [""] + cols)
             m_apo_t = st.selectbox("Telefono Apoderado", [""] + cols)
         validar = st.form_submit_button("Validar", type="primary")
+        
     if validar:
         mapeo = {"dni": m_dni, "nombres": m_nom, "apellido_paterno": m_pat,
                  "apellido_materno": m_mat, "grado": m_gra, "seccion": m_sec,
@@ -4973,6 +4985,7 @@ def _frag_importar_excel():
         st.session_state["_iv"] = val
         st.session_state["_ie"] = errs
         st.session_state["_ir"] = res
+        
     if "_ir" in st.session_state:
         r = st.session_state["_ir"]
         c1, c2, c3 = st.columns(3)
