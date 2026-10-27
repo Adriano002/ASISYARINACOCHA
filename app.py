@@ -2462,6 +2462,12 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
 # ─── CARNETS ───────────────────────────────────────────────────────────────
 def _generar_fotocheck_pil(alumno, escudo_path=None):
     from PIL import Image, ImageDraw, ImageFont
+    from pathlib import Path as _P
+    import qrcode
+    import datetime
+
+    BASE_DIR = _P(__file__).resolve().parent
+
     ANCHO_PX = 817
     ALTO_PX = 550
     NARANJA_OSCURO = (184, 92, 56)
@@ -2483,7 +2489,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             draw.ellipse([px - radio, py - radio, px + radio, py + radio],
                          fill=color_punto)
 
-    if escudo_path and Path(escudo_path).exists():
+    if escudo_path and _P(escudo_path).exists():
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (280, 280), Image.LANCZOS)
@@ -2505,26 +2511,187 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
         draw.line([(0, y), (FRANJA_W, y)], fill=(r, g, b))
 
+    # ── FUNCIÓN DE FUENTES CORREGIDA (RUTA ABSOLUTA) ──
     def _font(size, bold=False, italic=False):
-        nombres = []
         if bold and italic:
-            nombres = ["arialbi.ttf", "DejaVuSans-BoldOblique.ttf"]
+            nombres = ["arialbi.ttf"]
         elif bold:
-            nombres = ["arialbd.ttf", "DejaVuSans-Bold.ttf", "Helvetica-Bold"]
+            nombres = ["arialbd.ttf"]
         elif italic:
-            nombres = ["ariali.ttf", "DejaVuSans-Oblique.ttf"]
+            nombres = ["ariali.ttf"]
         else:
-            nombres = ["arial.ttf", "DejaVuSans.ttf", "Helvetica"]
+            nombres = ["arial.ttf"]
+
         for n in nombres:
             try:
-                return ImageFont.truetype(n, size)
-            except Exception:
-                continue
+                return ImageFont.truetype(str(BASE_DIR / n), size)
+            except Exception as e:
+                print(f"[_font FALLO] No se encontró {n} -> {e}")
+
+        # Fallback del sistema (tiene Ñ)
+        fallback = ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                    if bold else
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         try:
-            base_font = ImageFont.load_default()
-            return base_font.font_variant(size=size)
+            return ImageFont.truetype(fallback, size)
         except Exception:
-            return ImageFont.load_default()
+            pass
+
+        print("[_font DEFAULT] Usando fuente por defecto (sin Ñ)")
+        return ImageFont.load_default()
+
+    # ── FUNCIÓN DE DIBUJO SIN REPLACE ──
+    def _dibujar_texto(x, y, texto, font, color):
+        draw.text((x, y), texto, fill=color, font=font)
+
+    f_colegio = _font(18, bold=True)
+    f_foto = _font(24, bold=True)
+    f_titulo = _font(32, bold=True)
+    f_frase = _font(28, bold=True, italic=True)
+    f_label = _font(26, bold=True)
+
+    # ESCUDO GRANDE SIN FONDO BLANCO
+    esc_size = int(FRANJA_W * 0.75)
+    esc_x = (FRANJA_W - esc_size) // 2
+    espacio = ALTO_PX - FOTO_H
+    alto_bloque_texto = 3 * 18
+    alto_bloque_total = esc_size + 8 + alto_bloque_texto
+    esc_y = max(8, (espacio - alto_bloque_total) // 2 + 6)
+
+    if escudo_path and _P(escudo_path).exists():
+        try:
+            esc = Image.open(str(escudo_path)).convert("RGBA").resize(
+                (esc_size, esc_size), Image.LANCZOS)
+            img.paste(esc, (esc_x, esc_y), esc)
+        except Exception:
+            pass
+
+    def _txt_centrado(texto, y, font, color):
+        try:
+            bbox = draw.textbbox((0, 0), texto, font=font)
+            tw = bbox[2] - bbox[0]
+        except Exception:
+            tw = len(texto) * 7
+        _dibujar_texto((FRANJA_W - tw) // 2, y, texto, font, color)
+
+    y_txt = esc_y + esc_size + 6
+    for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
+        _txt_centrado(lbl, y_txt, f_colegio, BLANCO)
+        y_txt += 18
+
+    foto_x = 0
+    foto_y = ALTO_PX - FOTO_H
+    draw.rectangle([foto_x, foto_y, foto_x + FOTO_W, foto_y + FOTO_H],
+                   fill=BLANCO)
+    draw.rectangle([foto_x, foto_y, foto_x + FOTO_W - 1, foto_y + FOTO_H - 1],
+                   outline=NARANJA_FRANJA, width=1)
+    try:
+        bbox = draw.textbbox((0, 0), "FOTO", font=f_foto)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+    except Exception:
+        tw = 40
+        th = 12
+    draw.text((foto_x + (FOTO_W - tw) // 2, foto_y + (FOTO_H - th) // 2),
+              "FOTO", fill=GRIS_TXT, font=f_foto)
+
+    DER_X = FRANJA_W + 14
+    titulo_txt = "FOTOCHECK DEL ESTUDIANTE"
+    try:
+        bbox = draw.textbbox((0, 0), titulo_txt, font=f_titulo)
+        tw = bbox[2] - bbox[0]
+    except Exception:
+        tw = 280
+    espacio_d = ANCHO_PX - DER_X
+    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
+                   f_titulo, NEGRO)
+
+    ap_p = (alumno.get('apellido_paterno') or "").upper()
+    ap_m = (alumno.get('apellido_materno') or "").upper()
+    nombres = (alumno.get('nombres') or "").upper()
+    dni = alumno["dni"]
+    
+    # AQUI USAMOS grado_a_ui (asegurate que este definida arriba en tu archivo)
+    grado_val = alumno.get('grado')
+    if 'grado_a_ui' in globals():
+        grado_val = grado_a_ui(grado_val)
+    grado = (grado_val or "").upper()
+    
+    seccion = (alumno.get('seccion') or "").upper()
+    turno = (alumno.get('turno') or "").upper()
+
+    # Nombre del periodo o año actual
+    try:
+        if 'obtener_periodo_activo' in globals():
+            per = obtener_periodo_activo()
+            periodo_txt = per["nombre"] if per else str(datetime.datetime.now().year)
+        else:
+            periodo_txt = str(datetime.datetime.now().year)
+    except Exception:
+        periodo_txt = str(datetime.datetime.now().year)
+
+    info_x = DER_X
+    QR_SIZE = 215
+    qr_x = ANCHO_PX - QR_SIZE - 12
+    ancho_info = qr_x - info_x - 12
+
+    # ── AJUSTAR SIN REPLACE ──
+    def _ajustar(texto, size_ini, max_ancho, bold):
+        size = size_ini
+        while size > 10:
+            f = _font(size, bold=bold)
+            try:
+                ancho = draw.textlength(texto, font=f)
+            except Exception:
+                ancho = len(texto) * size * 0.55
+            if ancho <= max_ancho:
+                return f
+            size -= 1
+        return _font(10, bold=bold)
+
+    INFO_Y = 135
+    alto_linea = 65
+    ap_full = ap_p + " " + ap_m
+    _dibujar_texto(info_x, INFO_Y, ap_full,
+                   _ajustar(ap_full, 46, ancho_info, True), NEGRO)
+    y2 = INFO_Y + alto_linea
+    _dibujar_texto(info_x, y2, nombres,
+                   _ajustar(nombres, 46, ancho_info, True), NEGRO)
+
+    def _linea(y, label, valor, size=42):
+        _dibujar_texto(info_x, y, label, f_label, GRIS_LABEL)
+        try:
+            an = draw.textlength(label, font=f_label)
+        except Exception:
+            an = len(label) * 15
+        vx = info_x + int(an) + 10
+        _dibujar_texto(vx, y, valor,
+                       _ajustar(valor, size, ancho_info - int(an) - 10, True),
+                       NEGRO)
+
+    _linea(y2 + alto_linea, "DNI:", dni)
+    _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
+    _linea(y2 + 3 * alto_linea, "TURNO:", turno)
+    _linea(y2 + 4 * alto_linea, "PERIODO:", periodo_txt)
+
+    qr = qrcode.QRCode(version=1, box_size=10, border=1)
+    qr.add_data(str(alumno["dni"]).strip())
+    qr.make(fit=True)
+    qr_img_pil = qr.make_image(fill_color="black",
+                               back_color="white").convert("RGB").resize(
+        (QR_SIZE, QR_SIZE), Image.LANCZOS)
+    img.paste(qr_img_pil, (qr_x, 60))
+
+    frase = '"Ser del CNY, es ser mejor"'
+    try:
+        bbox = draw.textbbox((0, 0), frase, font=f_frase)
+        fw = bbox[2] - bbox[0]
+    except Exception:
+        fw = 250
+    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 46, frase,
+                   f_frase, NARANJA_FRANJA)
+
+    return img
     
     def _dibujar_texto(x, y, texto, font, color):
       draw.text((x, y), texto, fill=color, font=font)
