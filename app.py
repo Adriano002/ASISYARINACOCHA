@@ -200,7 +200,12 @@ def auditar(usuario, accion, va=None, vn=None, tb=None, rid=None):
                  (usuario, accion, timestamp_str(), va, vn, tb, rid, _ip()))
     except Exception as e:
         log.warning("audit: %s", e)
+def inicializar_sesion():
+    if st.session_state.get("user"):
+        return
 
+def refrescar_sesion_si_necesario():
+    return
 
 def cerrar_sesion():
     usuario = st.session_state.get("user")
