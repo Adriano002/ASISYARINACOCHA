@@ -6398,40 +6398,34 @@ def _control_faltas():
 
 #MAIN 
 def main():
-    st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
-                       page_icon="escudo.png", layout="wide",
-                       initial_sidebar_state="expanded")
-    
-    # --- COMENTADO PARA USAR SOLO SQLITE LOCAL ---
-    # try:
-    #     from db import descargar_bd_si_no_existe
-    #     descargar_bd_si_no_existe()
-    # except Exception as error:
-    #     log.warning("No se pudo verificar BD en R2: %s", error)
-
+    st.set_page_config(page_title="Asistencia I.E. Yarinacocha", page_icon="escudo.png", layout="wide", initial_sidebar_state="expanded")
     try:
         inicializar_bd()
         aplicar_estilos()
-
+        
         if not st.session_state.get("user"):
             vista_login()
             return
+            
         if not _verificar_admin_activo():
-            st.error("No hay Admin activo en el sistema.")
+            st.error("No hay Admin principal activo en el sistema.")
             st.stop()
+            
         if st.session_state["user"].get("debe_cambiar_password"):
             vista_cambio_password_obligatorio()
             return
+            
         if modo_mantenimiento() and st.session_state["user"]["rol"] != "Admin":
             vista_mantenimiento()
             return
             
-        # AQUI ESTA EL CAMBIO PARA QUE NO TE BLOQUEE
+        # AQUI ESTABA EL BUCLE ASESINO, YA LO QUITAMOS
         if sistema_bloqueado():
-            st.warning("El sistema no esta configurado. No hay periodo activo con alumnos.")
+            st.warning("⚠️ El sistema no esta configurado. No hay periodo activo con alumnos.")
             if st.session_state["user"]["rol"] == "Admin":
-                st.info("Ve a Auditoria para crear un periodo y subir el Excel.")
-                vista_auditoria() # Forzamos la vista para que puedas crear el periodo
+                st.info("Ve a Auditoria -> Periodos para crear un periodo y subir el Excel de alumnos.")
+                # Solo dibujamos el menú para que puedas navegar
+                menu_lateral()
             else:
                 st.info("Contacta al Administrador.")
             return
@@ -6440,6 +6434,10 @@ def main():
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
+            
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
+
+if __name__ == "__main__":
+    main()
