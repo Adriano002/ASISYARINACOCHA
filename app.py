@@ -6401,10 +6401,15 @@ def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
-    #try:
-       # from db import descargar_bd_si_no_existe
-        #descargar_bd_si_no_existe()
+    
+    # --- COMENTADO PARA USAR SOLO SQLITE LOCAL ---
+    # try:
+    #     from db import descargar_bd_si_no_existe
+    #     descargar_bd_si_no_existe()
+    # except Exception as error:
+    #     log.warning("No se pudo verificar BD en R2: %s", error)
 
+    try:
         inicializar_bd()
         aplicar_estilos()
 
