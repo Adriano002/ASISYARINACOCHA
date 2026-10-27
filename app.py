@@ -2544,8 +2544,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     
-    # 👇 EL TRUCO: Le subimos el tamaño a 55 y le quitamos las comillas para que quepa bien grande
-    f_frase = _font(55, bold=True, italic=True) 
+    # 👇 Tamaño 52 (un poquito más grande que el nombre)
+    f_frase = _font(52, bold=True, italic=True) 
     
     f_label = _font(26, bold=True)
 
@@ -2680,21 +2680,31 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE GIGANTE, RECTA Y SIN ADORNOS 👇
+    # 👇 FRASE EN 2 LÍNEAS (MÁS GRANDE QUE EL NOMBRE Y ELEGANTE) 👇
     # =====================================================================
-    frase = 'Ser del CNY, es ser mejor'
+    frase_1 = 'Ser del CNY,'
+    frase_2 = 'es ser mejor'
     
-    try:
-        bbox = draw.textbbox((0, 0), frase, font=f_frase)
-        fw = bbox[2] - bbox[0]
-    except Exception:
-        fw = 500
-
     frase_centro_x = DER_X + espacio_d // 2
-    frase_x = frase_centro_x - (fw // 2)
-    frase_y = ALTO_PX - 70 # Bien posicionada abajo
+    
+    # Calculamos la posición Y para que quede en el espacio libre de abajo
+    frase_y = ALTO_PX - 105
 
-    _dibujar_texto(frase_x, frase_y, frase, f_frase, NARANJA_FRANJA)
+    # Dibujamos la primera línea centrada
+    try:
+        bbox1 = draw.textbbox((0, 0), frase_1, font=f_frase)
+        fw1 = bbox1[2] - bbox1[0]
+    except Exception:
+        fw1 = 250
+    _dibujar_texto(frase_centro_x - (fw1 // 2), frase_y, frase_1, f_frase, NARANJA_FRANJA)
+
+    # Dibujamos la segunda línea centrada un poco más abajo
+    try:
+        bbox2 = draw.textbbox((0, 0), frase_2, font=f_frase)
+        fw2 = bbox2[2] - bbox2[0]
+    except Exception:
+        fw2 = 250
+    _dibujar_texto(frase_centro_x - (fw2 // 2), frase_y + 60, frase_2, f_frase, NARANJA_FRANJA)
 
     return img
     def _dibujar_texto(x, y, texto, font, color):
