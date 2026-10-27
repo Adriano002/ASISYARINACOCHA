@@ -4995,137 +4995,75 @@ def _frag_importar_excel():
                     st.session_state.pop(k, None)
                 st.rerun()
 
-
+def crear_periodo_manual(nombre, fecha_inicio, fecha_fin, usuario):
+    """Crea un periodo nuevo directamente desde la interfaz."""
+    try:
+        with cursor() as (con, cur):
+            cur.execute("UPDATE periodos SET activo = 0")
+            cur.execute(
+                "INSERT INTO periodos(nombre, fecha_inicio, fecha_fin, activo, cerrado) "
+                "VALUES(?, ?, ?, 1, 0)",
+                (nombre, to_date(fecha_inicio), to_date(fecha_fin))
+            )
+        auditar(usuario["usuario"], f"Creó periodo manual: {nombre}")
+        return True, "Periodo creado y activado correctamente."
+    except Exception as e:
+        return False, f"Error al crear periodo: {e}"
+        
 def vista_auditoria():
-    st.title("Auditoria y Periodos")
+    st.title("Auditoría y Periodos")
     usuario = st.session_state["user"]
-    tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
+    
+    tabs = st.tabs(["Registros de Auditoría", "Periodos / Año Escolar"])
+    
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
         if not df.empty:
             st.dataframe(df, width='stretch')
+            
     with tabs[1]:
-        st.subheader("Periodos registrados")
-        st.caption("Los periodos se crean automaticamente al cerrar el año "
-                   "escolar. No se pueden crear manualmente desde aqui.")
-        df_info = info_periodo_con_alumnos()
-        if df_info.empty:
-            st.info("Sin periodos creados.")
+        st.subheader("Configuración del Periodo")
+        
+        periodo_activo = obtener_periodo_activo()
+        if periodo_activo:
+            st.success(f"✅ Periodo activo actual: **{periodo_activo['nombre']}** "
+                       f"({periodo_activo['fecha_inicio']} al {periodo_activo['fecha_fin']})")
         else:
-            st.dataframe(df_info, width='stretch', hide_index=True)
-
+            st.warning("⚠️ No hay ningún periodo activo. El sistema está bloqueado.")
+            
         st.markdown("---")
-        st.markdown("### Cargar alumnos al periodo activo")
-        p = obtener_periodo_activo()
-        if p:
-            st.info(f"Periodo activo: **{p['nombre']}** "
-                    f"({p['fecha_inicio']} - {p['fecha_fin']})")
-            if periodo_tiene_alumnos(p["id"]):
-                st.success("El periodo ya tiene alumnos cargados.")
-            else:
-                st.warning("El periodo NO tiene alumnos.")
-            _frag_importar_excel()
-        else:
-            st.info("No hay periodo activo.")
-
-        st.markdown("---")
-        st.markdown("### Activar periodo (solo no cerrados)")
-        df2 = listar_periodos()
-        df2 = df2[df2["cerrado"] == 0]
-        if not df2.empty:
-            ops = {}
-            for _, r in df2.iterrows():
-                et = f"{r['nombre']} ({r['fecha_inicio']} - {r['fecha_fin']})"
-                if r["activo"]:
-                    et += " ACTIVO"
-                ops[et] = r["id"]
-            sel = st.selectbox("Periodo a activar", list(ops.keys()),
-                               key="act_periodo_sel")
-            if confirmar_accion("activar_periodo", "Activar",
-                                 "¿Estas seguro de activar este periodo?"):
-                ok, msg = activar_periodo(ops[sel], usuario)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
+        st.subheader("Crear Nuevo Periodo")
+        st.info("Si el sistema está bloqueado o necesitas empezar un año nuevo, crea el periodo aquí.")
+        
+        with st.form("form_crear_periodo_manual"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                nombre = st.text_input("Nombre del Periodo", value=str(ahora().year))
+            with c2:
+                fi = st.date_input("Fecha Inicio", value=date(ahora().year, 3, 1))
+            with c3:
+                ff = st.date_input("Fecha Fin", value=date(ahora().year, 12, 31))
+                
+            submit = st.form_submit_button("Crear y Activar Periodo", type="primary")
+            
+            if submit:
+                if not nombre.strip():
+                    st.error("El nombre es obligatorio.")
                 else:
-                    st.error(msg)
-    with tabs[2]:
-        st.subheader("Cierre de año escolar")
-        st.warning("Al cerrar el periodo se desactivan TODOS los alumnos y "
-                   "se crea uno nuevo.")
-        p = obtener_periodo_activo()
-        if not p:
-            st.info("No hay periodo activo.")
-            return
-        st.info(f"Periodo activo: {p['nombre']} "
-                f"({p['fecha_inicio']} - {p['fecha_fin']})")
-        st.markdown("Reporte resumen del periodo:")
-        df_rep = reporte_cierre_anual(p["id"])
-        if not df_rep.empty:
-            st.dataframe(df_rep, width='stretch')
+                    ok, msg = crear_periodo_manual(nombre, fi, ff, usuario)
+                    if ok:
+                        st.toast(msg)
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
         st.markdown("---")
-        st.markdown("**Paso 1: Descargar reporte anual detallado (OBLIGATORIO)**")
-        if st.button("Generar y descargar reporte anual", key="btn_desc_anual"):
-            hojas = reporte_detallado_por_mes(p["id"])
-            if not hojas:
-                st.warning("Sin datos.")
-            else:
-                st.download_button(
-                    "Descargar Excel anual",
-                    df_a_xlsx_multilhoja(hojas),
-                    f"reporte_anual_{p['nombre']}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                st.session_state["_reporte_descargado"] = True
-                st.toast("Reporte generado.")
-
-        st.markdown("---")
-        st.markdown("**Paso 2: Cerrar periodo (creara uno nuevo)**")
-        desc = st.session_state.get("_reporte_descargado", False)
-        if not desc:
-            st.info("Debes descargar el reporte anual antes.")
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            nn = st.text_input("Nombre nuevo periodo",
-                                value=str(ahora().year + 1))
-        with c2:
-            fi = st.date_input("Inicio nuevo",
-                                date(ahora().year + 1, 3, 1))
-        with c3:
-            ff = st.date_input("Fin nuevo",
-                                date(ahora().year + 1, 12, 31))
-        conf = st.text_input("Escribe CERRAR para confirmar")
-
-        if confirmar_accion(
-                "cerrar_AÑO", "Cerrar año escolar",
-                "¿Estas seguro de cerrar el año escolar?"):
-            if not desc:
-                st.error("Primero debes descargar el reporte anual.")
-            elif conf.strip() != "CERRAR":
-                st.error("Debes escribir exactamente CERRAR.")
-            else:
-                ok, msg = cerrar_AÑO_escolar(
-                    usuario, p["id"], nn,
-                    fi.strftime("%Y-%m-%d"),
-                    ff.strftime("%Y-%m-%d"))
-                if ok:
-                    st.session_state.pop("_reporte_descargado", None)
-                    st.success(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-
-        st.markdown("---")
-        st.markdown("Cierres anteriores:")
-        dfc = listar_cierres_anuales()
-        if not dfc.empty:
-            st.dataframe(dfc, width='stretch')
-        st.markdown("Periodos cerrados (solo consulta):")
-        dfp = listar_periodos_cerrados()
-        if not dfp.empty:
-            st.dataframe(dfp, width='stretch')
+        st.subheader("Historial de Periodos")
+        df_periodos = info_periodo_con_alumnos()
+        if not df_periodos.empty:
+            st.dataframe(df_periodos, width='stretch', hide_index=True)
 
 
 # DÍAS ESPECIALES
