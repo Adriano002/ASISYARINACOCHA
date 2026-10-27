@@ -2544,8 +2544,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     
-    # 👇 Tamaño 52 (un poquito más grande que el nombre)
-    f_frase = _font(52, bold=True, italic=True) 
+    # La frase será tamaño 46, NEGRITA pero SIN CURSIVA (para que ocupe menos)
+    f_frase = _font(46, bold=True, italic=False) 
     
     f_label = _font(26, bold=True)
 
@@ -2680,170 +2680,22 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE EN 2 LÍNEAS (MÁS GRANDE QUE EL NOMBRE Y ELEGANTE) 👇
+    # 👇 FRASE EN UNA SOLA LÍNEA, GRANDE Y CENTRADA AUTOMÁTICAMENTE 👇
     # =====================================================================
-    frase_1 = 'Ser del CNY,'
-    frase_2 = 'es ser mejor'
-    
+    frase = 'Ser del CNY es ser mejor'
     frase_centro_x = DER_X + espacio_d // 2
+    frase_y = ALTO_PX - 65 
+
+    # Usamos _ajustar para que crezca lo máximo posible sin salirse del carnet
+    f_frase_final = _ajustar(frase, 46, espacio_d - 20, True)
     
-    # Calculamos la posición Y para que quede en el espacio libre de abajo
-    frase_y = ALTO_PX - 105
-
-    # Dibujamos la primera línea centrada
     try:
-        bbox1 = draw.textbbox((0, 0), frase_1, font=f_frase)
-        fw1 = bbox1[2] - bbox1[0]
-    except Exception:
-        fw1 = 250
-    _dibujar_texto(frase_centro_x - (fw1 // 2), frase_y, frase_1, f_frase, NARANJA_FRANJA)
-
-    # Dibujamos la segunda línea centrada un poco más abajo
-    try:
-        bbox2 = draw.textbbox((0, 0), frase_2, font=f_frase)
-        fw2 = bbox2[2] - bbox2[0]
-    except Exception:
-        fw2 = 250
-    _dibujar_texto(frase_centro_x - (fw2 // 2), frase_y + 60, frase_2, f_frase, NARANJA_FRANJA)
-
-    return img
-    def _dibujar_texto(x, y, texto, font, color):
-      draw.text((x, y), texto, fill=color, font=font)
-
-    f_colegio = _font(18, bold=True)
-    f_foto = _font(24, bold=True)
-    f_titulo = _font(32, bold=True)
-    f_frase = _font(28, bold=True, italic=True)
-    f_label = _font(26, bold=True)
-
-    # ESCUDO GRANDE SIN FONDO BLANCO
-    esc_size = int(FRANJA_W * 0.75)
-    esc_x = (FRANJA_W - esc_size) // 2
-    espacio = ALTO_PX - FOTO_H
-    alto_bloque_texto = 3 * 18
-    alto_bloque_total = esc_size + 8 + alto_bloque_texto
-    esc_y = max(8, (espacio - alto_bloque_total) // 2 + 6)
-
-    if escudo_path and Path(escudo_path).exists():
-        try:
-            esc = Image.open(str(escudo_path)).convert("RGBA").resize(
-                (esc_size, esc_size), Image.LANCZOS)
-            # Lo pegamos directo, respetando su transparencia original (sin fondo blanco)
-            img.paste(esc, (esc_x, esc_y), esc)
-        except Exception:
-            pass
-
-    def _txt_centrado(texto, y, font, color):
-        try:
-            bbox = draw.textbbox((0, 0), texto, font=font)
-            tw = bbox[2] - bbox[0]
-        except Exception:
-            tw = len(texto) * 7
-        _dibujar_texto((FRANJA_W - tw) // 2, y, texto, font, color)
-
-    y_txt = esc_y + esc_size + 6
-    for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
-        _txt_centrado(lbl, y_txt, f_colegio, BLANCO)
-        y_txt += 18
-
-    foto_x = 0
-    foto_y = ALTO_PX - FOTO_H
-    draw.rectangle([foto_x, foto_y, foto_x + FOTO_W, foto_y + FOTO_H],
-                   fill=BLANCO)
-    draw.rectangle([foto_x, foto_y, foto_x + FOTO_W - 1, foto_y + FOTO_H - 1],
-                   outline=NARANJA_FRANJA, width=1)
-    try:
-        bbox = draw.textbbox((0, 0), "FOTO", font=f_foto)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
-    except Exception:
-        tw = 40
-        th = 12
-    draw.text((foto_x + (FOTO_W - tw) // 2, foto_y + (FOTO_H - th) // 2),
-              "FOTO", fill=GRIS_TXT, font=f_foto)
-
-    DER_X = FRANJA_W + 14
-    titulo_txt = "FOTOCHECK DEL ESTUDIANTE"
-    try:
-        bbox = draw.textbbox((0, 0), titulo_txt, font=f_titulo)
-        tw = bbox[2] - bbox[0]
-    except Exception:
-        tw = 280
-    espacio_d = ANCHO_PX - DER_X
-    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
-                   f_titulo, NEGRO)
-
-    ap_p = (alumno.get('apellido_paterno') or "").upper()
-    ap_m = (alumno.get('apellido_materno') or "").upper()
-    nombres = (alumno.get('nombres') or "").upper()
-    dni = alumno["dni"]
-    grado = grado_a_ui(alumno.get('grado')).upper()
-    seccion = (alumno.get('seccion') or "").upper()
-    turno = (alumno.get('turno') or "").upper()
-
-    # ── Periodo: usar el nombre del periodo activo, fallback al año ──
-    try:
-        per = obtener_periodo_activo()
-        periodo_txt = per["nombre"] if per else str(datetime.now().year)
-    except Exception:
-        periodo_txt = str(datetime.now().year)
-
-    info_x = DER_X
-    QR_SIZE = 215
-    qr_x = ANCHO_PX - QR_SIZE - 12
-    ancho_info = qr_x - info_x - 12
-
-    def _ajustar(texto, size_ini, max_ancho, bold):
-        size = size_ini
-        while size > 10:
-            f = _font(size, bold=bold)
-            try:
-                ancho = draw.textlength(texto, font=f)
-            except Exception:
-                ancho = len(texto) * size * 0.55
-            if ancho <= max_ancho:
-                return f
-            size -= 1
-        return _font(10, bold=bold)
-
-    INFO_Y = 135
-    alto_linea = 65
-    ap_full = ap_p + " " + ap_m
-    _dibujar_texto(info_x, INFO_Y, ap_full,
-                   _ajustar(ap_full, 46, ancho_info, True), NEGRO)
-    y2 = INFO_Y + alto_linea
-    _dibujar_texto(info_x, y2, nombres,
-                   _ajustar(nombres, 46, ancho_info, True), NEGRO)
-
-    def _linea(y, label, valor, size=42):
-        _dibujar_texto(info_x, y, label, f_label, GRIS_LABEL)
-        an = draw.textlength(label, font=f_label)
-        vx = info_x + int(an) + 10
-        _dibujar_texto(vx, y, valor,
-                       _ajustar(valor, size, ancho_info - int(an) - 10, True),
-                       NEGRO)
-
-    _linea(y2 + alto_linea, "DNI:", dni)
-    _linea(y2 + 2 * alto_linea, "GRADO:", f'{grado} "{seccion}"')
-    _linea(y2 + 3 * alto_linea, "TURNO:", turno)
-    _linea(y2 + 4 * alto_linea, "PERIODO:", periodo_txt)
-
-    qr = qrcode.QRCode(version=1, box_size=10, border=1)
-    qr.add_data(str(alumno["dni"]).strip())
-    qr.make(fit=True)
-    qr_img_pil = qr.make_image(fill_color="black",
-                               back_color="white").convert("RGB").resize(
-        (QR_SIZE, QR_SIZE), Image.LANCZOS)
-    img.paste(qr_img_pil, (qr_x, 60))
-
-    frase = '"Ser del CNY, es ser mejor"'
-    try:
-        bbox = draw.textbbox((0, 0), frase, font=f_frase)
+        bbox = draw.textbbox((0, 0), frase, font=f_frase_final)
         fw = bbox[2] - bbox[0]
     except Exception:
-        fw = 250
-    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 46, frase,
-                   f_frase, NARANJA_FRANJA)
+        fw = 500
+
+    _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase_final, NARANJA_FRANJA)
 
     return img
 def _render_carnets(filas, titulo=None):
