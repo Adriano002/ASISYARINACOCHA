@@ -2465,6 +2465,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     from pathlib import Path as _P
     import qrcode
     import datetime
+    import math
 
     BASE_DIR = _P(__file__).resolve().parent
 
@@ -2478,8 +2479,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     NEGRO = (17, 17, 17)
     GRIS_LABEL = (90, 60, 30)
     GRIS_TXT = (150, 150, 150)
-    
-    DORADO = (180, 140, 60) # Detalle decorativo
 
     img = Image.new("RGB", (ANCHO_PX, ALTO_PX), FONDO)
     draw = ImageDraw.Draw(img)
@@ -2545,6 +2544,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
+    f_frase = _font(46, bold=True, italic=True)
     f_label = _font(26, bold=True)
 
     esc_size = int(FRANJA_W * 0.75)
@@ -2599,15 +2599,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         tw = 280
     espacio_d = ANCHO_PX - DER_X
-    titulo_x = DER_X + (espacio_d - tw) // 2
-    
-    # ── DETALLE 1: Líneas doradas sutiles a los lados del título ──
-    line_y = 28
-    line_len = 40
-    draw.line([(titulo_x - line_len - 10, line_y), (titulo_x - 10, line_y)], fill=DORADO, width=2)
-    draw.line([(titulo_x + tw + 10, line_y), (titulo_x + tw + line_len + 10, line_y)], fill=DORADO, width=2)
-
-    _dibujar_texto(titulo_x, 10, titulo_txt, f_titulo, NEGRO)
+    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
+                   f_titulo, NEGRO)
 
     ap_p = (alumno.get('apellido_paterno') or "").upper()
     ap_m = (alumno.get('apellido_materno') or "").upper()
@@ -2684,30 +2677,69 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     
     img.paste(qr_img_pil, (qr_x, 65))
 
+    # 👇 LA FRASE EN CURVA CON DIBUJOS 👇
     frase = '"Ser del CNY, es ser mejor"'
-    f_frase = _font(46, bold=True, italic=True)
     
+    # Calculamos el ancho total para centrarla
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
-        fw = 500
+        fw = 450
         
-    frase_x = DER_X + (espacio_d - fw) // 2
+    frase_centro_x = DER_X + espacio_d // 2
+    frase_y = ALTO_PX - 60
     
-    # ── DETALLE 2: Puntitos dorados a los lados de la frase ──
-    frase_y = ALTO_PX - 65
-    draw.ellipse([frase_x - 20, frase_y + 25, frase_x - 12, frase_y + 33], fill=DORADO)
-    draw.ellipse([frase_x + fw + 12, frase_y + 25, frase_x + fw + 20, frase_y + 33], fill=DORADO)
+    # 1. Dibujamos las estrellitas decorativas a los lados
+    estrella_x_izq = frase_centro_x - (fw // 2) - 35
+    estrella_x_der = frase_centro_x + (fw // 2) + 20
+    _dibujar_texto(estrella_x_izq, frase_y + 10, "✦", f_label, NARANJA_FRANJA)
+    _dibujar_texto(estrella_x_der, frase_y + 10, "✦", f_label, NARANJA_FRANJA)
 
-    _dibujar_texto(frase_x, frase_y, frase, f_frase, NARANJA_FRANJA)
-
-    # ── DETALLE 3: Borde decorativo sutil ──
-    draw.rectangle([2, 2, ANCHO_PX - 3, ALTO_PX - 3], outline=DORADO, width=1)
-    draw.rectangle([6, 6, ANCHO_PX - 7, ALTO_PX - 7], outline=DORADO, width=1)
+    # 2. Dibujamos el texto en arco (letra por letra)
+    # Cada letra se rota un poquito y se eleva en el centro para hacer la curva
+    ancho_letra_acumulado = 0
+    arco_radio = 400 # Qué tan pronunciada es la curva
+    for i, letra in enumerate(frase):
+        try:
+            letra_bbox = draw.textbbox((0, 0), letra, font=f_frase)
+            ancho_letra = letra_bbox[2] - letra_bbox[0]
+        except Exception:
+            ancho_letra = 20
+            
+        # Calculamos la posición X de esta letra
+        x_letra = frase_centro_x - (fw // 2) + ancho_letra_acumulado
+        
+        # Calculamos el ángulo y la altura (Y) según la posición en la curva
+        # La formula matemática del arco
+        x_relativo = x_letra - frase_centro_x
+        angulo = math.degrees(math.asin(x_relativo / arco_radio))
+        
+        # Elevación de la letra para que forme la curva (las de los extremos bajan)
+        y_letra = frase_y + (arco_radio - math.sqrt(arco_radio**2 - x_relativo**2))
+        
+        # Creamos una imagen temporal del tamaño de la letra para rotarla
+        # (Pillow no permite rotar texto directo, hay que rotar la imagen de la letra)
+        if letra.strip() == "": 
+            # Si es un espacio, solo avanzamos
+            ancho_letra_acumulado += ancho_letra
+            continue
+            
+        # Hacemos un lienzo transparente del tamaño de la letra (con margen)
+        tamano_letra = (ancho_letra + 20, 60)
+        img_letra = Image.new("RGBA", tamano_letra, (255, 255, 255, 0))
+        draw_letra = ImageDraw.Draw(img_letra)
+        draw_letra.text((10, 10), letra, font=f_frase, fill=NARANJA_FRANJA)
+        
+        # Rotamos la letra
+        img_letra_rotada = img_letra.rotate(-angulo, expand=True, resample=Image.BICUBIC)
+        
+        # Pegamos la letra rotada en el carnet
+        img.paste(img_letra_rotada, (int(x_letra) - 10, int(y_letra) - 10), img_letra_rotada)
+        
+        ancho_letra_acumulado += ancho_letra
 
     return img
-    
     def _dibujar_texto(x, y, texto, font, color):
       draw.text((x, y), texto, fill=color, font=font)
 
