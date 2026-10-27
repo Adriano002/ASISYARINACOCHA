@@ -2511,7 +2511,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
         draw.line([(0, y), (FRANJA_W, y)], fill=(r, g, b))
 
-    # ── FUNCIÓN DE FUENTES CORREGIDA (RUTA ABSOLUTA) ──
     def _font(size, bold=False, italic=False):
         if bold and italic:
             nombres = ["arialbi.ttf"]
@@ -2526,9 +2525,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             try:
                 return ImageFont.truetype(str(BASE_DIR / n), size)
             except Exception as e:
-                print(f"[_font FALLO] No se encontró {n} -> {e}")
+                pass
 
-        # Fallback del sistema (tiene Ñ)
         fallback = ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
                     if bold else
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
@@ -2537,17 +2535,16 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         except Exception:
             pass
 
-        print("[_font DEFAULT] Usando fuente por defecto (sin Ñ)")
         return ImageFont.load_default()
 
-    # ── FUNCIÓN DE DIBUJO SIN REPLACE ──
     def _dibujar_texto(x, y, texto, font, color):
         draw.text((x, y), texto, fill=color, font=font)
 
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
-    f_frase = _font(28, bold=True, italic=True)
+    # 👇 AUMENTAMOS EL TAMAÑO DE LA FRASE
+    f_frase = _font(38, bold=True, italic=True) 
     f_label = _font(26, bold=True)
 
     # ESCUDO GRANDE SIN FONDO BLANCO
@@ -2611,7 +2608,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     nombres = (alumno.get('nombres') or "").upper()
     dni = alumno["dni"]
     
-    # AQUI USAMOS grado_a_ui (asegurate que este definida arriba en tu archivo)
     grado_val = alumno.get('grado')
     if 'grado_a_ui' in globals():
         grado_val = grado_a_ui(grado_val)
@@ -2620,7 +2616,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     seccion = (alumno.get('seccion') or "").upper()
     turno = (alumno.get('turno') or "").upper()
 
-    # Nombre del periodo o año actual
     try:
         if 'obtener_periodo_activo' in globals():
             per = obtener_periodo_activo()
@@ -2635,7 +2630,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_x = ANCHO_PX - QR_SIZE - 12
     ancho_info = qr_x - info_x - 12
 
-    # ── AJUSTAR SIN REPLACE ──
     def _ajustar(texto, size_ini, max_ancho, bold):
         size = size_ini
         while size > 10:
@@ -2649,8 +2643,10 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    INFO_Y = 135
-    alto_linea = 65
+    # 👇 AJUSTAMOS LA ALTURA PARA QUE ESTÉ A LA ALTURA DEL QR
+    INFO_Y = 90
+    alto_linea = 58 # Un poco más compacto para que quepa bien
+    
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
                    _ajustar(ap_full, 46, ancho_info, True), NEGRO)
@@ -2680,15 +2676,17 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_img_pil = qr.make_image(fill_color="black",
                                back_color="white").convert("RGB").resize(
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
-    img.paste(qr_img_pil, (qr_x, 60))
+    # 👇 EL QR TAMBIÉN LO SUBIMOS UN POCO PARA QUE SE VEA CENTRADO
+    img.paste(qr_img_pil, (qr_x, 40))
 
     frase = '"Ser del CNY, es ser mejor"'
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
-        fw = 250
-    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 46, frase,
+        fw = 350
+    # 👇 LA FRASE LA PONEMOS MÁS ABAJO Y CENTRADA
+    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 60, frase,
                    f_frase, NARANJA_FRANJA)
 
     return img
