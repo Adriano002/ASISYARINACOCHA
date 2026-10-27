@@ -5027,12 +5027,73 @@ def crear_periodo_manual(nombre, fecha_inicio, fecha_fin, usuario):
         return True, "Periodo creado y activado correctamente."
     except Exception as e:
         return False, f"Error al crear periodo: {e}"
+
+def _frag_importar_excel():
+    st.subheader("Cargar alumnos al periodo")
+    st.info("Columnas: DNI, Nombres, Apellido Paterno, Apellido Materno, Grado, Seccion, Turno, Apoderado, Telefono.")
+    st.caption("Si un DNI ya existe, se reactiva y actualiza.")
+    
+    periodo = obtener_periodo_activo()
+    if not periodo:
+        st.error("⚠️ Primero debes crear un Periodo Activo arriba.")
+        return
         
+    arch = st.file_uploader("Sube el Excel", type=["xlsx", "xls"], key="import_excel_periodo")
+    if not arch:
+        return
+        
+    df = pd.read_excel(arch)
+    st.write(f"{len(df)} filas detectadas.")
+    cols = list(df.columns)
+    
+    with st.form("mapeo_periodo"):
+        c1, c2 = st.columns(2)
+        with c1:
+            m_dni = st.selectbox("DNI *", cols)
+            m_nom = st.selectbox("Nombres *", cols)
+            m_pat = st.selectbox("Apellido Paterno *", cols)
+            m_mat = st.selectbox("Apellido Materno", [""] + cols)
+        with c2:
+            m_gra = st.selectbox("Grado *", cols)
+            m_sec = st.selectbox("Seccion *", cols)
+            m_tur = st.selectbox("Turno *", cols)
+            m_apo_n = st.selectbox("Nombre Apoderado", [""] + cols)
+            m_apo_t = st.selectbox("Telefono Apoderado", [""] + cols)
+        validar = st.form_submit_button("Validar y Mapear", type="primary")
+        
+    if validar:
+        mapeo = {"dni": m_dni, "nombres": m_nom, "apellido_paterno": m_pat,
+                 "apellido_materno": m_mat, "grado": m_gra, "seccion": m_sec,
+                 "turno": m_tur, "apoderado_nombre": m_apo_n,
+                 "apoderado_telefono": m_apo_t}
+        val, errs, res = validar_importacion(df, mapeo)
+        st.session_state["_iv"] = val
+        st.session_state["_ie"] = errs
+        st.session_state["_ir"] = res
+        
+    if "_ir" in st.session_state:
+        r = st.session_state["_ir"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total", r["total"])
+        c2.metric("Validas", r["validas"])
+        c3.metric("Errores", r["errores"])
+        if st.session_state.get("_ie"):
+            with st.expander("Ver Errores"):
+                st.dataframe(pd.DataFrame(st.session_state["_ie"]), width='stretch')
+        if st.session_state.get("_iv"):
+            if confirmar_accion("importar_excel", "Importar alumnos", "¿Estas seguro de importar los alumnos validos?"):
+                ins, reac, errs = insertar_alumnos_validos(st.session_state["_iv"])
+                st.toast(f"{ins} importados, {reac} reactivados.")
+                if errs:
+                    st.warning(f"{len(errs)} errores al insertar")
+                for k in ["_iv", "_ie", "_ir"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
 def vista_auditoria():
     st.title("Auditoría y Periodos")
     usuario = st.session_state["user"]
     
-    tabs = st.tabs(["Registros de Auditoría", "Periodos / Año Escolar"])
+    tabs = st.tabs(["Registros", "Periodos"])
     
     with tabs[0]:
         df = obtener_auditoria(500)
@@ -5045,8 +5106,7 @@ def vista_auditoria():
         
         periodo_activo = obtener_periodo_activo()
         if periodo_activo:
-            st.success(f"✅ Periodo activo: **{periodo_activo['nombre']}** "
-                       f"({periodo_activo['fecha_inicio']} al {periodo_activo['fecha_fin']})")
+            st.success(f"✅ Periodo activo: **{periodo_activo['nombre']}** ({periodo_activo['fecha_inicio']} al {periodo_activo['fecha_fin']})")
         else:
             st.warning("⚠️ No hay ningún periodo activo. El sistema está bloqueado.")
             
@@ -5082,6 +5142,11 @@ def vista_auditoria():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
+
+        st.markdown("---")
+        
+        # AQUI ES DONDE APARECE EL BOTON DE EXCEL
+        _frag_importar_excel()
 
         st.markdown("---")
         st.subheader("Historial de Periodos")
