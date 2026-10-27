@@ -28,6 +28,8 @@ try:
 except ImportError:
     def st_autorefresh(**kwargs):
         pass
+
+# ─── LOGGING ───────────────────────────────────────────────────────────────
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 logging.basicConfig(
@@ -40,7 +42,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("asistencia")
 
-
+# ─── CONSTANTES ────────────────────────────────────────────────────────────
 MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -69,6 +71,7 @@ LIMITE_NUEVO = 3
 LIMITE_REINCIDENTE = 1
 
 
+# ─── UTILIDADES DE TIEMPO ──────────────────────────────────────────────────
 def ahora():
     return datetime.now(timezone.utc) - timedelta(hours=5)
 
@@ -104,7 +107,7 @@ def _safe_df(fn, default_cols=None):
         return pd.DataFrame(columns=default_cols or [])
 
 
-
+# ─── HELPERS ───────────────────────────────────────────────────────────────
 def confirmar_accion(clave, texto_boton="Confirmar",
                      texto_check="¿Estás seguro de hacer esta acción?",
                      tipo_boton="primary"):
@@ -116,36 +119,15 @@ def confirmar_accion(clave, texto_boton="Confirmar",
 
 
 def generar_qr(dni, size=220):
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
-                        box_size=10, border=2)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
-
-    escudo_path = Path("escudo.png")
-    if escudo_path.exists():
-        try:
-            from PIL import Image, ImageDraw
-            logo = Image.open(str(escudo_path)).convert("RGBA")
-            qr_width, qr_height = img.size
-            logo_size = int(qr_width * 0.28)
-            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
-
-            fondo_logo = Image.new("RGBA", (logo_size + 6, logo_size + 6),
-                                   (255, 255, 255, 255))
-            draw_logo = ImageDraw.Draw(fondo_logo)
-            draw_logo.rectangle(
-                [0, 0, fondo_logo.width - 1, fondo_logo.height - 1],
-                outline=(0, 0, 0, 255), width=3
-            )
-            fondo_logo.paste(logo, (3, 3), logo)
-
-            pos = ((qr_width - fondo_logo.width) // 2,
-                   (qr_height - fondo_logo.height) // 2)
-            img.paste(fondo_logo, pos, fondo_logo)
-        except Exception:
-            pass
-    return img.convert("RGB")
+    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
 
 def generar_qr_bytes(dni, size=220):
@@ -184,6 +166,8 @@ def _botones_lista(items, etiqueta_fn, key_fn, max_cols=3):
             clickeado = item
     return clickeado
 
+
+# ─── SEGURIDAD ─────────────────────────────────────────────────────────────
 def hashear_password(password):
     salt = secrets.token_bytes(16)
     d = hashlib.pbkdf2_hmac(PBK_ALG, password.encode("utf-8"), salt, PBK_ITER)
@@ -284,6 +268,7 @@ def _verificar_admin_activo():
         return cur.fetchone() is not None
 
 
+# ─── INICIALIZACIÓN BD ─────────────────────────────────────────────────────
 @st.cache_resource
 def inicializar_bd():
     aplicar_schema()
@@ -347,6 +332,7 @@ def _seed():
             log.warning("admin creado, pass temporal: %s", pwd)
 
 
+# ─── MANTENIMIENTO ─────────────────────────────────────────────────────────
 def modo_mantenimiento():
     with cursor() as (con, cur):
         cur.execute("SELECT valor FROM config WHERE clave=?", ("mantenimiento",))
@@ -386,6 +372,8 @@ def vista_mantenimiento():
         st.warning(msg)
     st.info("Vuelve a intentarlo mas tarde.")
 
+
+# ─── PERIODOS ──────────────────────────────────────────────────────────────
 def obtener_periodo_activo():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE activo=1 LIMIT 1")
@@ -446,6 +434,7 @@ def info_periodo_con_alumnos():
     """)
 
 
+# ─── TURNOS / VENTANAS ─────────────────────────────────────────────────────
 def listar_turnos():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM turnos ORDER BY id")
@@ -480,7 +469,7 @@ def listar_ventanas(id_turno=None):
     return out
 
 
-
+# ─── DÍAS ESPECIALES ───────────────────────────────────────────────────────
 def _dia_dict(f):
     d = dict(f)
     d["fecha"] = fmt_date(d.get("fecha"))
@@ -560,6 +549,7 @@ def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
     return None
 
 
+# ─── GRADOS / SECCIONES / ALUMNOS ──────────────────────────────────────────
 def listar_grados():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM grados ORDER BY nombre")
@@ -732,7 +722,7 @@ def reactivar_alumno(idal, dni, usuario):
     return True, "Alumno reactivado."
 
 
-# IMPORTACIÓN
+# ─── IMPORTACIÓN EXCEL ─────────────────────────────────────────────────────
 def _normalizar_grado(n):
     n = (n or "").strip().title()
     r = {"1°": "1ro", "2°": "2do", "3°": "3ro", "4°": "4to", "5°": "5to",
@@ -922,7 +912,7 @@ def insertar_alumnos_validos(val):
     return ins, reac, errs
 
 
-#  BLOQUEOS
+# ─── BLOQUEOS ──────────────────────────────────────────────────────────────
 def _fecha_ultimo_desbloqueo(idal):
     with cursor() as (con, cur):
         cur.execute("""
@@ -1024,7 +1014,7 @@ def obtener_auditoria(limite=500):
                    "ORDER BY id DESC LIMIT ?", (int(limite),))
 
 
-# JUSTIFICACIONES Y PERMISOS 
+# ─── JUSTIFICACIONES Y PERMISOS ────────────────────────────────────────────
 def _aplicar_just_prev(cur, idal, fecha, tipo):
     cur.execute("SELECT id FROM justificaciones_previas "
                 "WHERE alumno_id=? AND fecha_objetivo=? AND tipo=? AND aplicada=0",
@@ -1236,7 +1226,7 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
             tb="justificaciones_previas", rid=id_just)
     return True, f"Justificacion de {just['alumno']} reactivada (pendiente)."
 
-#REGISTRAR ENTRADA
+# ─── REGISTRAR ENTRADA ─────────────────────────────────────────────────────
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
@@ -1412,7 +1402,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
     ), {"alumno": al, "evento_nombre": ev_nombre}
 
 
-# MARCAR FALTAS AL CIERRE 
+# ─── MARCAR FALTAS AL CIERRE ───────────────────────────────────────────────
 def marcar_faltas_al_cierre():
     fecha_d = hoy_date()
     fecha_str = hoy_str()
@@ -1580,10 +1570,12 @@ def _procesar_escaneo(dni):
 
 def escaner_qr_continuo(key="qr_scanner"):
     st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
-                '<div class="scan-sub">Apunta al código del alumno</div></div>',
+                '<div class="scan-sub">Apunta al codigo del alumno</div></div>',
                 unsafe_allow_html=True)
+
     mount_id = st.session_state.get("_qr_mount_id", 0)
     result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
+
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
@@ -1605,19 +1597,16 @@ def escaner_qr_continuo(key="qr_scanner"):
                     </script>
                 """, height=0)
                 st.session_state.pop("_qr_sonido_pendiente", None)
-            st.rerun()
 
-    # 🆕 Mensaje de desbloqueo exitoso
-    desbloq = st.session_state.get("_qr_desbloqueo_exitoso")
-    if desbloq:
-        st.success(
-            f"✅ **{desbloq['nombre']}** desbloqueado con éxito. "
-            f"**Vuelve a escanear su QR** para registrar su asistencia."
-        )
-        if st.button("OK, entendido", key="ok_desbloq_msg",
-                     type="secondary"):
-            st.session_state.pop("_qr_desbloqueo_exitoso", None)
-            st.rerun()
+            pendientes = st.session_state.get("_qr_pendientes_rerun", 0) + 1
+            st.session_state["_qr_pendientes_rerun"] = pendientes
+            ult_rerun = st.session_state.get("_qr_ultimo_rerun", 0)
+            ahora_ts = time.time()
+
+            if pendientes >= 10 or (ahora_ts - ult_rerun) >= 2.0:
+                st.session_state["_qr_pendientes_rerun"] = 0
+                st.session_state["_qr_ultimo_rerun"] = ahora_ts
+                st.rerun()
 
     mensajes = st.session_state.get("_qr_mensajes", [])
     if mensajes:
@@ -1625,7 +1614,7 @@ def escaner_qr_continuo(key="qr_scanner"):
         if (time.time() - m.get("ts", 0)) < 8:
             _render_mensaje_qr(m)
         if len(mensajes) > 1:
-            st.markdown('<div class="scan-ultimos">Últimos escaneos</div>',
+            st.markdown('<div class="scan-ultimos">Ultimos escaneos</div>',
                         unsafe_allow_html=True)
             for msg in mensajes[1:6]:
                 _render_mensaje_qr(msg)
@@ -1663,34 +1652,6 @@ def _render_mensaje_qr(msg):
     html += f'<div class="qr-texto">{mensaje}</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # 🆕 Botones Sí/No al escanear un alumno BLOQUEADO
-    if tipo == "BLOQUEADO" and alumno and alumno.get("id"):
-        alumno_id = alumno.get("id")
-        dni = alumno.get("dni")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("✅ Sí, desbloquear ahora",
-                         key=f"desbloq_si_{alumno_id}",
-                         type="primary", width='stretch'):
-                liberar_bloqueo(alumno_id,
-                                st.session_state["user"],
-                                "Desbloqueo inmediato desde escaneo QR")
-                st.session_state["_qr_desbloqueo_exitoso"] = {
-                    "dni": dni,
-                    "nombre": (alumno.get("apellido_paterno", "") + " " +
-                               (alumno.get("apellido_materno") or "") + ", " +
-                               alumno.get("nombres", "")).strip(", "),
-                }
-                st.session_state.pop("_qr_mensajes", None)
-                st.rerun()
-        with c2:
-            if st.button("❌ No, dejarlo bloqueado",
-                         key=f"desbloq_no_{alumno_id}",
-                         width='stretch'):
-                if st.session_state.get("_qr_mensajes"):
-                    st.session_state["_qr_mensajes"] = \
-                        st.session_state["_qr_mensajes"][1:]
-                st.rerun()
 
 # ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
 def perfil_alumno_datos(idal):
@@ -2222,32 +2183,56 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             return
         texto_base = texto.replace("Ñ", "N").replace("ñ", "n")
         draw.text((x, y), texto_base, fill=color, font=font)
+        try:
+            bbox = draw.textbbox((0, 0), "N", font=font)
+            alto_letra = bbox[3] - bbox[1]
+        except Exception:
+            alto_letra = getattr(font, "size", 30)
+        try:
+            ancho_N = draw.textlength("N", font=font)
+        except Exception:
+            ancho_N = getattr(font, "size", 30) * 0.6
+        grosor = max(2, int(alto_letra * 0.10))
+        for i, ch in enumerate(texto):
+            if ch in ("Ñ", "ñ"):
+                prefijo = texto_base[:i]
+                try:
+                    x_actual = x + draw.textlength(prefijo, font=font)
+                except Exception:
+                    x_actual = x + i * ancho_N
+                centro_x = x_actual + ancho_N / 2
+                tilde_y = y + max(0, int(alto_letra * 0.05))
+                tilde_w = ancho_N * 0.85
+                tilde_h = max(3, int(alto_letra * 0.18))
+                x1 = centro_x - tilde_w / 2
+                x2 = centro_x + tilde_w / 2
+                puntos = [
+                    (x1, tilde_y + tilde_h),
+                    (x1 + tilde_w * 0.25, tilde_y),
+                    (x1 + tilde_w * 0.5, tilde_y + tilde_h * 0.5),
+                    (x1 + tilde_w * 0.75, tilde_y + tilde_h),
+                    (x2, tilde_y + tilde_h * 0.2),
+                ]
+                try:
+                    draw.line(puntos, fill=color, width=grosor, joint="curve")
+                except TypeError:
+                    draw.line(puntos, fill=color, width=grosor)
 
-    f_colegio = _font(18, bold=True)
+    f_colegio = _font(20, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     f_frase = _font(28, bold=True, italic=True)
     f_label = _font(30, bold=True)
-
-    # 🎨 ESCUDO MÁS GRANDE pero SIN llenar el recuadro
-    esc_size = int(FRANJA_W * 0.75)   # ≈ 162 px (75% del ancho de la franja)
+    esc_size = 80
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
-    alto_bloque_texto = 3 * 18
-    alto_bloque_total = esc_size + 8 + alto_bloque_texto
-    esc_y = max(8, (espacio - alto_bloque_total) // 2 + 6)
-
+    alto_bloque = esc_size + 70
+    esc_y = max(8, (espacio - alto_bloque) // 2 + 10)
     if escudo_path and Path(escudo_path).exists():
         try:
             esc = Image.open(str(escudo_path)).convert("RGBA").resize(
                 (esc_size, esc_size), Image.LANCZOS)
-            margen = 6
-            fondo_esc = Image.new("RGBA",
-                                  (esc_size + margen * 2,
-                                   esc_size + margen * 2),
-                                  (255, 255, 255, 255))
-            fondo_esc.paste(esc, (margen, margen), esc)
-            img.paste(fondo_esc, (esc_x - margen, esc_y - margen), fondo_esc)
+            img.paste(esc, (esc_x, esc_y), esc)
         except Exception:
             pass
 
@@ -2262,7 +2247,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     y_txt = esc_y + esc_size + 6
     for lbl in ["INSTITUCION", "EDUCATIVA", "YARINACOCHA"]:
         _txt_centrado(lbl, y_txt, f_colegio, BLANCO)
-        y_txt += 18
+        y_txt += 20
 
     foto_x = 0
     foto_y = ALTO_PX - FOTO_H
@@ -2291,13 +2276,13 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
                    f_titulo, NEGRO)
 
-    ap_p = (alumno.get('apellido_paterno') or "").upper()
-    ap_m = (alumno.get('apellido_materno') or "").upper()
-    nombres = (alumno.get('nombres') or "").upper()
+    ap_p = alumno['apellido_paterno'].upper()
+    ap_m = (alumno['apellido_materno'] or "").upper()
+    nombres = alumno['nombres'].upper()
     dni = alumno["dni"]
-    grado = grado_a_ui(alumno.get('grado')).upper()
-    seccion = (alumno.get('seccion') or "").upper()
-    turno = (alumno.get('turno') or "").upper()
+    grado = alumno['grado'].upper()
+    seccion = alumno['seccion'].upper()
+    turno = alumno['turno'].upper()
     ano = str(datetime.now().year)
     info_x = DER_X
     QR_SIZE = 215
@@ -2438,19 +2423,19 @@ def pdf_carnets_por_seccion(idsec):
 def pdf_carnets_seleccionados(ids, titulo=None):
     if not ids:
         return None
-    ph = ",".join(["?"] * len(ids))
+    ph = ",".join("?" * len(ids))
     with cursor() as (con, cur):
         cur.execute(f"""
-            SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
-            FROM alumnos a
-            JOIN secciones s ON a.seccion_id=s.id
+            SELECT a.*,s.nombre AS seccion,g.nombre AS grado,t.nombre AS turno
+            FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
             JOIN grados g ON s.grado_id=g.id
             JOIN turnos t ON s.turno_id=t.id
             WHERE a.id IN ({ph}) AND a.activo=1
-            ORDER BY a.apellido_paterno, a.apellido_materno
-        """, tuple(ids))
+            ORDER BY a.apellido_paterno,a.apellido_materno
+        """, ids)
         filas = [dict(r) for r in cur.fetchall()]
     return _render_carnets(filas, titulo) if filas else None
+
 
 def pdf_carnets_todos():
     with cursor() as (con, cur):
