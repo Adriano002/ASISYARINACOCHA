@@ -1,6 +1,6 @@
 # app.py
 # Sistema de Asistencia I.E. Yarinacocha
-# Versión simplificada, con comentarios en español.
+# Versión simplificada con comentarios en español.
 
 # ─────────────────────────────────────────────────────────────
 # IMPORTACIONES
@@ -37,7 +37,6 @@ from db import (
     escribir_y_esperar,
     formatear_fecha,
     formatear_hora,
-    formatear_timestamp,
     leer_dataframe,
     leer_uno,
     leer_varios,
@@ -49,9 +48,8 @@ from db import (
 )
 from qr_scanner_component import qr_scanner
 
-
 # ─────────────────────────────────────────────────────────────
-# CONFIGURACIÓN DE LOGS
+# LOGS
 # ─────────────────────────────────────────────────────────────
 
 CARPETA_LOGS = Path("logs")
@@ -67,15 +65,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("asistencia")
 
-
 # ─────────────────────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────────────────────
 
-MESES_ES = [
-    "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-]
+MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
 COLOR_PRIMARIO = "#B85C38"
 ITERACIONES_HASH = 260_000
@@ -97,94 +92,59 @@ TIPO_VENTANA_REFUERZO = "reforzamiento"
 
 MAX_DIAS_PERMISO = 7
 HORAS_CIERRE_EVENTO = 2
-
 LIMITE_ALUMNO_NUEVO = 3
 LIMITE_ALUMNO_REINCIDENTE = 1
-
 
 # ─────────────────────────────────────────────────────────────
 # UTILIDADES
 # ─────────────────────────────────────────────────────────────
 
 def ahora():
-    """Devuelve la fecha y hora actual en hora de Perú."""
     return obtener_fecha_hora_actual()
 
-
 def hoy_texto():
-    """Devuelve la fecha de hoy como texto YYYY-MM-DD."""
     return obtener_fecha_actual()
 
-
 def hoy_fecha():
-    """Devuelve la fecha de hoy como objeto date."""
     return obtener_fecha_hora_actual().date()
 
-
 def hora_corta():
-    """Devuelve la hora actual como texto HH:MM."""
     return obtener_hora_actual()
 
-
 def timestamp_texto():
-    """Devuelve fecha y hora completas como texto."""
     return obtener_timestamp_actual()
 
-
 def es_fin_de_semana(fecha=None):
-    """Devuelve True si la fecha es sábado o domingo."""
     fecha = fecha or hoy_fecha()
     return fecha.weekday() >= 5
 
-
 def hash_password(password):
-    """
-    Convierte una contraseña en un hash seguro.
-    Usamos PBKDF2 con SHA-256 (el estándar recomendado).
-    """
     salt = secrets.token_bytes(16)
     hash_bytes = hashlib.pbkdf2_hmac(
-        ALGORITMO_HASH,
-        password.encode("utf-8"),
-        salt,
-        ITERACIONES_HASH,
+        ALGORITMO_HASH, password.encode("utf-8"), salt, ITERACIONES_HASH
     )
     return f"pbkdf2_{ALGORITMO_HASH}${ITERACIONES_HASH}${salt.hex()}${hash_bytes.hex()}"
 
-
 def verificar_password(password, hash_guardado):
-    """
-    Verifica si una contraseña coincide con su hash.
-    Devuelve True o False.
-    """
     if not hash_guardado or not hash_guardado.startswith("pbkdf2_"):
         return False
     try:
         _, iteraciones, salt_hex, hash_hex = hash_guardado.split("$")
         hash_calculado = hashlib.pbkdf2_hmac(
-            ALGORITMO_HASH,
-            password.encode("utf-8"),
-            bytes.fromhex(salt_hex),
-            int(iteraciones),
+            ALGORITMO_HASH, password.encode("utf-8"),
+            bytes.fromhex(salt_hex), int(iteraciones)
         )
         return secrets.compare_digest(hash_calculado.hex(), hash_hex)
     except (ValueError, TypeError):
         return False
 
-
 def obtener_ip():
-    """Devuelve la IP del usuario (o 'local' si no se puede)."""
     try:
         return st.context.headers.get("X-Forwarded-For", "local").split(",")[0].strip()
     except Exception:
         return "local"
 
-
 def auditar(usuario, accion, tabla=None, registro_id=None):
-    """
-    Guarda un registro en la tabla de auditoría.
-    Sirve para saber quién hizo qué y cuándo.
-    """
     try:
         escribir_seguro(
             "INSERT INTO auditoria(usuario, accion, fecha, tabla_afectada, registro_id, ip) "
@@ -194,58 +154,31 @@ def auditar(usuario, accion, tabla=None, registro_id=None):
     except Exception as error:
         log.warning("No se pudo auditar: %s", error)
 
-
 def generar_qr(dni, tamano=220):
-    """
-    Genera un código QR con el DNI del alumno.
-    Devuelve una imagen PIL.
-    """
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=10,
-        border=2,
-    )
+    qr = qrcode.QRCode(version=1,
+                       error_correction=qrcode.constants.ERROR_CORRECT_H,
+                       box_size=10, border=2)
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
     imagen = qr.make_image(fill_color="black", back_color="white").convert("RGB")
     return imagen
 
-
-def generar_qr_bytes(dni, tamano=220):
-    """Genera un QR y devuelve sus bytes (para descargar)."""
-    imagen = generar_qr(dni, tamano)
-    buffer = BytesIO()
-    imagen.save(buffer, format="PNG")
-    buffer.seek(0)
-    return buffer.getvalue()
-
-
 def calcular_limite_tardanzas(es_reincidente):
-    """Devuelve cuántas tardanzas se permiten antes de bloquear."""
     if es_reincidente:
         return LIMITE_ALUMNO_REINCIDENTE
     return LIMITE_ALUMNO_NUEVO
 
-
 def nombre_completo_alumno(alumno):
-    """Devuelve el nombre completo en formato 'Apellidos, Nombres'."""
     apellidos = alumno.get("apellido_paterno", "")
     if alumno.get("apellido_materno"):
         apellidos += " " + alumno["apellido_materno"]
     return f"{apellidos}, {alumno.get('nombres', '')}".strip(", ")
 
-
 # ─────────────────────────────────────────────────────────────
-# ESTILOS CSS (minimalista, sin HTML de faz)
+# ESTILOS CSS
 # ─────────────────────────────────────────────────────────────
 
 def aplicar_estilos():
-    """
-    Aplica los estilos CSS globales.
-    Todo apunta a clases .st-key-... que Streamlit genera
-    cuando usamos st.container(key="...").
-    """
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
@@ -287,7 +220,6 @@ def aplicar_estilos():
     h3{ font-size: 19px !important; font-weight: 700 !important;
         color: var(--texto-titulo) !important; }
 
-    /* ── SIDEBAR ── */
     section[data-testid="stSidebar"]{
         border-right: 1px solid var(--primario-borde);
     }
@@ -307,7 +239,6 @@ def aplicar_estilos():
     }
     section[data-testid="stSidebar"] .stRadio input{ display: none; }
 
-    /* ── INPUTS ── */
     .stTextInput input, .stNumberInput input, .stDateInput input,
     .stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
         border-radius: var(--radius-sm) !important;
@@ -320,7 +251,6 @@ def aplicar_estilos():
         box-shadow: 0 0 0 3px var(--primario-soft) !important;
     }
 
-    /* ── BOTONES ── */
     .stButton > button, .stFormSubmitButton > button,
     .stDownloadButton > button{
         background: var(--primario) !important;
@@ -345,7 +275,6 @@ def aplicar_estilos():
         transform: translateY(-1px);
     }
 
-    /* ── MÉTRICAS ── */
     div[data-testid="stMetric"]{
         background: var(--primario-soft);
         border: 1px solid var(--primario-borde);
@@ -361,7 +290,6 @@ def aplicar_estilos():
         color: var(--texto-titulo) !important;
     }
 
-    /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"]{
         gap: 4px;
         border-bottom: 2px solid var(--primario-borde);
@@ -379,7 +307,6 @@ def aplicar_estilos():
         opacity: 1;
     }
 
-    /* ── EXPANDERS ── */
     .streamlit-expanderHeader, details summary{
         border: 1px solid var(--primario-borde) !important;
         border-radius: var(--radius-sm) !important;
@@ -388,7 +315,6 @@ def aplicar_estilos():
         font-size: 16px !important;
     }
 
-    /* ── SIDEBAR HEADER ── */
     .st-key-sidebar_header{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 20px 16px;
@@ -406,7 +332,6 @@ def aplicar_estilos():
         font-weight: 800 !important;
     }
 
-    /* ── MENSAJES QR (verde/amarillo/rojo) ── */
     .st-key-qr_msg_puntual,
     .st-key-qr_msg_tardanza,
     .st-key-qr_msg_bloqueado,
@@ -452,7 +377,6 @@ def aplicar_estilos():
         margin: 0 !important;
     }
 
-    /* ── PERFIL HERO ── */
     .st-key-perfil_hero{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         border-radius: 14px;
@@ -476,22 +400,6 @@ def aplicar_estilos():
         margin: 4px 0 !important;
     }
 
-    /* ── BLOQUES ── */
-    .st-key-bloque{
-        background: var(--secondary-background-color);
-        border: 1px solid var(--primario-borde);
-        border-radius: var(--radius);
-        padding: 20px 22px;
-        margin-bottom: 20px;
-    }
-
-    /* ── CARNET EN PERFIL ── */
-    .st-key-carnet_alumno img{
-        border-radius: var(--radius);
-        box-shadow: 0 4px 16px rgba(232,123,74,.20);
-    }
-
-    /* ── RESPONSIVE ── */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
         h2{ font-size: 1.2rem !important; }
@@ -500,43 +408,31 @@ def aplicar_estilos():
     </style>
     """, unsafe_allow_html=True)
 
-
 # ─────────────────────────────────────────────────────────────
 # INICIALIZACIÓN DE LA BASE DE DATOS
 # ─────────────────────────────────────────────────────────────
 
 @st.cache_resource
 def inicializar_base_datos():
-    """
-    Crea las tablas si no existen y siembra datos iniciales.
-    Solo se ejecuta una vez por proceso.
-    """
     from schema import aplicar_schema
     aplicar_schema()
     _sembrar_datos_iniciales()
     log.info("Base de datos lista.")
     return True
 
-
 def _sembrar_datos_iniciales():
-    """Crea turnos, ventanas, grados y admin si no existen."""
-    from db import obtener_conexion
     conexion = obtener_conexion()
     cursor = conexion.cursor()
 
-    # Turnos
     cursor.execute("SELECT COUNT(*) AS n FROM turnos")
     if cursor.fetchone()["n"] == 0:
         cursor.executemany(
             "INSERT INTO turnos(nombre, hora_entrada, hora_salida, tolerancia_min) "
             "VALUES(?, ?, ?, ?)",
-            [
-                ("Mañana", "06:00", "12:25", 10),
-                ("Tarde", "12:00", "18:10", 10),
-            ],
+            [("Mañana", "06:00", "12:25", 10),
+             ("Tarde", "12:00", "18:10", 10)],
         )
 
-    # Ventanas
     cursor.execute("SELECT COUNT(*) AS n FROM ventanas")
     if cursor.fetchone()["n"] == 0:
         cursor.execute("SELECT id FROM turnos WHERE nombre = ?", ("Mañana",))
@@ -549,36 +445,30 @@ def _sembrar_datos_iniciales():
                 "INSERT INTO ventanas(turno_id, tipo, nombre, hora_apertura, "
                 "hora_limite_puntual, hora_cierre, tolerancia_min, orden) "
                 "VALUES(?, 'clases', 'Clases mañana', '06:00', '06:55', '07:10', 10, 1)",
-                (turno_manana["id"],),
-            )
+                (turno_manana["id"],))
             cursor.execute(
                 "INSERT INTO ventanas(turno_id, tipo, nombre, hora_apertura, "
                 "hora_limite_puntual, hora_cierre, tolerancia_min, orden) "
                 "VALUES(?, 'reforzamiento', 'Reforzamiento mañana', '08:00', '08:00', '14:00', 0, 2)",
-                (turno_manana["id"],),
-            )
+                (turno_manana["id"],))
 
         if turno_tarde:
             cursor.execute(
                 "INSERT INTO ventanas(turno_id, tipo, nombre, hora_apertura, "
                 "hora_limite_puntual, hora_cierre, tolerancia_min, orden) "
                 "VALUES(?, 'reforzamiento', 'Reforzamiento tarde', '10:00', '10:00', '10:20', 0, 1)",
-                (turno_tarde["id"],),
-            )
+                (turno_tarde["id"],))
             cursor.execute(
                 "INSERT INTO ventanas(turno_id, tipo, nombre, hora_apertura, "
                 "hora_limite_puntual, hora_cierre, tolerancia_min, orden) "
                 "VALUES(?, 'clases', 'Clases tarde', '12:00', '12:49', '18:10', 10, 2)",
-                (turno_tarde["id"],),
-            )
+                (turno_tarde["id"],))
 
-    # Grados
     cursor.execute("SELECT COUNT(*) AS n FROM grados")
     if cursor.fetchone()["n"] == 0:
         for grado in ["1ro", "2do", "3ro", "4to", "5to"]:
             cursor.execute("INSERT INTO grados(nombre) VALUES(?)", (grado,))
 
-    # Usuario admin
     cursor.execute("SELECT COUNT(*) AS n FROM usuarios")
     if cursor.fetchone()["n"] == 0:
         password_temporal = secrets.token_urlsafe(9)
@@ -592,43 +482,31 @@ def _sembrar_datos_iniciales():
 
     conexion.commit()
 
-
 # ─────────────────────────────────────────────────────────────
 # AUTENTICACIÓN
 # ─────────────────────────────────────────────────────────────
 
 def usuario_esta_bloqueado(usuario):
-    """Devuelve True si la cuenta está bloqueada por intentos fallidos."""
     if not usuario.get("bloqueado_hasta"):
         return False
     try:
-        bloqueado_hasta = datetime.strptime(
-            usuario["bloqueado_hasta"], "%Y-%m-%d %H:%M:%S"
-        )
+        bloqueado_hasta = datetime.strptime(usuario["bloqueado_hasta"],
+                                            "%Y-%m-%d %H:%M:%S")
         return ahora().replace(tzinfo=None) < bloqueado_hasta
     except (ValueError, TypeError):
         return False
 
-
 def autenticar(nombre_usuario, password):
-    """
-    Verifica las credenciales del usuario.
-    Devuelve (usuario, mensaje_error).
-    Si el login es exitoso, mensaje_error es "".
-    """
     nombre_usuario = (nombre_usuario or "").strip().lower()
-
     usuario = leer_uno(
         "SELECT * FROM usuarios WHERE LOWER(usuario) = ? AND activo = 1",
-        (nombre_usuario,),
-    )
+        (nombre_usuario,))
     if not usuario:
         return None, "Usuario no encontrado o inactivo."
 
     if usuario_esta_bloqueado(usuario):
-        bloqueado_hasta = datetime.strptime(
-            usuario["bloqueado_hasta"], "%Y-%m-%d %H:%M:%S"
-        )
+        bloqueado_hasta = datetime.strptime(usuario["bloqueado_hasta"],
+                                            "%Y-%m-%d %H:%M:%S")
         minutos_restantes = int(
             (bloqueado_hasta - ahora().replace(tzinfo=None)).total_seconds() / 60
         ) + 1
@@ -638,31 +516,24 @@ def autenticar(nombre_usuario, password):
         intentos = (usuario.get("intentos_fallidos") or 0) + 1
         if intentos >= MAX_INTENTOS_LOGIN:
             bloqueado_hasta = (ahora() + timedelta(minutes=MINUTOS_BLOQUEO)).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+                "%Y-%m-%d %H:%M:%S")
             escribir_seguro(
                 "UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE id = ?",
-                (bloqueado_hasta, usuario["id"]),
-            )
+                (bloqueado_hasta, usuario["id"]))
             return None, f"Cuenta bloqueada por {MINUTOS_BLOQUEO} minutos."
         escribir_seguro(
             "UPDATE usuarios SET intentos_fallidos = ? WHERE id = ?",
-            (intentos, usuario["id"]),
-        )
+            (intentos, usuario["id"]))
         return None, f"Credenciales incorrectas. Quedan {MAX_INTENTOS_LOGIN - intentos} intento(s)."
 
-    # Login exitoso
     escribir_seguro(
         "UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL, "
         "ultimo_login = ?, ultimo_ip = ? WHERE id = ?",
-        (timestamp_texto(), obtener_ip(), usuario["id"]),
-    )
+        (timestamp_texto(), obtener_ip(), usuario["id"]))
     usuario["ultimo_login"] = timestamp_texto()
     return usuario, ""
 
-
 def cerrar_sesion():
-    """Cierra la sesión del usuario."""
     usuario = st.session_state.get("user")
     if usuario:
         auditar(usuario["usuario"], "Logout")
@@ -674,20 +545,15 @@ def cerrar_sesion():
 # ─────────────────────────────────────────────────────────────
 
 def vista_login():
-    """Pantalla de inicio de sesión. Solo título y formulario."""
-
     st.title("asisyarina")
-
     _, centro, _ = st.columns([1, 1, 1])
     with centro:
         with st.form("formulario_login"):
             usuario = st.text_input("Usuario", placeholder="tu usuario")
-            password = st.text_input(
-                "Contraseña", type="password", placeholder="tu contraseña"
-            )
+            password = st.text_input("Contraseña", type="password",
+                                      placeholder="tu contraseña")
             enviado = st.form_submit_button("Ingresar", type="primary",
-                                            use_container_width=True)
-
+                                             use_container_width=True)
             if enviado:
                 datos, error = autenticar(usuario, password)
                 if datos:
@@ -697,21 +563,17 @@ def vista_login():
                 else:
                     st.error(error or "Credenciales incorrectas.")
 
-
 def vista_cambio_password_obligatorio():
-    """Cambio obligatorio de contraseña en el primer login."""
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
     st.warning("Tu cuenta tiene una contraseña temporal.")
-
     _, centro, _ = st.columns([1, 1.2, 1])
     with centro:
         with st.form("formulario_cambio_password"):
             nueva = st.text_input("Nueva contraseña", type="password")
             confirmar = st.text_input("Confirmar", type="password")
             ok = st.form_submit_button("Cambiar", type="primary",
-                                       use_container_width=True)
-
+                                        use_container_width=True)
         if ok:
             if len(nueva) < 6:
                 st.error("Mínimo 6 caracteres.")
@@ -721,45 +583,33 @@ def vista_cambio_password_obligatorio():
                 nuevo_hash = hash_password(nueva)
                 escribir_seguro(
                     "UPDATE usuarios SET password = ?, debe_cambiar_password = 0 "
-                    "WHERE id = ?",
-                    (nuevo_hash, usuario["id"]),
-                )
+                    "WHERE id = ?", (nuevo_hash, usuario["id"]))
                 st.session_state["user"]["debe_cambiar_password"] = 0
                 st.session_state["user"]["password"] = nuevo_hash
                 auditar(usuario["usuario"], "Cambio pwd obligatorio")
                 st.rerun()
-
 
 # ─────────────────────────────────────────────────────────────
 # MENÚ LATERAL
 # ─────────────────────────────────────────────────────────────
 
 def opciones_por_rol(usuario):
-    """Devuelve las opciones del menú según el rol del usuario."""
     rol = usuario["rol"]
     if rol == "Admin":
-        return [
-            "Puerta", "Bloqueados", "Panel Direccion", "Reportes",
-            "Alumnos", "Carnets", "Dias especiales", "Ventanas",
-            "Justificaciones y Permisos", "Usuarios", "Backup",
-            "Auditoria", "Mi cuenta",
-        ]
+        return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes",
+                "Alumnos", "Carnets", "Dias especiales", "Ventanas",
+                "Justificaciones y Permisos", "Usuarios", "Backup",
+                "Auditoria", "Mi cuenta"]
     if rol == "Direccion":
-        return [
-            "Panel Direccion", "Bloqueados", "Reportes", "Alumnos",
-            "Carnets", "Dias especiales", "Justificaciones y Permisos",
-            "Mi cuenta",
-        ]
+        return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos",
+                "Carnets", "Dias especiales", "Justificaciones y Permisos",
+                "Mi cuenta"]
     if rol == "Auxiliar":
-        return [
-            "Puerta", "Bloqueados", "Justificaciones y Permisos",
-            "Reportes", "Mi cuenta",
-        ]
+        return ["Puerta", "Bloqueados", "Justificaciones y Permisos",
+                "Reportes", "Mi cuenta"]
     return []
 
-
 def menu_lateral():
-    """Dibuja el menú lateral y devuelve la opción elegida."""
     usuario = st.session_state["user"]
     rol = usuario["rol"]
     opciones = opciones_por_rol(usuario)
@@ -777,14 +627,12 @@ def menu_lateral():
 
         opcion = st.radio("Menu", opciones, key="menu",
                           label_visibility="collapsed")
-
         st.markdown("---")
         if st.button("Cerrar sesión", use_container_width=True):
             cerrar_sesion()
             st.rerun()
 
     return opcion
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: MI CUENTA
@@ -804,12 +652,8 @@ def vista_mi_cuenta():
             with st.container(key="hero_nombre"):
                 st.markdown(usuario["nombres"])
             with st.container(key="hero_meta"):
-                st.markdown(
-                    f"Usuario: {usuario['usuario']} · Rol: {usuario['rol']}"
-                )
-                st.markdown(
-                    f"Último login: {usuario.get('ultimo_login') or 'Nunca'}"
-                )
+                st.markdown(f"Usuario: {usuario['usuario']} · Rol: {usuario['rol']}")
+                st.markdown(f"Último login: {usuario.get('ultimo_login') or 'Nunca'}")
 
     if usuario["rol"] == "Auxiliar":
         secciones = leer_dataframe("""
@@ -821,7 +665,6 @@ def vista_mi_cuenta():
             WHERE a.usuario_id = ?
             ORDER BY g.nombre, s.nombre
         """, (usuario["id"],))
-
         st.subheader("Mis secciones asignadas")
         if secciones.empty:
             st.warning("No tienes secciones asignadas.")
@@ -831,9 +674,7 @@ def vista_mi_cuenta():
     st.subheader("Mi actividad reciente")
     actividad = leer_dataframe(
         "SELECT accion, fecha FROM auditoria WHERE usuario = ? "
-        "ORDER BY id DESC LIMIT 10",
-        (usuario["usuario"],),
-    )
+        "ORDER BY id DESC LIMIT 10", (usuario["usuario"],))
     if actividad.empty:
         st.info("Sin actividad.")
     else:
@@ -844,7 +685,6 @@ def vista_mi_cuenta():
         actual = st.text_input("Contraseña actual", type="password")
         nueva = st.text_input("Nueva contraseña", type="password")
         confirmar = st.text_input("Confirmar nueva contraseña", type="password")
-
         if st.form_submit_button("Cambiar contraseña", type="primary"):
             if not verificar_password(actual, usuario["password"]):
                 st.error("Contraseña actual incorrecta.")
@@ -856,37 +696,16 @@ def vista_mi_cuenta():
                 nuevo_hash = hash_password(nueva)
                 escribir_seguro(
                     "UPDATE usuarios SET password = ? WHERE id = ?",
-                    (nuevo_hash, usuario["id"]),
-                )
+                    (nuevo_hash, usuario["id"]))
                 st.session_state["user"]["password"] = nuevo_hash
                 auditar(usuario["usuario"], "Cambio su contraseña")
                 st.success("Contraseña actualizada.")
 
-
 # ─────────────────────────────────────────────────────────────
-# ESCANEO QR Y MENSAJES
+# ESCANEO QR
 # ─────────────────────────────────────────────────────────────
 
-def _buscar_alumno_por_dni(dni):
-    """Busca un alumno por DNI con todos sus datos en 1 sola query."""
-    return leer_uno("""
-        SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
-               a.seccion_id, s.nombre AS seccion,
-               g.nombre AS grado, t.id AS turno_id, t.nombre AS turno
-        FROM alumnos a
-        JOIN secciones s ON a.seccion_id = s.id
-        JOIN grados g ON s.grado_id = g.id
-        JOIN turnos t ON s.turno_id = t.id
-        WHERE a.dni = ? AND a.activo = 1
-    """, (dni,))
-
-
-def _obtener_datos_alumno_completos(dni, id_periodo):
-    """
-    Una sola query que trae todo lo necesario para registrar
-    la entrada: alumno, bloqueo, tardanzas, permiso.
-    Hacemos esto para que el escaneo sea rápido.
-    """
+def _obtener_datos_alumno_completos(dni):
     fecha = hoy_texto()
     return leer_uno("""
         SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
@@ -909,32 +728,25 @@ def _obtener_datos_alumno_completos(dni, id_periodo):
         WHERE a.dni = ? AND a.activo = 1
     """, (fecha, fecha, dni))
 
-
-def _obtener_ventana_activa(id_turno, fecha, id_seccion=None):
-    """Devuelve la ventana activa para el turno y hora actual."""
+def _obtener_ventana_activa(id_turno):
     hora = hora_corta()
+    fecha = hoy_texto()
+    fecha_d = hoy_fecha()
 
-    # Primero revisar si hay feriado hoy
     feriado = leer_uno(
         "SELECT id FROM dias_especiales WHERE fecha = ? AND activo = 1 "
-        "AND tipo = 'feriado' LIMIT 1",
-        (fecha,),
-    )
+        "AND tipo = 'feriado' LIMIT 1", (fecha_d,))
     if feriado:
         return None
 
-    # Revisar si hay evento hoy
     evento = leer_uno(
         "SELECT * FROM dias_especiales WHERE fecha = ? AND activo = 1 "
         "AND tipo = 'evento' AND turno_id = ? ORDER BY id DESC LIMIT 1",
-        (fecha, id_turno),
-    )
+        (fecha_d, id_turno))
 
     ventanas = leer_varios(
-        "SELECT * FROM ventanas WHERE turno_id = ? AND activo = 1 "
-        "ORDER BY orden, id",
-        (id_turno,),
-    )
+        "SELECT * FROM ventanas WHERE turno_id = ? AND activo = 1 ORDER BY orden, id",
+        (id_turno,))
 
     for ventana in ventanas:
         apertura = formatear_hora(ventana["hora_apertura"])
@@ -958,17 +770,10 @@ def _obtener_ventana_activa(id_turno, fecha, id_seccion=None):
                 "hora_cierre_efectiva": cierre,
                 "es_evento": es_evento,
                 "evento_nombre": evento["descripcion"] if es_evento else None,
-                "dia_especial_id": evento["id"] if es_evento else None,
             }
-
     return None
 
-
 def registrar_entrada(dni, usuario, origen="qr"):
-    """
-    Registra la entrada de un alumno.
-    Devuelve (ok, tipo, mensaje, extra).
-    """
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
         return False, "ERROR", "DNI inválido", {}
@@ -979,13 +784,12 @@ def registrar_entrada(dni, usuario, origen="qr"):
     fecha_d = hoy_fecha()
     hora = hora_corta()
 
-    alumno = _obtener_datos_alumno_completos(dni, id_periodo)
+    alumno = _obtener_datos_alumno_completos(dni)
     if not alumno:
         return False, "ERROR", "DNI no encontrado", {}
 
     nombre = nombre_completo_alumno(alumno)
 
-    # ¿Está bloqueado?
     if alumno.get("bloqueo_id"):
         auditar(usuario["usuario"], f"Intento escaneo bloqueado DNI {dni}",
                 tabla="bloqueos", registro_id=alumno["id"])
@@ -993,23 +797,18 @@ def registrar_entrada(dni, usuario, origen="qr"):
             f"{nombre} | BLOQUEADO - retener y llevar a Dirección"
         ), {"alumno": alumno, "motivo": alumno.get("bloqueo_motivo")}
 
-    # ¿Ventana activa?
-    ventana = _obtener_ventana_activa(alumno["turno_id"], fecha, alumno["seccion_id"])
+    ventana = _obtener_ventana_activa(alumno["turno_id"])
     if not ventana:
         return False, "ERROR", f"{nombre} | Sin ventana activa ({hora})", {"alumno": alumno}
 
     tiene_permiso = (alumno.get("tiene_permiso") or 0) > 0
 
-    # ¿Ya registró hoy?
     ya_registro = leer_uno(
-        "SELECT id FROM asistencias WHERE alumno_id = ? AND fecha = ? "
-        "AND tipo = ? LIMIT 1",
-        (alumno["id"], fecha_d, ventana["tipo"]),
-    )
+        "SELECT id FROM asistencias WHERE alumno_id = ? AND fecha = ? AND tipo = ? LIMIT 1",
+        (alumno["id"], fecha_d, ventana["tipo"]))
     if ya_registro:
         return False, "ERROR", f"{nombre} ya registró {ventana['tipo']} hoy", {}
 
-    # Reforzamiento
     if ventana["tipo"] == TIPO_VENTANA_REFUERZO:
         escribir_seguro(
             "INSERT INTO asistencias(alumno_id, fecha, ventana_id, tipo, hora, "
@@ -1017,16 +816,13 @@ def registrar_entrada(dni, usuario, origen="qr"):
             "VALUES(?, ?, ?, 'reforzamiento', ?, ?, ?, ?, ?)",
             (alumno["id"], fecha_d, ventana["id"], hora,
              ESTADO_ASISTIO_REFUERZO, 1 if tiene_permiso else 0,
-             origen, id_periodo),
-        )
+             origen, id_periodo))
         auditar(usuario["usuario"], f"Reforzamiento {origen} DNI {dni}",
                 tabla="asistencias")
         return True, "REFORZAMIENTO", (
-            f"{nombre} | {alumno['grado']} {alumno['seccion']} | "
-            f"Reforzamiento {hora}"
+            f"{nombre} | {alumno['grado']} {alumno['seccion']} | Reforzamiento {hora}"
         ), {"alumno": alumno}
 
-    # Clases (puntual o tardanza)
     estado = ESTADO_PUNTUAL if hora <= ventana["hora_limite_efectiva"] else ESTADO_TARDANZA
 
     escribir_seguro(
@@ -1034,8 +830,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
         "estado, justificada, origen, periodo_id) "
         "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (alumno["id"], fecha_d, ventana["id"], "clases", hora, estado,
-         1 if tiene_permiso else 0, origen, id_periodo),
-    )
+         1 if tiene_permiso else 0, origen, id_periodo))
 
     if estado == ESTADO_PUNTUAL:
         auditar(usuario["usuario"], f"Entrada Puntual {origen} DNI {dni}",
@@ -1044,15 +839,11 @@ def registrar_entrada(dni, usuario, origen="qr"):
             f"{nombre} | {alumno['grado']} {alumno['seccion']} | Puntual {hora}"
         ), {"alumno": alumno}
 
-    # Es tardanza: calcular número y acción
-    es_reincidente = False
     ultimo_desbloqueo = leer_uno(
         "SELECT fecha_fin FROM bloqueos WHERE alumno_id = ? AND activo = 0 "
         "AND fecha_fin IS NOT NULL ORDER BY fecha_fin DESC LIMIT 1",
-        (alumno["id"],),
-    )
-    if ultimo_desbloqueo:
-        es_reincidente = True
+        (alumno["id"],))
+    es_reincidente = ultimo_desbloqueo is not None
 
     limite = calcular_limite_tardanzas(es_reincidente)
     numero = (alumno.get("tardanzas_ciclo") or 0) + 1
@@ -1064,18 +855,15 @@ def registrar_entrada(dni, usuario, origen="qr"):
         "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (alumno["id"], fecha_d, hora, numero, accion,
          1 if tiene_permiso else 0, origen, usuario["usuario"],
-         timestamp_texto(), id_periodo),
-    )
+         timestamp_texto(), id_periodo))
 
-    # ¿Alcanzó el límite? Crear bloqueo automático
     alcanzo_limite = numero >= limite
     if alcanzo_limite:
         escribir_seguro(
             "INSERT INTO bloqueos(alumno_id, motivo, activo, fecha_inicio, "
             "creado_por, origen) VALUES(?, ?, 1, ?, ?, 'automatico')",
             (alumno["id"], f"{numero} tardanza(s) - reincidente={es_reincidente}",
-             fecha, usuario["usuario"]),
-        )
+             fecha, usuario["usuario"]))
 
     auditar(usuario["usuario"], f"Tardanza {numero}a DNI {dni} -> {accion}",
             tabla="tardanzas")
@@ -1088,15 +876,11 @@ def registrar_entrada(dni, usuario, origen="qr"):
         mensaje += " | ⚠️ Última oportunidad"
 
     return True, "TARDANZA", mensaje, {
-        "alumno": alumno,
-        "numero": numero,
-        "accion": accion,
+        "alumno": alumno, "numero": numero, "accion": accion,
         "alcanzo_limite": alcanzo_limite,
     }
 
-
 def _procesar_escaneo(dni):
-    """Procesa un escaneo y guarda el mensaje en session_state."""
     usuario = st.session_state.get("user")
     if not usuario:
         return
@@ -1119,25 +903,15 @@ def _procesar_escaneo(dni):
     else:
         sonido = "error"
 
-    # Guardar solo el último mensaje (para ahorrar RAM)
     st.session_state["_qr_mensaje_actual"] = {
-        "dni": dni,
-        "tipo": tipo,
-        "mensaje": mensaje,
-        "extra": extra,
-        "ts": time.time(),
+        "dni": dni, "tipo": tipo, "mensaje": mensaje,
+        "extra": extra, "ts": time.time(),
     }
     st.session_state["_qr_sonido_pendiente"] = {
-        "kind": sonido,
-        "ts": time.time(),
+        "kind": sonido, "ts": time.time(),
     }
 
-
 def _disparar_sonido(kind):
-    """
-    Dispara el sonido en el iframe padre.
-    Es JS puro (no HTML de faz).
-    """
     st.components.v1.html(f"""
         <script>
         (function() {{
@@ -1150,15 +924,12 @@ def _disparar_sonido(kind):
         </script>
     """, height=0)
 
-
 def _render_mensaje_qr(mensaje):
-    """Renderiza un mensaje QR con el color correcto."""
     tipo = mensaje["tipo"]
     texto = mensaje["mensaje"]
     extra = mensaje.get("extra") or {}
     alumno = extra.get("alumno") or {}
 
-    # Determinar el color
     if tipo == "TARDANZA":
         if extra.get("alcanzo_limite") or extra.get("accion") == ACCION_DERIVADO:
             clave = "qr_msg_bloqueado"
@@ -1181,17 +952,11 @@ def _render_mensaje_qr(mensaje):
         with st.container(key="qr_texto"):
             st.markdown(texto)
 
-    # Botones de desbloqueo si está bloqueado
     if tipo == "BLOQUEADO" and alumno.get("id"):
         _render_botones_desbloqueo(alumno)
 
-
 def _render_botones_desbloqueo(alumno):
-    """Muestra botones para desbloquear un alumno desde el escaneo."""
     id_alumno = alumno.get("id")
-    dni = alumno.get("dni")
-    nombre = nombre_completo_alumno(alumno)
-
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Sí, desbloquear ahora",
@@ -1200,9 +965,7 @@ def _render_botones_desbloqueo(alumno):
             escribir_seguro(
                 "UPDATE bloqueos SET activo = 0, fecha_fin = ?, liberado_por = ? "
                 "WHERE alumno_id = ? AND activo = 1",
-                (timestamp_texto(), st.session_state["user"]["usuario"],
-                 id_alumno),
-            )
+                (timestamp_texto(), st.session_state["user"]["usuario"], id_alumno))
             auditar(st.session_state["user"]["usuario"],
                     f"Desbloqueo inmediato alumno_id={id_alumno}")
             st.session_state["_qr_mensaje_actual"] = None
@@ -1214,57 +977,42 @@ def _render_botones_desbloqueo(alumno):
             st.session_state["_qr_mensaje_actual"] = None
             st.rerun()
 
-
 def escaner_qr_continuo(key="qr_scanner"):
-    """Renderiza el escáner QR y procesa los escaneos."""
-    # Componente
     resultado = qr_scanner(key=f"qr_{key}", on_scan=lambda: None)
 
     if resultado is not None and getattr(resultado, "qr_dni", None):
         dni = str(resultado.qr_dni).strip()
         ultimo = st.session_state.get("_ultimo_qr_escaneado", {})
-        if not (ultimo.get("dni") == dni
-                and (time.time() - ultimo.get("ts", 0)) < 5.0):
-            st.session_state["_ultimo_qr_escaneado"] = {
-                "dni": dni, "ts": time.time()
-            }
+        if not (ultimo.get("dni") == dni and (time.time() - ultimo.get("ts", 0)) < 5.0):
+            st.session_state["_ultimo_qr_escaneado"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
-
-            # Disparar sonido
             sonido = st.session_state.get("_qr_sonido_pendiente") or {}
             if sonido.get("kind"):
                 _disparar_sonido(sonido["kind"])
                 st.session_state.pop("_qr_sonido_pendiente", None)
-
             st.rerun()
 
-    # Mostrar mensaje actual
     mensaje = st.session_state.get("_qr_mensaje_actual")
     if mensaje and (time.time() - mensaje.get("ts", 0)) < 10:
         _render_mensaje_qr(mensaje)
 
-    # Botón para reiniciar cámara
     if st.button("🔄 Reiniciar cámara", key="reiniciar_camara"):
         st.session_state.pop("_ultimo_qr_escaneado", None)
         st.rerun()
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: PUERTA
 # ─────────────────────────────────────────────────────────────
 
 def vista_puerta():
-    """Vista minimalista: solo título y cámara."""
     st.title("Escaneo QR")
     escaner_qr_continuo(key="puerta")
 
-
 # ─────────────────────────────────────────────────────────────
-# VISTA: PERFIL DEL ALUMNO
+# PERFIL DEL ALUMNO
 # ─────────────────────────────────────────────────────────────
 
 def perfil_alumno_datos(id_alumno):
-    """Carga todos los datos del perfil del alumno."""
     alumno = leer_uno("""
         SELECT a.*, g.nombre AS grado, s.nombre AS seccion,
                s.id AS seccion_id, t.id AS turno_id, t.nombre AS turno
@@ -1280,101 +1028,65 @@ def perfil_alumno_datos(id_alumno):
     asistencias = leer_dataframe(
         "SELECT id, fecha, hora, tipo, estado, justificada, observacion, "
         "origen, justificado_por, justificado_en "
-        "FROM asistencias WHERE alumno_id = ? "
-        "ORDER BY fecha DESC, hora DESC",
-        (id_alumno,),
-    )
-
+        "FROM asistencias WHERE alumno_id = ? ORDER BY fecha DESC, hora DESC",
+        (id_alumno,))
     tardanzas = leer_dataframe(
         "SELECT fecha, hora, numero AS N, accion, justificada, origen "
-        "FROM tardanzas WHERE alumno_id = ? "
-        "ORDER BY fecha DESC, hora DESC",
-        (id_alumno,),
-    )
-
+        "FROM tardanzas WHERE alumno_id = ? ORDER BY fecha DESC, hora DESC",
+        (id_alumno,))
     bloqueos = leer_dataframe(
         "SELECT fecha_inicio, COALESCE(fecha_fin, '-') AS fecha_fin, "
         "COALESCE(motivo, '') AS motivo, COALESCE(activo, 0) AS activo "
-        "FROM bloqueos WHERE alumno_id = ? "
-        "ORDER BY fecha_inicio DESC",
-        (id_alumno,),
-    )
-
+        "FROM bloqueos WHERE alumno_id = ? ORDER BY fecha_inicio DESC",
+        (id_alumno,))
     permisos = leer_dataframe(
         "SELECT id, fecha_inicio, fecha_fin, COALESCE(motivo, '') AS motivo, "
-        "COALESCE(activo, 0) AS activo "
-        "FROM permisos WHERE alumno_id = ? "
-        "ORDER BY fecha_inicio DESC",
-        (id_alumno,),
-    )
-
+        "COALESCE(activo, 0) AS activo FROM permisos WHERE alumno_id = ? "
+        "ORDER BY fecha_inicio DESC", (id_alumno,))
     justificaciones = leer_dataframe(
         "SELECT id, fecha_objetivo, COALESCE(motivo, '') AS motivo, "
-        "COALESCE(aplicada, 0) AS aplicada "
-        "FROM justificaciones_previas WHERE alumno_id = ? "
-        "ORDER BY fecha_objetivo DESC",
-        (id_alumno,),
-    )
+        "COALESCE(aplicada, 0) AS aplicada FROM justificaciones_previas "
+        "WHERE alumno_id = ? ORDER BY fecha_objetivo DESC", (id_alumno,))
 
     total_puntuales = int((asistencias["estado"] == ESTADO_PUNTUAL).sum()) if not asistencias.empty else 0
     total_tardanzas = int((asistencias["estado"] == ESTADO_TARDANZA).sum()) if not asistencias.empty else 0
     total_faltas = int((asistencias["estado"] == ESTADO_FALTA).sum()) if not asistencias.empty else 0
     total_refuerzos = 0
     if not asistencias.empty:
-        total_refuerzos = int(
-            ((asistencias["tipo"] == "reforzamiento")
-             & (asistencias["estado"] == ESTADO_ASISTIO_REFUERZO)).sum()
-        )
+        total_refuerzos = int(((asistencias["tipo"] == "reforzamiento")
+                              & (asistencias["estado"] == ESTADO_ASISTIO_REFUERZO)).sum())
 
-    # Contar tardanzas injustificadas
     tardanzas_injust = int((tardanzas["justificada"] == 0).sum()) if not tardanzas.empty else 0
 
-    # ¿Está bloqueado?
     bloqueado = leer_uno(
         "SELECT id FROM bloqueos WHERE alumno_id = ? AND activo = 1 LIMIT 1",
-        (id_alumno,),
-    ) is not None
+        (id_alumno,)) is not None
 
-    # ¿Es reincidente?
     ultimo_desbloqueo = leer_uno(
         "SELECT fecha_fin FROM bloqueos WHERE alumno_id = ? AND activo = 0 "
         "AND fecha_fin IS NOT NULL ORDER BY fecha_fin DESC LIMIT 1",
-        (id_alumno,),
-    )
+        (id_alumno,))
     es_reincidente = ultimo_desbloqueo is not None
     limite = calcular_limite_tardanzas(es_reincidente)
 
-    # Tardanzas desde el último desbloqueo
     if ultimo_desbloqueo:
         desde_fecha = formatear_fecha(ultimo_desbloqueo["fecha_fin"])
-        tardanzas_ciclo = len(
-            tardanzas[(tardanzas["justificada"] == 0)
-                      & (tardanzas["fecha"] > desde_fecha)]
-        ) if not tardanzas.empty else 0
+        tardanzas_ciclo = len(tardanzas[(tardanzas["justificada"] == 0)
+                                        & (tardanzas["fecha"] > desde_fecha)]) if not tardanzas.empty else 0
     else:
         tardanzas_ciclo = tardanzas_injust
 
     return {
-        "alumno": alumno,
-        "asistencias": asistencias,
-        "tardanzas": tardanzas,
-        "bloqueos": bloqueos,
-        "permisos": permisos,
+        "alumno": alumno, "asistencias": asistencias, "tardanzas": tardanzas,
+        "bloqueos": bloqueos, "permisos": permisos,
         "justificaciones_previas": justificaciones,
-        "total_puntuales": total_puntuales,
-        "total_tardanzas": total_tardanzas,
-        "total_faltas": total_faltas,
-        "total_refuerzos": total_refuerzos,
-        "tardanzas_injust": tardanzas_injust,
-        "tardanzas_ciclo": tardanzas_ciclo,
-        "reincidente": es_reincidente,
-        "limite": limite,
-        "bloqueado": bloqueado,
+        "total_puntuales": total_puntuales, "total_tardanzas": total_tardanzas,
+        "total_faltas": total_faltas, "total_refuerzos": total_refuerzos,
+        "tardanzas_injust": tardanzas_injust, "tardanzas_ciclo": tardanzas_ciclo,
+        "reincidente": es_reincidente, "limite": limite, "bloqueado": bloqueado,
     }
 
-
 def vista_perfil_alumno(id_alumno):
-    """Vista del perfil del alumno con carnet completo."""
     datos = perfil_alumno_datos(id_alumno)
     if not datos:
         st.warning("Alumno no encontrado.")
@@ -1392,7 +1104,6 @@ def vista_perfil_alumno(id_alumno):
     inicial = (alumno["apellido_paterno"] or alumno["nombres"] or "?")[0].upper()
     estado = "BLOQUEADO" if datos["bloqueado"] else "ACTIVO"
 
-    # Header
     with st.container(key="perfil_hero"):
         c1, c2 = st.columns([1, 6], vertical_alignment="center")
         with c1:
@@ -1402,48 +1113,35 @@ def vista_perfil_alumno(id_alumno):
             with st.container(key="hero_nombre"):
                 st.markdown(nombre)
             with st.container(key="hero_meta"):
-                st.markdown(
-                    f"{alumno['grado']} {alumno['seccion']} · "
-                    f"Turno {alumno['turno']} · DNI {alumno['dni']} · {estado}"
-                )
+                st.markdown(f"{alumno['grado']} {alumno['seccion']} · "
+                            f"Turno {alumno['turno']} · DNI {alumno['dni']} · {estado}")
 
-    # Carnet completo (reemplaza el QR triste)
     st.subheader("Carnet del alumno")
     try:
         imagen_carnet = _generar_fotocheck_pil(alumno, Path("escudo.png"))
-        with st.container(key="carnet_alumno"):
-            st.image(imagen_carnet, use_container_width=True)
+        st.image(imagen_carnet, use_container_width=True)
     except Exception as error:
         st.warning(f"No se pudo generar el carnet: {error}")
 
-    # Botones de acción
     st.subheader("Acciones")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         pdf_carnet = pdf_carnet_alumno(alumno["dni"])
         if pdf_carnet:
-            st.download_button(
-                "Descargar carnet", pdf_carnet,
-                f"carnet_{alumno['dni']}.pdf",
-                "application/pdf",
-                use_container_width=True,
-            )
+            st.download_button("Descargar carnet", pdf_carnet,
+                               f"carnet_{alumno['dni']}.pdf",
+                               "application/pdf", use_container_width=True)
     with c2:
-        st.download_button(
-            "Historial Excel",
-            _df_a_excel(datos["asistencias"], "Historial"),
-            f"historial_{alumno['dni']}.xlsx",
-            use_container_width=True,
-        )
+        st.download_button("Historial Excel",
+                           _df_a_excel(datos["asistencias"], "Historial"),
+                           f"historial_{alumno['dni']}.xlsx",
+                           use_container_width=True)
     with c3:
         pdf_resumen = pdf_resumen_alumno(id_alumno)
         if pdf_resumen:
-            st.download_button(
-                "Resumen PDF", pdf_resumen,
-                f"resumen_{alumno['dni']}.pdf",
-                "application/pdf",
-                use_container_width=True,
-            )
+            st.download_button("Resumen PDF", pdf_resumen,
+                               f"resumen_{alumno['dni']}.pdf",
+                               "application/pdf", use_container_width=True)
     with c4:
         if usuario["rol"] == "Admin":
             if alumno.get("activo", 1) == 1:
@@ -1451,8 +1149,7 @@ def vista_perfil_alumno(id_alumno):
                              key="desactivar_alumno"):
                     escribir_seguro(
                         "UPDATE alumnos SET activo = 0, retirado_en = ? WHERE id = ?",
-                        (timestamp_texto(), id_alumno),
-                    )
+                        (timestamp_texto(), id_alumno))
                     auditar(usuario["usuario"], f"Desactivó alumno DNI {alumno['dni']}")
                     st.success("Alumno desactivado.")
                     st.rerun()
@@ -1461,44 +1158,37 @@ def vista_perfil_alumno(id_alumno):
                              key="reactivar_alumno"):
                     escribir_seguro(
                         "UPDATE alumnos SET activo = 1, retirado_en = NULL WHERE id = ?",
-                        (id_alumno,),
-                    )
+                        (id_alumno,))
                     auditar(usuario["usuario"], f"Reactivó alumno DNI {alumno['dni']}")
                     st.success("Alumno reactivado.")
                     st.rerun()
 
-    # Tabs
     tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos",
                     "Justificaciones previas"])
-
     with tabs[0]:
         if datos["asistencias"].empty:
             st.info("Sin asistencias.")
         else:
             st.dataframe(datos["asistencias"], use_container_width=True,
                          hide_index=True, height=400)
-
     with tabs[1]:
         if datos["tardanzas"].empty:
             st.info("Sin tardanzas.")
         else:
             st.dataframe(datos["tardanzas"], use_container_width=True,
                          hide_index=True, height=400)
-
     with tabs[2]:
         if datos["bloqueos"].empty:
             st.info("Sin bloqueos.")
         else:
             st.dataframe(datos["bloqueos"], use_container_width=True,
                          hide_index=True, height=400)
-
     with tabs[3]:
         if datos["permisos"].empty:
             st.info("Sin permisos registrados.")
         else:
             st.dataframe(datos["permisos"], use_container_width=True,
                          hide_index=True, height=400)
-
     with tabs[4]:
         if datos["justificaciones_previas"].empty:
             st.info("Sin justificaciones previas.")
@@ -1506,14 +1196,12 @@ def vista_perfil_alumno(id_alumno):
             st.dataframe(datos["justificaciones_previas"],
                          use_container_width=True, hide_index=True, height=400)
 
-
 # ─────────────────────────────────────────────────────────────
 # VISTA: ALUMNOS
 # ─────────────────────────────────────────────────────────────
 
 def vista_alumnos():
     st.title("Alumnos")
-
     id_perfil = st.session_state.get("perfil_alumno_id")
     if id_perfil:
         vista_perfil_alumno(id_perfil)
@@ -1527,13 +1215,10 @@ def vista_alumnos():
     with tabs[2]:
         _alumnos_editar()
 
-
 def _alumnos_listar():
     c1, c2, c3 = st.columns([2, 2, 3])
     with c1:
-        grados = leer_dataframe(
-            "SELECT DISTINCT nombre FROM grados ORDER BY nombre"
-        )
+        grados = leer_dataframe("SELECT DISTINCT nombre FROM grados ORDER BY nombre")
         opciones_grado = ["Todos"] + grados["nombre"].tolist()
         grado_sel = st.selectbox("Grado", opciones_grado, key="fil_grado")
     with c2:
@@ -1548,8 +1233,7 @@ def _alumnos_listar():
             opciones_seccion = ["Todas"]
         seccion_sel = st.selectbox("Sección", opciones_seccion, key="fil_seccion")
     with c3:
-        texto = st.text_input("Buscar", placeholder="Nombre o DNI",
-                              key="fil_texto")
+        texto = st.text_input("Buscar", placeholder="Nombre o DNI", key="fil_texto")
 
     consulta = """
         SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
@@ -1561,7 +1245,6 @@ def _alumnos_listar():
         WHERE a.activo = 1
     """
     parametros = []
-
     if texto.strip():
         consulta += " AND (a.nombres LIKE ? OR a.apellido_paterno LIKE ? " \
                     "OR a.apellido_materno LIKE ? OR a.dni LIKE ?)"
@@ -1573,12 +1256,10 @@ def _alumnos_listar():
     if seccion_sel != "Todas":
         consulta += " AND s.nombre = ?"
         parametros.append(seccion_sel)
-
     consulta += " ORDER BY a.apellido_paterno LIMIT 200"
 
     alumnos = leer_dataframe(consulta, parametros)
     st.write(f"**{len(alumnos)} alumnos**")
-
     if alumnos.empty:
         st.info("Sin resultados.")
         return
@@ -1587,15 +1268,12 @@ def _alumnos_listar():
         nombre = nombre_completo_alumno(alumno)
         c1, c2 = st.columns([5, 1])
         with c1:
-            st.markdown(
-                f"**{nombre}** — {alumno['grado']} {alumno['seccion']} "
-                f"({alumno['turno']}) — DNI {alumno['dni']}"
-            )
+            st.markdown(f"**{nombre}** — {alumno['grado']} {alumno['seccion']} "
+                        f"({alumno['turno']}) — DNI {alumno['dni']}")
         with c2:
             if st.button("Ver", key=f"ver_alumno_{alumno['id']}"):
                 st.session_state["perfil_alumno_id"] = alumno["id"]
                 st.rerun()
-
 
 def _alumnos_crear():
     st.subheader("Crear alumno")
@@ -1609,18 +1287,13 @@ def _alumnos_crear():
             apellido_paterno = st.text_input("Apellido Paterno *")
         with c2:
             apellido_materno = st.text_input("Apellido Materno")
-            grado_sel = st.selectbox(
-                "Grado *", grados.to_dict("records"),
-                format_func=lambda g: g["nombre"],
-            )
+            grado_sel = st.selectbox("Grado *", grados.to_dict("records"),
+                                      format_func=lambda g: g["nombre"])
             secciones = leer_dataframe(
                 "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
-                (grado_sel["id"],),
-            ) if grado_sel else leer_dataframe("SELECT * FROM secciones")
-            seccion_sel = st.selectbox(
-                "Sección *", secciones.to_dict("records"),
-                format_func=lambda s: s["nombre"],
-            ) if not secciones.empty else None
+                (grado_sel["id"],)) if grado_sel else leer_dataframe("SELECT * FROM secciones")
+            seccion_sel = st.selectbox("Sección *", secciones.to_dict("records"),
+                                        format_func=lambda s: s["nombre"]) if not secciones.empty else None
 
         apoderado = st.text_input("Apoderado")
         telefono = st.text_input("Teléfono apoderado")
@@ -1639,14 +1312,10 @@ def _alumnos_crear():
                         "apellido_materno, seccion_id, nombre_apoderado, "
                         "telefono_apoderado, periodo_id, activo) "
                         "VALUES(?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                        (dni.strip(), nombres.strip(),
-                         apellido_paterno.strip(),
-                         apellido_materno.strip() or None,
-                         seccion_sel["id"],
-                         apoderado.strip() or None,
-                         telefono.strip() or None,
-                         id_periodo),
-                    )
+                        (dni.strip(), nombres.strip(), apellido_paterno.strip(),
+                         apellido_materno.strip() or None, seccion_sel["id"],
+                         apoderado.strip() or None, telefono.strip() or None,
+                         id_periodo))
                     auditar(st.session_state["user"]["usuario"],
                             f"Creó alumno DNI {dni}")
                     st.success(f"Alumno {nombres} creado.")
@@ -1656,7 +1325,6 @@ def _alumnos_crear():
                         st.error(f"Ya existe un alumno con DNI {dni}.")
                     else:
                         st.error(f"Error: {error}")
-
 
 def _alumnos_editar():
     st.subheader("Editar alumno")
@@ -1670,15 +1338,12 @@ def _alumnos_editar():
         WHERE a.activo = 1
         ORDER BY a.apellido_paterno LIMIT 200
     """)
-
     if alumnos.empty:
         st.info("No hay alumnos para editar.")
         return
 
-    opciones = {
-        f"{nombre_completo_alumno(row)} — {row['grado']} {row['seccion']}": row["id"]
-        for _, row in alumnos.iterrows()
-    }
+    opciones = {f"{nombre_completo_alumno(row)} — {row['grado']} {row['seccion']}": row["id"]
+                for _, row in alumnos.iterrows()}
     seleccion = st.selectbox("Alumno", list(opciones.keys()))
     id_alumno = opciones[seleccion]
 
@@ -1690,7 +1355,6 @@ def _alumnos_editar():
         JOIN grados g ON s.grado_id = g.id
         WHERE a.id = ?
     """, (id_alumno,))
-
     if not alumno:
         st.error("Alumno no encontrado.")
         return
@@ -1700,41 +1364,33 @@ def _alumnos_editar():
     with st.form("formulario_editar_alumno"):
         c1, c2 = st.columns(2)
         with c1:
-            apoderado = st.text_input("Apoderado",
-                                       value=alumno["nombre_apoderado"] or "")
-            telefono = st.text_input("Teléfono",
-                                      value=alumno["telefono_apoderado"] or "")
+            apoderado = st.text_input("Apoderado", value=alumno["nombre_apoderado"] or "")
+            telefono = st.text_input("Teléfono", value=alumno["telefono_apoderado"] or "")
         with c2:
             grados = leer_dataframe("SELECT * FROM grados ORDER BY nombre")
             grado_sel = st.selectbox(
                 "Grado", grados.to_dict("records"),
                 format_func=lambda g: g["nombre"],
                 index=next((i for i, g in enumerate(grados.to_dict("records"))
-                           if g["id"] == alumno["grado_id"]), 0),
-            )
+                            if g["id"] == alumno["grado_id"]), 0))
             secciones = leer_dataframe(
                 "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
-                (grado_sel["id"],),
-            )
+                (grado_sel["id"],))
             seccion_sel = st.selectbox(
                 "Sección", secciones.to_dict("records"),
                 format_func=lambda s: s["nombre"],
                 index=next((i for i, s in enumerate(secciones.to_dict("records"))
-                           if s["id"] == alumno["seccion_id"]), 0),
-            )
-
+                            if s["id"] == alumno["seccion_id"]), 0))
         if st.form_submit_button("Guardar cambios", type="primary"):
             escribir_seguro(
                 "UPDATE alumnos SET seccion_id = ?, nombre_apoderado = ?, "
                 "telefono_apoderado = ? WHERE id = ?",
                 (seccion_sel["id"], apoderado.strip() or None,
-                 telefono.strip() or None, id_alumno),
-            )
+                 telefono.strip() or None, id_alumno))
             auditar(st.session_state["user"]["usuario"],
                     f"Editó alumno id={id_alumno}")
             st.success("Cambios guardados.")
             st.rerun()
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: BLOQUEADOS
@@ -1742,11 +1398,8 @@ def _alumnos_editar():
 
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
-    st.caption(
-        "Alumno nuevo → 3 tardanzas → bloqueo. "
-        "Alumno reincidente → 1 tardanza → bloqueo."
-    )
-
+    st.caption("Alumno nuevo → 3 tardanzas → bloqueo. "
+               "Alumno reincidente → 1 tardanza → bloqueo.")
     bloqueados = leer_dataframe("""
         SELECT b.id, a.id AS alumno_id, a.dni,
                a.apellido_paterno || ' ' || COALESCE(a.apellido_materno, '') || ', ' || a.nombres AS alumno,
@@ -1760,9 +1413,7 @@ def vista_bloqueados():
         WHERE b.activo = 1
         ORDER BY b.fecha_inicio DESC
     """)
-
     st.metric("Total bloqueados", len(bloqueados))
-
     if bloqueados.empty:
         st.success("No hay alumnos bloqueados.")
         return
@@ -1770,38 +1421,26 @@ def vista_bloqueados():
     st.dataframe(bloqueados, use_container_width=True, hide_index=True)
 
     st.subheader("Desbloquear alumno")
-    opciones = {
-        f"{row['alumno']} — {row['grado']} {row['seccion']}": row["alumno_id"]
-        for _, row in bloqueados.iterrows()
-    }
+    opciones = {f"{row['alumno']} — {row['grado']} {row['seccion']}": row["alumno_id"]
+                for _, row in bloqueados.iterrows()}
     seleccion = st.selectbox("Alumno", list(opciones.keys()),
                               key="desbloquear_alumno_sel")
     id_alumno = opciones[seleccion]
-
-    motivo = st.text_input("Motivo de desbloqueo *",
-                            key="motivo_desbloqueo")
-
-    confirmar = st.checkbox(
-        "Confirmo que deseo desbloquear a este alumno",
-        key="confirmar_desbloqueo",
-    )
-
-    if st.button("Desbloquear", type="primary",
-                 disabled=not confirmar):
+    motivo = st.text_input("Motivo de desbloqueo *", key="motivo_desbloqueo")
+    confirmar = st.checkbox("Confirmo que deseo desbloquear a este alumno",
+                             key="confirmar_desbloqueo")
+    if st.button("Desbloquear", type="primary", disabled=not confirmar):
         if not motivo.strip():
             st.error("El motivo es obligatorio.")
         else:
             escribir_seguro(
                 "UPDATE bloqueos SET activo = 0, fecha_fin = ?, "
                 "liberado_por = ? WHERE alumno_id = ? AND activo = 1",
-                (timestamp_texto(), st.session_state["user"]["usuario"],
-                 id_alumno),
-            )
+                (timestamp_texto(), st.session_state["user"]["usuario"], id_alumno))
             auditar(st.session_state["user"]["usuario"],
                     f"Desbloqueó alumno_id={id_alumno}. Motivo: {motivo.strip()}")
             st.success("Alumno desbloqueado.")
             st.rerun()
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: PANEL DIRECCION
@@ -1809,8 +1448,6 @@ def vista_bloqueados():
 
 def vista_panel_direccion():
     st.title("Panel Dirección")
-
-    # Botón actualizar (reemplaza st_autorefresh)
     if st.button("🔄 Actualizar"):
         st.rerun()
 
@@ -1824,10 +1461,7 @@ def vista_panel_direccion():
                           horizontal=True, key="panel_turno")
     id_turno = opciones[turno_sel]
 
-    fecha = hoy_texto()
     fecha_d = hoy_fecha()
-
-    # Una sola query con todas las métricas
     metricas = leer_uno("""
         SELECT
             COUNT(DISTINCT a.id) AS total,
@@ -1856,7 +1490,6 @@ def vista_panel_direccion():
     c2.metric("Puntuales", metricas["puntuales"] or 0)
     c3.metric("Tardanzas", metricas["tardanzas"] or 0)
     c4.metric("Faltas", metricas["faltas"] or 0)
-
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Refuerzos", metricas["refuerzos"] or 0)
     c2.metric("Bloqueados", bloqueados["n"] or 0)
@@ -1875,12 +1508,10 @@ def vista_panel_direccion():
         WHERE ast.fecha = ? AND s.turno_id = ?
         ORDER BY ast.hora DESC LIMIT 30
     """, (fecha_d, id_turno))
-
     if ultimos.empty:
         st.info("Sin escaneos hoy.")
     else:
         st.dataframe(ultimos, use_container_width=True, hide_index=True)
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: CARNETS
@@ -1888,7 +1519,7 @@ def vista_panel_direccion():
 
 def vista_carnets():
     st.title("Carnets QR")
-    st.caption("Descarga por sección o por selección.")
+    st.caption("Descarga por sección.")
 
     if st.session_state.get("carnet_ver_seccion"):
         _carnets_ver_seccion(st.session_state["carnet_ver_seccion"])
@@ -1898,8 +1529,7 @@ def vista_carnets():
     for _, grado in grados.iterrows():
         secciones = leer_dataframe(
             "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
-            (grado["id"],),
-        )
+            (grado["id"],))
         if st.button(f"{grado['nombre']} ({len(secciones)} secciones)",
                      use_container_width=True,
                      key=f"carnet_grado_{grado['id']}"):
@@ -1911,20 +1541,17 @@ def vista_carnets():
         st.subheader("Secciones")
         secciones = leer_dataframe(
             "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
-            (grado_sel,),
-        )
+            (grado_sel,))
         for _, seccion in secciones.iterrows():
             alumnos = leer_dataframe(
                 "SELECT COUNT(*) AS n FROM alumnos WHERE seccion_id = ? AND activo = 1",
-                (seccion["id"],),
-            )
+                (seccion["id"],))
             n = alumnos.iloc[0]["n"] if not alumnos.empty else 0
             if st.button(f"{seccion['nombre']} ({n} alumnos)",
                          use_container_width=True,
                          key=f"carnet_seccion_{seccion['id']}"):
                 st.session_state["carnet_ver_seccion"] = seccion["id"]
                 st.rerun()
-
 
 def _carnets_ver_seccion(id_seccion):
     seccion = leer_uno("""
@@ -1934,7 +1561,6 @@ def _carnets_ver_seccion(id_seccion):
         JOIN turnos t ON s.turno_id = t.id
         WHERE s.id = ?
     """, (id_seccion,))
-
     if not seccion:
         st.warning("Sección no encontrada.")
         st.session_state.pop("carnet_ver_seccion", None)
@@ -1945,12 +1571,10 @@ def _carnets_ver_seccion(id_seccion):
         st.rerun()
 
     st.subheader(f"{seccion['grado']} {seccion['seccion']} — Turno {seccion['turno']}")
-
     alumnos = leer_dataframe("""
         SELECT * FROM alumnos WHERE seccion_id = ? AND activo = 1
         ORDER BY apellido_paterno
     """, (id_seccion,))
-
     if alumnos.empty:
         st.info("Sin alumnos.")
         return
@@ -1959,21 +1583,461 @@ def _carnets_ver_seccion(id_seccion):
                  use_container_width=True):
         pdf = _pdf_carnets_por_seccion(id_seccion)
         if pdf:
-            st.download_button(
-                "Guardar PDF", pdf,
-                f"carnets_{seccion['grado']}{seccion['seccion']}.pdf",
-                "application/pdf",
-            )
+            st.download_button("Guardar PDF", pdf,
+                               f"carnets_{seccion['grado']}{seccion['seccion']}.pdf",
+                               "application/pdf")
 
+# ─────────────────────────────────────────────────────────────
+# VISTA: VENTANAS
+# ─────────────────────────────────────────────────────────────
+
+def vista_ventanas():
+    st.title("Ventanas de asistencia")
+    turnos = leer_varios("SELECT * FROM turnos ORDER BY id")
+    for turno in turnos:
+        st.subheader(f"Turno {turno['nombre']}")
+        ventanas = leer_varios(
+            "SELECT * FROM ventanas WHERE turno_id = ? AND activo = 1 ORDER BY orden, id",
+            (turno["id"],))
+        for ventana in ventanas:
+            with st.expander(f"{ventana['nombre']} ({ventana['tipo']})"):
+                hora_apertura = datetime.strptime(
+                    formatear_hora(ventana["hora_apertura"]), "%H:%M").time()
+                hora_limite = datetime.strptime(
+                    formatear_hora(ventana["hora_limite_puntual"] or ventana["hora_apertura"]),
+                    "%H:%M").time()
+                hora_cierre = datetime.strptime(
+                    formatear_hora(ventana["hora_cierre"]), "%H:%M").time()
+
+                nueva_apertura = st.time_input("Apertura", value=hora_apertura,
+                                                key=f"ap_{ventana['id']}")
+                nuevo_limite = st.time_input("Límite puntual", value=hora_limite,
+                                              key=f"lim_{ventana['id']}")
+                nuevo_cierre = st.time_input("Cierre", value=hora_cierre,
+                                              key=f"ci_{ventana['id']}")
+                confirmar = st.checkbox("Confirmo que deseo guardar los cambios",
+                                         key=f"conf_vent_{ventana['id']}")
+                if st.button("Guardar", type="primary",
+                             key=f"guardar_vent_{ventana['id']}",
+                             disabled=not confirmar):
+                    escribir_seguro(
+                        "UPDATE ventanas SET hora_apertura = ?, "
+                        "hora_limite_puntual = ?, hora_cierre = ? WHERE id = ?",
+                        (nueva_apertura.strftime("%H:%M"),
+                         nuevo_limite.strftime("%H:%M"),
+                         nuevo_cierre.strftime("%H:%M"), ventana["id"]))
+                    auditar(st.session_state["user"]["usuario"],
+                            f"Editó ventana id={ventana['id']}")
+                    st.success("Ventana actualizada.")
+                    st.rerun()
+
+# ─────────────────────────────────────────────────────────────
+# VISTA: DÍAS ESPECIALES
+# ─────────────────────────────────────────────────────────────
+
+def vista_dias_especiales():
+    st.title("Días especiales")
+    usuario = st.session_state["user"]
+    tab_crear, tab_listar = st.tabs(["Crear", "Listar / eliminar"])
+
+    with tab_crear:
+        tipo = st.radio("Tipo", ["Evento", "Feriado"], horizontal=True, key="dia_tipo")
+        c1, c2 = st.columns(2)
+        with c1:
+            fecha = st.date_input("Fecha", min_value=hoy_fecha(), key="dia_fecha")
+            descripcion = st.text_input("Descripción del evento", key="dia_desc")
+        with c2:
+            if tipo == "Evento":
+                turnos = leer_varios("SELECT * FROM turnos ORDER BY id")
+                opciones_turno = {"Ambos": None}
+                opciones_turno.update({t["nombre"]: t["id"] for t in turnos})
+                turno_sel = st.selectbox("Turno", list(opciones_turno.keys()),
+                                          key="dia_turno")
+                hora_input = st.time_input("Hora de entrada",
+                                            value=datetime.strptime("08:00", "%H:%M").time(),
+                                            key="dia_hora")
+                hora_entrada = hora_input.strftime("%H:%M")
+            else:
+                turno_sel = "Ambos"
+                hora_entrada = "00:00"
+                st.info("Los feriados no tienen horario ni turno.")
+
+        contar_como_clases = False
+        if tipo == "Evento":
+            contar_como_clases = st.checkbox("Contar como clases normales",
+                                              value=False, key="dia_contar_clases")
+
+        alcance = "Todo el colegio"
+        selecciones_secciones = []
+        if tipo == "Evento":
+            alcance = st.radio("Aplica a:",
+                                ["Todo el colegio", "Solo algunas secciones"],
+                                key="dia_alcance", horizontal=True)
+            if alcance == "Solo algunas secciones":
+                grados = leer_varios("SELECT * FROM grados ORDER BY nombre")
+                for grado in grados:
+                    secciones = leer_varios(
+                        "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
+                        (grado["id"],))
+                    for seccion in secciones:
+                        if st.checkbox(f"{grado['nombre']} {seccion['nombre']}",
+                                       key=f"dia_sec_{seccion['id']}"):
+                            selecciones_secciones.append(seccion["id"])
+
+        confirmar = st.checkbox("Confirmo que deseo crear este día especial",
+                                 key="conf_dia_crear")
+        if st.button("Crear", type="primary", disabled=not confirmar):
+            if not descripcion.strip():
+                st.error("La descripción es obligatoria.")
+            elif (tipo == "Evento" and alcance == "Solo algunas secciones"
+                  and not selecciones_secciones):
+                st.error("Selecciona al menos una sección.")
+            else:
+                id_turno = (opciones_turno.get(turno_sel) if tipo == "Evento" else None)
+                periodo = leer_uno("SELECT id FROM periodos WHERE activo = 1 LIMIT 1")
+                id_periodo = periodo["id"] if periodo else None
+                id_dia = escribir_y_esperar(
+                    "INSERT INTO dias_especiales(fecha, descripcion, turno_id, "
+                    "hora_entrada, tipo, periodo_id, contar_como_clases) "
+                    "VALUES(?, ?, ?, ?, ?, ?, ?)",
+                    (fecha.strftime("%Y-%m-%d"), descripcion.strip(), id_turno,
+                     hora_entrada, "evento" if tipo == "Evento" else "feriado",
+                     id_periodo, 1 if contar_como_clases else 0))
+                for id_seccion in selecciones_secciones:
+                    escribir_seguro(
+                        "INSERT INTO dias_especiales_secciones"
+                        "(dia_especial_id, seccion_id) VALUES(?, ?)",
+                        (id_dia, id_seccion))
+                auditar(usuario["usuario"], f"Creó día especial: {descripcion.strip()}")
+                st.success("Día especial creado.")
+                st.rerun()
+
+    with tab_listar:
+        dias = leer_dataframe("""
+            SELECT d.id, d.fecha, d.descripcion,
+                   COALESCE(t.nombre, 'Ambos') AS turno,
+                   d.hora_entrada, d.tipo
+            FROM dias_especiales d
+            LEFT JOIN turnos t ON d.turno_id = t.id
+            WHERE d.fecha >= ? AND d.activo = 1
+            ORDER BY d.fecha, d.hora_entrada
+        """, (hoy_texto(),))
+        if dias.empty:
+            st.info("Sin días especiales.")
+        else:
+            st.dataframe(dias, use_container_width=True, hide_index=True)
+            opciones = {f"{row['fecha']} - {row['descripcion']}": row["id"]
+                        for _, row in dias.iterrows()}
+            seleccion = st.selectbox("Eliminar", list(opciones.keys()),
+                                      key="eliminar_dia_sel")
+            confirmar_del = st.checkbox("Confirmo que deseo eliminar este día especial",
+                                         key="conf_dia_eliminar")
+            if st.button("Eliminar", type="primary", disabled=not confirmar_del):
+                escribir_seguro("DELETE FROM dias_especiales WHERE id = ?",
+                                (opciones[seleccion],))
+                auditar(usuario["usuario"],
+                        f"Eliminó día especial id={opciones[seleccion]}")
+                st.success("Día especial eliminado.")
+                st.rerun()
+
+# ─────────────────────────────────────────────────────────────
+# VISTA: JUSTIFICACIONES Y PERMISOS
+# ─────────────────────────────────────────────────────────────
+
+def vista_justificaciones_permisos():
+    st.title("Justificaciones y Permisos")
+    usuario = st.session_state["user"]
+    tab_just, tab_perm = st.tabs(["Justificación previa", "Permisos"])
+
+    with tab_just:
+        st.subheader("Registrar justificación previa")
+        st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
+        _selector_grado_seccion_alumno(
+            clave="just_sel",
+            al_seleccionar=lambda al: _form_justificacion_previa(al, usuario))
+
+        st.markdown("---")
+        st.subheader("Justificaciones registradas")
+        justificaciones = leer_dataframe("""
+            SELECT jp.id, jp.fecha_objetivo, a.dni,
+                   a.apellido_paterno || ' ' || COALESCE(a.apellido_materno, '') || ', ' || a.nombres AS alumno,
+                   g.nombre AS grado, s.nombre AS seccion, jp.motivo,
+                   CASE WHEN jp.aplicada = 1 THEN 'Aplicada'
+                        WHEN jp.aplicada = -1 THEN 'Anulada'
+                        ELSE 'Pendiente' END AS estado
+            FROM justificaciones_previas jp
+            JOIN alumnos a ON jp.alumno_id = a.id
+            JOIN secciones s ON a.seccion_id = s.id
+            JOIN grados g ON s.grado_id = g.id
+            WHERE jp.fecha_objetivo >= ?
+            ORDER BY jp.fecha_objetivo DESC LIMIT 200
+        """, (hoy_texto(),))
+        if justificaciones.empty:
+            st.info("Sin justificaciones previas.")
+        else:
+            st.dataframe(justificaciones, use_container_width=True, hide_index=True)
+            pendientes = justificaciones[justificaciones["estado"] == "Pendiente"]
+            if not pendientes.empty:
+                opciones = {f"{row['fecha_objetivo']} - {row['alumno']}": row["id"]
+                            for _, row in pendientes.iterrows()}
+                sel = st.selectbox("Anular justificación pendiente",
+                                    list(opciones.keys()), key="anular_just_sel")
+                motivo_anul = st.text_input("Motivo de anulación (opcional)",
+                                             key="motivo_anul_just")
+                confirmar = st.checkbox("Confirmo que deseo anular esta justificación",
+                                         key="conf_anular_just")
+                if st.button("Anular", type="primary", disabled=not confirmar):
+                    escribir_seguro(
+                        "UPDATE justificaciones_previas SET aplicada = -1 WHERE id = ?",
+                        (opciones[sel],))
+                    auditar(usuario["usuario"],
+                            f"Anuló justificación id={opciones[sel]}. Motivo: {motivo_anul}")
+                    st.success("Justificación anulada.")
+                    st.rerun()
+
+    with tab_perm:
+        st.subheader("Registrar permiso")
+        st.caption(f"Permisos futuros (desde mañana, máximo {MAX_DIAS_PERMISO} días).")
+        _selector_grado_seccion_alumno(
+            clave="perm_sel",
+            al_seleccionar=lambda al: _form_permiso(al, usuario))
+
+        st.markdown("---")
+        st.subheader("Permisos registrados")
+        permisos = leer_dataframe("""
+            SELECT p.id, p.fecha_inicio, p.fecha_fin, a.dni,
+                   a.apellido_paterno || ' ' || COALESCE(a.apellido_materno, '') || ', ' || a.nombres AS alumno,
+                   g.nombre AS grado, s.nombre AS seccion, p.motivo,
+                   CASE WHEN p.activo = 1 THEN 'Activo' ELSE 'Anulado' END AS estado
+            FROM permisos p
+            JOIN alumnos a ON p.alumno_id = a.id
+            JOIN secciones s ON a.seccion_id = s.id
+            JOIN grados g ON s.grado_id = g.id
+            WHERE p.fecha_fin >= ?
+            ORDER BY p.fecha_inicio DESC LIMIT 200
+        """, (hoy_texto(),))
+        if permisos.empty:
+            st.info("Sin permisos registrados.")
+        else:
+            st.dataframe(permisos, use_container_width=True, hide_index=True)
+
+def _selector_grado_seccion_alumno(clave, al_seleccionar):
+    grados = leer_varios("SELECT * FROM grados ORDER BY nombre")
+    c1, c2 = st.columns(2)
+    with c1:
+        grado_sel = st.selectbox("Grado", grados,
+                                  format_func=lambda g: g["nombre"],
+                                  key=f"{clave}_grado")
+    with c2:
+        secciones = leer_varios(
+            "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
+            (grado_sel["id"],)) if grado_sel else []
+        seccion_sel = st.selectbox("Sección", secciones,
+                                    format_func=lambda s: s["nombre"],
+                                    key=f"{clave}_seccion") if secciones else None
+    if seccion_sel:
+        alumnos = leer_varios("""
+            SELECT id, dni, nombres, apellido_paterno, apellido_materno
+            FROM alumnos WHERE seccion_id = ? AND activo = 1
+            ORDER BY apellido_paterno
+        """, (seccion_sel["id"],))
+        if alumnos:
+            alumno_sel = st.selectbox("Alumno", alumnos,
+                                       format_func=lambda a: nombre_completo_alumno(a),
+                                       key=f"{clave}_alumno")
+            if alumno_sel:
+                al_seleccionar(alumno_sel)
+
+def _form_justificacion_previa(alumno, usuario):
+    st.markdown(f"**{nombre_completo_alumno(alumno)}** — DNI {alumno['dni']}")
+    hoy = hoy_fecha()
+    with st.form(f"form_just_{alumno['id']}"):
+        fecha_obj = st.date_input("Fecha objetivo", value=hoy,
+                                   min_value=hoy, max_value=hoy + timedelta(days=2))
+        motivo = st.text_area("Motivo (obligatorio)")
+        if st.form_submit_button("Registrar", type="primary"):
+            if not motivo.strip():
+                st.error("El motivo es obligatorio.")
+            else:
+                try:
+                    escribir_y_esperar(
+                        "INSERT INTO justificaciones_previas(alumno_id, "
+                        "fecha_objetivo, tipo, motivo, creado_por, timestamp, "
+                        "aplicada) VALUES(?, ?, 'Falta', ?, ?, ?, 0)",
+                        (alumno["id"], fecha_obj.strftime("%Y-%m-%d"),
+                         motivo.strip(), usuario["usuario"], timestamp_texto()))
+                    auditar(usuario["usuario"],
+                            f"Creó justificación previa para alumno_id={alumno['id']}")
+                    st.success("Justificación registrada.")
+                    st.rerun()
+                except Exception as error:
+                    if "unique" in str(error).lower():
+                        st.error("Ya existe una justificación para ese alumno en esa fecha.")
+                    else:
+                        st.error(f"Error: {error}")
+
+def _form_permiso(alumno, usuario):
+    st.markdown(f"**{nombre_completo_alumno(alumno)}** — DNI {alumno['dni']}")
+    manana = hoy_fecha() + timedelta(days=1)
+    with st.form(f"form_perm_{alumno['id']}"):
+        c1, c2 = st.columns(2)
+        with c1:
+            fecha_inicio = st.date_input("Fecha inicio", value=manana, min_value=manana)
+        with c2:
+            fecha_fin = st.date_input("Fecha fin", value=manana, min_value=manana)
+        motivo = st.text_area("Motivo (obligatorio)")
+        if st.form_submit_button("Registrar", type="primary"):
+            if not motivo.strip():
+                st.error("El motivo es obligatorio.")
+            elif fecha_fin < fecha_inicio:
+                st.error("La fecha fin no puede ser anterior a la inicio.")
+            elif (fecha_fin - fecha_inicio).days + 1 > MAX_DIAS_PERMISO:
+                st.error(f"Máximo {MAX_DIAS_PERMISO} días.")
+            else:
+                solapamiento = leer_uno("""
+                    SELECT id FROM permisos
+                    WHERE alumno_id = ? AND activo = 1
+                    AND NOT (fecha_fin < ? OR fecha_inicio > ?)
+                """, (alumno["id"], fecha_inicio.strftime("%Y-%m-%d"),
+                      fecha_fin.strftime("%Y-%m-%d")))
+                if solapamiento:
+                    st.error("Ya existe un permiso que se solapa con esas fechas.")
+                else:
+                    periodo = leer_uno("SELECT id FROM periodos WHERE activo = 1 LIMIT 1")
+                    id_periodo = periodo["id"] if periodo else None
+                    escribir_y_esperar(
+                        "INSERT INTO permisos(alumno_id, fecha_inicio, "
+                        "fecha_fin, motivo, creado_por, timestamp, activo, "
+                        "periodo_id) VALUES(?, ?, ?, ?, ?, ?, 1, ?)",
+                        (alumno["id"], fecha_inicio.strftime("%Y-%m-%d"),
+                         fecha_fin.strftime("%Y-%m-%d"), motivo.strip(),
+                         usuario["usuario"], timestamp_texto(), id_periodo))
+                    auditar(usuario["usuario"],
+                            f"Creó permiso para alumno_id={alumno['id']}")
+                    st.success("Permiso registrado.")
+                    st.rerun()
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: REPORTES
 # ─────────────────────────────────────────────────────────────
 
 def vista_reportes():
-    st.title("Reportes y Consultas")
-    st.info("Vista de reportes en construcción. Pronto estará disponible.")
+    st.title("Reportes")
+    usuario = st.session_state["user"]
+    secciones_permitidas = None
+    if usuario["rol"] == "Auxiliar":
+        secciones_permitidas = leer_varios(
+            "SELECT seccion_id FROM auxiliar_secciones WHERE usuario_id = ?",
+            (usuario["id"],))
+        secciones_permitidas = [s["seccion_id"] for s in secciones_permitidas]
+        if not secciones_permitidas:
+            st.info("No tienes secciones asignadas. Contacta al administrador.")
+            return
 
+    grados = leer_varios("SELECT * FROM grados ORDER BY nombre")
+    c1, c2 = st.columns(2)
+    with c1:
+        grado_sel = st.selectbox("Grado", grados,
+                                  format_func=lambda g: g["nombre"], key="rep_grado")
+    with c2:
+        secciones = leer_varios(
+            "SELECT * FROM secciones WHERE grado_id = ? ORDER BY nombre",
+            (grado_sel["id"],)) if grado_sel else []
+        if secciones_permitidas is not None:
+            secciones = [s for s in secciones if s["id"] in secciones_permitidas]
+        seccion_sel = st.selectbox("Sección", secciones,
+                                    format_func=lambda s: s["nombre"],
+                                    key="rep_seccion") if secciones else None
+
+    if not seccion_sel:
+        st.info("Selecciona una sección.")
+        return
+
+    st.markdown("---")
+    tipo_reporte = st.radio("Tipo de reporte", ["Diario", "Mensual"],
+                             horizontal=True, key="rep_tipo")
+    if tipo_reporte == "Diario":
+        fecha = st.date_input("Fecha", value=hoy_fecha(), key="rep_fecha")
+        asistencias = leer_dataframe("""
+            SELECT a.apellido_paterno, a.apellido_materno, a.nombres,
+                   ast.tipo, ast.estado, ast.hora, ast.justificada
+            FROM alumnos a
+            LEFT JOIN asistencias ast ON ast.alumno_id = a.id AND ast.fecha = ?
+            WHERE a.seccion_id = ? AND a.activo = 1
+            ORDER BY a.apellido_paterno, a.apellido_materno
+        """, (fecha.strftime("%Y-%m-%d"), seccion_sel["id"]))
+        if asistencias.empty:
+            st.info("Sin datos.")
+        else:
+            st.dataframe(asistencias, use_container_width=True, hide_index=True)
+            st.download_button("Descargar Excel",
+                               _df_a_excel(asistencias, "Diario"),
+                               f"reporte_diario_{fecha}.xlsx",
+                               use_container_width=True)
+    else:
+        anio = st.number_input("Año", min_value=2020, max_value=2100,
+                                value=hoy_fecha().year, key="rep_anio")
+        mes = st.selectbox("Mes", list(range(1, 13)),
+                            format_func=lambda m: MESES_ES[m],
+                            index=hoy_fecha().month - 1, key="rep_mes")
+        if mes == 12:
+            fecha_fin = date(int(anio) + 1, 1, 1)
+        else:
+            fecha_fin = date(int(anio), int(mes) + 1, 1)
+        fecha_inicio = date(int(anio), int(mes), 1)
+        asistencias = leer_dataframe("""
+            SELECT a.apellido_paterno, a.apellido_materno, a.nombres,
+                   ast.fecha, ast.tipo, ast.estado, ast.hora, ast.justificada
+            FROM alumnos a
+            LEFT JOIN asistencias ast ON ast.alumno_id = a.id
+            WHERE a.seccion_id = ? AND a.activo = 1
+            AND ast.fecha >= ? AND ast.fecha < ?
+            ORDER BY a.apellido_paterno, ast.fecha
+        """, (seccion_sel["id"], fecha_inicio.strftime("%Y-%m-%d"),
+              fecha_fin.strftime("%Y-%m-%d")))
+        if asistencias.empty:
+            st.info("Sin datos.")
+        else:
+            st.dataframe(asistencias, use_container_width=True, hide_index=True)
+            st.download_button("Descargar Excel",
+                               _df_a_excel(asistencias, "Mensual"),
+                               f"reporte_{anio}_{mes:02d}.xlsx",
+                               use_container_width=True)
+
+    if usuario["rol"] == "Admin":
+        st.markdown("---")
+        st.subheader("Reporte general por auxiliar")
+        _reporte_general_auxiliares()
+
+def _reporte_general_auxiliares():
+    turnos = leer_varios("SELECT * FROM turnos ORDER BY id")
+    if not turnos:
+        return
+    opciones = {t["nombre"]: t["id"] for t in turnos}
+    turno_sel = st.selectbox("Turno", list(opciones.keys()), key="repgen_turno")
+    id_turno = opciones[turno_sel]
+    fecha = hoy_fecha()
+    datos = leer_dataframe("""
+        SELECT g.nombre AS grado, s.nombre AS seccion,
+               COALESCE(u.nombres, '(Sin auxiliar)') AS auxiliar,
+               SUM(CASE WHEN ast.estado = 'Puntual' THEN 1 ELSE 0 END) AS puntuales,
+               SUM(CASE WHEN ast.estado = 'Tardanza' THEN 1 ELSE 0 END) AS tardanzas,
+               SUM(CASE WHEN ast.estado = 'Falta' THEN 1 ELSE 0 END) AS faltas
+        FROM secciones s
+        JOIN grados g ON s.grado_id = g.id
+        LEFT JOIN auxiliar_secciones ause ON ause.seccion_id = s.id
+        LEFT JOIN usuarios u ON u.id = ause.usuario_id
+            AND u.rol = 'Auxiliar' AND u.activo = 1
+        LEFT JOIN alumnos a ON a.seccion_id = s.id AND a.activo = 1
+        LEFT JOIN asistencias ast ON ast.alumno_id = a.id AND ast.fecha = ?
+        WHERE s.turno_id = ?
+        GROUP BY s.id, g.nombre, s.nombre, u.nombres
+        ORDER BY u.nombres, g.nombre, s.nombre
+    """, (fecha.strftime("%Y-%m-%d"), id_turno))
+    if datos.empty:
+        st.info("Sin datos para este turno.")
+    else:
+        st.dataframe(datos, use_container_width=True, hide_index=True)
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: USUARIOS
@@ -1982,17 +2046,14 @@ def vista_reportes():
 def vista_usuarios():
     st.title("Usuarios")
     tab_listar, tab_crear = st.tabs(["Listar", "Crear"])
-
     with tab_listar:
         usuarios = leer_dataframe(
             "SELECT id, usuario, rol, nombres, activo, ultimo_login "
-            "FROM usuarios ORDER BY nombres"
-        )
+            "FROM usuarios ORDER BY nombres")
         if usuarios.empty:
             st.info("Sin usuarios.")
         else:
             st.dataframe(usuarios, use_container_width=True, hide_index=True)
-
     with tab_crear:
         st.subheader("Crear usuario")
         with st.form("formulario_crear_usuario"):
@@ -2003,7 +2064,6 @@ def vista_usuarios():
             with c2:
                 nombres = st.text_input("Nombres *")
                 rol = st.selectbox("Rol", ["Admin", "Direccion", "Auxiliar"])
-
             if st.form_submit_button("Crear", type="primary"):
                 if not nuevo_usuario or not nueva_password or not nombres:
                     st.error("Completa todos los campos.")
@@ -2015,9 +2075,7 @@ def vista_usuarios():
                             "INSERT INTO usuarios(usuario, password, rol, nombres) "
                             "VALUES(?, ?, ?, ?)",
                             (nuevo_usuario.strip().lower(),
-                             hash_password(nueva_password),
-                             rol, nombres.strip()),
-                        )
+                             hash_password(nueva_password), rol, nombres.strip()))
                         auditar(st.session_state["user"]["usuario"],
                                 f"Creó usuario {nuevo_usuario}")
                         st.success("Usuario creado.")
@@ -2028,7 +2086,6 @@ def vista_usuarios():
                         else:
                             st.error(f"Error: {error}")
 
-
 # ─────────────────────────────────────────────────────────────
 # VISTA: AUDITORIA
 # ─────────────────────────────────────────────────────────────
@@ -2037,12 +2094,10 @@ def vista_auditoria():
     st.title("Auditoría")
     registros = leer_dataframe(
         "SELECT id, usuario, accion, fecha, ip FROM auditoria "
-        "ORDER BY id DESC LIMIT 500"
-    )
+        "ORDER BY id DESC LIMIT 500")
     st.write(f"**{len(registros)} registros**")
     if not registros.empty:
         st.dataframe(registros, use_container_width=True, hide_index=True)
-
 
 # ─────────────────────────────────────────────────────────────
 # VISTA: BACKUP
@@ -2056,79 +2111,137 @@ def vista_backup():
     except ImportError:
         st.warning("Módulo de sincronización no disponible.")
 
-
 # ─────────────────────────────────────────────────────────────
-# VISTA: DIAS ESPECIALES (básica)
-# ─────────────────────────────────────────────────────────────
-
-def vista_dias_especiales():
-    st.title("Días especiales")
-    st.info("Vista en construcción. Pronto estará disponible.")
-
-
-# ─────────────────────────────────────────────────────────────
-# VISTA: VENTANAS (básica)
+# MARCAR FALTAS AL CIERRE (1 vez por ventana)
 # ─────────────────────────────────────────────────────────────
 
-def vista_ventanas():
-    st.title("Ventanas de asistencia")
-    st.info("Vista en construcción. Pronto estará disponible.")
+def _ventana_ya_marcada(id_ventana, fecha):
+    resultado = leer_uno(
+        "SELECT id FROM cierres_ventana WHERE ventana_id = ? AND fecha = ?",
+        (id_ventana, fecha))
+    return resultado is not None
 
+def _registrar_cierre_ventana(id_ventana, fecha):
+    escribir_seguro(
+        "INSERT OR IGNORE INTO cierres_ventana(ventana_id, fecha, marcado_en) "
+        "VALUES(?, ?, ?)",
+        (id_ventana, fecha, timestamp_texto()))
+
+def _marcar_faltas_de_ventana(ventana, turno, fecha, fecha_d, id_periodo):
+    alumnos = leer_varios("""
+        SELECT a.id FROM alumnos a
+        JOIN secciones s ON a.seccion_id = s.id
+        WHERE s.turno_id = ? AND a.activo = 1
+    """, (turno["id"],))
+    if not alumnos:
+        return
+    ids_alumnos = [a["id"] for a in alumnos]
+    tipo = "clases" if ventana["tipo"] == TIPO_VENTANA_CLASES else "reforzamiento"
+    estado_falta = ESTADO_FALTA if tipo == "clases" else "No asistio"
+    marcadores = ",".join("?" * len(ids_alumnos))
+    asistencias_hoy = leer_varios(f"""
+        SELECT alumno_id FROM asistencias
+        WHERE fecha = ? AND tipo = ? AND alumno_id IN ({marcadores})
+    """, [fecha_d, tipo] + ids_alumnos)
+    ya_registraron = {a["alumno_id"] for a in asistencias_hoy}
+    permisos = leer_varios(f"""
+        SELECT alumno_id FROM permisos
+        WHERE activo = 1 AND fecha_inicio <= ? AND fecha_fin >= ?
+        AND alumno_id IN ({marcadores})
+    """, [fecha_d, fecha_d] + ids_alumnos)
+    con_permiso = {p["alumno_id"] for p in permisos}
+    justificaciones = leer_varios(f"""
+        SELECT alumno_id FROM justificaciones_previas
+        WHERE fecha_objetivo = ? AND aplicada = 0
+        AND alumno_id IN ({marcadores})
+    """, [fecha_d] + ids_alumnos)
+    con_justificacion = {j["alumno_id"] for j in justificaciones}
+
+    hora_actual = hora_corta()
+    for alumno in alumnos:
+        id_alumno = alumno["id"]
+        if id_alumno in ya_registraron:
+            continue
+        if id_alumno in con_permiso:
+            escribir_seguro(
+                "INSERT INTO asistencias(alumno_id, fecha, ventana_id, tipo, "
+                "hora, estado, justificada, observacion, origen, periodo_id) "
+                "VALUES(?, ?, ?, ?, ?, 'Permiso', 1, 'Permiso otorgado', 'manual', ?)",
+                (id_alumno, fecha_d, ventana["id"], tipo, hora_actual, id_periodo))
+        elif id_alumno in con_justificacion:
+            escribir_seguro(
+                "INSERT INTO asistencias(alumno_id, fecha, ventana_id, tipo, "
+                "hora, estado, justificada, origen, periodo_id) "
+                "VALUES(?, ?, ?, ?, ?, ?, 1, 'auto', ?)",
+                (id_alumno, fecha_d, ventana["id"], tipo, hora_actual,
+                 estado_falta, id_periodo))
+            escribir_seguro(
+                "UPDATE justificaciones_previas SET aplicada = 1 "
+                "WHERE alumno_id = ? AND fecha_objetivo = ? AND aplicada = 0",
+                (id_alumno, fecha_d))
+        else:
+            escribir_seguro(
+                "INSERT INTO asistencias(alumno_id, fecha, ventana_id, tipo, "
+                "hora, estado, justificada, origen, periodo_id) "
+                "VALUES(?, ?, ?, ?, ?, ?, 0, 'auto', ?)",
+                (id_alumno, fecha_d, ventana["id"], tipo, hora_actual,
+                 estado_falta, id_periodo))
+
+def marcar_faltas_al_cierre():
+    fecha = hoy_texto()
+    fecha_d = hoy_fecha()
+    hora_actual = hora_corta()
+    feriado = leer_uno(
+        "SELECT id FROM dias_especiales WHERE fecha = ? AND activo = 1 "
+        "AND tipo = 'feriado' LIMIT 1", (fecha_d,))
+    if feriado:
+        return
+    periodo = leer_uno("SELECT id FROM periodos WHERE activo = 1 LIMIT 1")
+    id_periodo = periodo["id"] if periodo else None
+    turnos = leer_varios("SELECT * FROM turnos ORDER BY id")
+    for turno in turnos:
+        ventanas = leer_varios(
+            "SELECT * FROM ventanas WHERE turno_id = ? AND activo = 1",
+            (turno["id"],))
+        for ventana in ventanas:
+            hora_cierre = formatear_hora(ventana["hora_cierre"])
+            if hora_actual < hora_cierre:
+                continue
+            if _ventana_ya_marcada(ventana["id"], fecha):
+                continue
+            _marcar_faltas_de_ventana(ventana, turno, fecha, fecha_d, id_periodo)
+            _registrar_cierre_ventana(ventana["id"], fecha)
 
 # ─────────────────────────────────────────────────────────────
-# VISTA: JUSTIFICACIONES Y PERMISOS (básica)
-# ─────────────────────────────────────────────────────────────
-
-def vista_justificaciones_permisos():
-    st.title("Justificaciones y Permisos")
-    st.info("Vista en construcción. Pronto estará disponible.")
-
-
-# ─────────────────────────────────────────────────────────────
-# FUNCIONES AUXILIARES DE PDF Y CARNETS
+# HELPERS DE PDF Y CARNETS
 # ─────────────────────────────────────────────────────────────
 
 def _df_a_excel(df, nombre_hoja="Datos"):
-    """Convierte un DataFrame a bytes de Excel."""
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=nombre_hoja)
     buffer.seek(0)
     return buffer.getvalue()
 
-
 def _generar_fotocheck_pil(alumno, ruta_escudo=None):
-    """Genera el carnet del alumno como imagen PIL."""
     from PIL import Image, ImageDraw, ImageFont
-
-    ANCHO = 980
-    ALTO = 626
+    ANCHO, ALTO = 980, 626
     NARANJA_OSCURO = (184, 92, 56)
     NARANJA_CLARO = (212, 132, 96)
     FONDO = (255, 240, 225)
-    BLANCO = (255, 255, 255)
     NEGRO = (17, 17, 17)
-    GRIS = (150, 150, 150)
-
     imagen = Image.new("RGB", (ANCHO, ALTO), FONDO)
     dibujo = ImageDraw.Draw(imagen)
-
-    # Patrón de puntos
     for y in range(0, ALTO, 22):
         for x in range(0, ANCHO, 22):
             dibujo.ellipse([x-1, y-1, x+1, y+1], fill=(235, 210, 180))
-
-    # Franja degradada izquierda (foto)
-    FOTO_ANCHO = 240
-    FOTO_ALTO = 310
+    FOTO_ANCHO, FOTO_ALTO = 240, 310
     for y in range(ALTO):
         t = y / ALTO
         r = int(NARANJA_OSCURO[0] + (NARANJA_CLARO[0] - NARANJA_OSCURO[0]) * t)
         g = int(NARANJA_OSCURO[1] + (NARANJA_CLARO[1] - NARANJA_OSCURO[1]) * t)
         b = int(NARANJA_OSCURO[2] + (NARANJA_CLARO[2] - NARANJA_OSCURO[2]) * t)
         dibujo.line([(0, y), (FOTO_ANCHO, y)], fill=(r, g, b))
-
-    # Fuente
     try:
         fuente_titulo = ImageFont.truetype("arial.ttf", 34)
         fuente_label = ImageFont.truetype("arial.ttf", 30)
@@ -2139,92 +2252,61 @@ def _generar_fotocheck_pil(alumno, ruta_escudo=None):
         fuente_label = ImageFont.load_default()
         fuente_valor = ImageFont.load_default()
         fuente_frase = ImageFont.load_default()
-
-    # Título
-    dibujo.text((300, 15), "FOTOCHECK DEL ESTUDIANTE", fill=NEGRO,
-                font=fuente_titulo)
-
-    # Datos
+    dibujo.text((300, 15), "FOTOCHECK DEL ESTUDIANTE", fill=NEGRO, font=fuente_titulo)
     x_info = FOTO_ANCHO + 20
     apellidos = (alumno.get("apellido_paterno", "") + " " +
                  (alumno.get("apellido_materno") or "")).upper()
     nombres = (alumno.get("nombres", "")).upper()
-
     dibujo.text((x_info, 110), apellidos, fill=NEGRO, font=fuente_valor)
     dibujo.text((x_info, 180), nombres, fill=NEGRO, font=fuente_valor)
-
     dibujo.text((x_info, 260), "DNI:", fill=(90, 60, 30), font=fuente_label)
-    dibujo.text((x_info + 100, 260), alumno.get("dni", ""), fill=NEGRO,
-                font=fuente_valor)
-
+    dibujo.text((x_info + 100, 260), alumno.get("dni", ""), fill=NEGRO, font=fuente_valor)
     dibujo.text((x_info, 330), "GRADO:", fill=(90, 60, 30), font=fuente_label)
     dibujo.text((x_info + 150, 330),
                 f"{alumno.get('grado', '')} \"{alumno.get('seccion', '')}\"",
                 fill=NEGRO, font=fuente_valor)
-
     dibujo.text((x_info, 400), "TURNO:", fill=(90, 60, 30), font=fuente_label)
-    dibujo.text((x_info + 150, 400), alumno.get("turno", ""), fill=NEGRO,
-                font=fuente_valor)
-
-    # QR
+    dibujo.text((x_info + 150, 400), alumno.get("turno", ""), fill=NEGRO, font=fuente_valor)
     qr_imagen = generar_qr(alumno.get("dni", ""))
     qr_imagen = qr_imagen.resize((225, 225), Image.LANCZOS)
     imagen.paste(qr_imagen, (ANCHO - 240, 70))
-
-    # Frase
     dibujo.text((x_info, ALTO - 60), '"Ser del CNY, es ser mejor"',
                 fill=NARANJA_OSCURO, font=fuente_frase)
-
     return imagen
 
-
 def _render_carnets(filas, titulo=None):
-    """Renderiza un PDF de carnets en formato 2x5 por hoja A4."""
     buffer = BytesIO()
     margen = 5
-    documento = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=margen, leftMargin=margen,
-        topMargin=margen, bottomMargin=margen,
-    )
+    documento = SimpleDocTemplate(buffer, pagesize=A4,
+                                    rightMargin=margen, leftMargin=margen,
+                                    topMargin=margen, bottomMargin=margen)
     estilos = getSampleStyleSheet()
     MM = 2.8346
-    ANCHO_CARNET = 85.0 * MM
-    ALTO_CARNET = 53.0 * MM
+    ANCHO_CARNET, ALTO_CARNET = 85.0 * MM, 53.0 * MM
     ruta_escudo = Path("escudo.png")
-
     elementos = []
     if titulo:
         elementos.append(Paragraph(f"<b>{titulo}</b>", estilos["Heading2"]))
         elementos.append(Spacer(1, 6))
-
-    # Generar por lotes de 10 para no saturar memoria
     for i in range(0, len(filas), 10):
         lote = filas[i:i+10]
         fotochecks = []
         for alumno in lote:
             imagen = _generar_fotocheck_pil(
-                alumno,
-                ruta_escudo if ruta_escudo.exists() else None,
-            )
+                alumno, ruta_escudo if ruta_escudo.exists() else None)
             buffer_img = BytesIO()
             imagen.save(buffer_img, format="PNG")
             buffer_img.seek(0)
-            fotochecks.append(RLImage(buffer_img,
-                                      width=ANCHO_CARNET,
+            fotochecks.append(RLImage(buffer_img, width=ANCHO_CARNET,
                                       height=ALTO_CARNET))
             del imagen
-
-        # Armar tabla 2 columnas
         filas_tabla = []
         for j in range(0, len(fotochecks), 2):
             fila = fotochecks[j:j+2]
             while len(fila) < 2:
                 fila.append("")
             filas_tabla.append(fila)
-
-        tabla = Table(filas_tabla,
-                      colWidths=[ANCHO_CARNET, ANCHO_CARNET],
+        tabla = Table(filas_tabla, colWidths=[ANCHO_CARNET, ANCHO_CARNET],
                       hAlign="CENTER")
         tabla.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -2233,11 +2315,9 @@ def _render_carnets(filas, titulo=None):
         elementos.append(tabla)
         if i + 10 < len(filas):
             elementos.append(PageBreak())
-
     documento.build(elementos)
     buffer.seek(0)
     return buffer.getvalue()
-
 
 def _pdf_carnets_por_seccion(id_seccion):
     filas = leer_varios("""
@@ -2253,9 +2333,7 @@ def _pdf_carnets_por_seccion(id_seccion):
         return None
     return _render_carnets(filas)
 
-
 def pdf_carnet_alumno(dni):
-    """Genera el PDF del carnet de un alumno."""
     filas = leer_varios("""
         SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
         FROM alumnos a
@@ -2268,14 +2346,11 @@ def pdf_carnet_alumno(dni):
         return None
     return _render_carnets(filas)
 
-
 def pdf_resumen_alumno(id_alumno):
-    """Genera un PDF con el resumen del alumno."""
     datos = perfil_alumno_datos(id_alumno)
     if not datos:
         return None
     alumno = datos["alumno"]
-
     buffer = BytesIO()
     documento = SimpleDocTemplate(buffer, pagesize=A4,
                                     rightMargin=30, leftMargin=30,
@@ -2285,18 +2360,13 @@ def pdf_resumen_alumno(id_alumno):
         Paragraph("<b>Reporte de Asistencia</b>", estilos["Heading1"]),
         Paragraph("I.E. Yarinacocha", estilos["Normal"]),
         Spacer(1, 20),
-        Paragraph(f"<b>Alumno:</b> {nombre_completo_alumno(alumno)}",
-                  estilos["Normal"]),
+        Paragraph(f"<b>Alumno:</b> {nombre_completo_alumno(alumno)}", estilos["Normal"]),
         Paragraph(f"<b>DNI:</b> {alumno['dni']}", estilos["Normal"]),
-        Paragraph(
-            f"<b>Grado:</b> {alumno['grado']} {alumno['seccion']} — "
-            f"{alumno['turno']}",
-            estilos["Normal"],
-        ),
+        Paragraph(f"<b>Grado:</b> {alumno['grado']} {alumno['seccion']} — "
+                  f"{alumno['turno']}", estilos["Normal"]),
         Spacer(1, 15),
         Paragraph("<b>Resumen</b>", estilos["Heading2"]),
     ]
-
     resumen = [
         ["Puntuales", "Tardanzas", "Faltas", "Refuerzos"],
         [datos["total_puntuales"], datos["total_tardanzas"],
@@ -2310,21 +2380,18 @@ def pdf_resumen_alumno(id_alumno):
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
     elementos.append(tabla)
-
     documento.build(elementos)
     buffer.seek(0)
     return buffer.getvalue()
 
+# ─────────────────────────────────────────────────────────────
 # MAIN
+# ─────────────────────────────────────────────────────────────
 
 def main():
-    st.set_page_config(
-        page_title="Asistencia I.E. Yarinacocha",
-        page_icon="escudo.png",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
-
+    st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
+                        page_icon="escudo.png", layout="wide",
+                        initial_sidebar_state="expanded")
     try:
         from db import descargar_bd_si_no_existe
         descargar_bd_si_no_existe()
@@ -2341,6 +2408,11 @@ def main():
     if st.session_state["user"].get("debe_cambiar_password"):
         vista_cambio_password_obligatorio()
         return
+
+    try:
+        marcar_faltas_al_cierre()
+    except Exception as error:
+        log.warning("Error marcando faltas: %s", error)
 
     opcion = menu_lateral()
 
@@ -2359,7 +2431,6 @@ def main():
         "Mi cuenta": vista_mi_cuenta,
         "Justificaciones y Permisos": vista_justificaciones_permisos,
     }
-
     funcion_vista = rutas.get(opcion)
     if funcion_vista:
         funcion_vista()
