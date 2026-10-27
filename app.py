@@ -6399,16 +6399,28 @@ def _control_faltas():
 #MAIN 
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha", page_icon="escudo.png", layout="wide", initial_sidebar_state="expanded")
+    
+    # --- CONEXIÓN A CLOUDFLARE R2 ---
+    try:
+        from db import descargar_bd_si_no_existe
+        descargar_bd_si_no_existe()
+    except Exception as error:
+        log.warning("No se pudo verificar BD en R2: %s", error)
+
     try:
         inicializar_bd()
         aplicar_estilos()
+        inicializar_sesion()
         
         if not st.session_state.get("user"):
             vista_login()
             return
             
+        refrescar_sesion_si_necesario()
+        
         if not _verificar_admin_activo():
             st.error("No hay Admin principal activo en el sistema.")
+            st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
             
         if st.session_state["user"].get("debe_cambiar_password"):
@@ -6419,12 +6431,12 @@ def main():
             vista_mantenimiento()
             return
             
-        # AQUI ESTABA EL BUCLE ASESINO, YA LO QUITAMOS
+        # --- AQUI ESTABA EL BUCLE ASESINO, YA LO QUITAMOS ---
         if sistema_bloqueado():
-            st.warning("⚠️ El sistema no esta configurado. No hay periodo activo con alumnos.")
+            st.warning("⚠️ El sistema no está configurado. No hay periodo activo con alumnos cargados.")
             if st.session_state["user"]["rol"] == "Admin":
                 st.info("Ve a Auditoria -> Periodos para crear un periodo y subir el Excel de alumnos.")
-                # Solo dibujamos el menú para que puedas navegar
+                # Solo dibujamos el menú para que puedas navegar, sin forzar la vista
                 menu_lateral()
             else:
                 st.info("Contacta al Administrador.")
@@ -6435,8 +6447,13 @@ def main():
         if op:
             _enrutar(op, st.session_state["user"])
             
+    except sqlite3.OperationalError as e:
+        st.error("Error de base de datos: " + str(e))
+        st.info("Verifica que el archivo asistencia.db no esté bloqueado.")
+        log.exception("Error de BD en main")
     except Exception as e:
-        st.error(f"Error inesperado: {e}")
+        st.error("Error inesperado: " + str(e))
+        st.info("El error quedó registrado en logs/app.log.")
         log.exception("Error en main")
 
 if __name__ == "__main__":
