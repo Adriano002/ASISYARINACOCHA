@@ -1,222 +1,244 @@
 # db.py
-# Este archivo se encarga de hablar con la base de datos SQLite.
-# Aquí abrimos la conexión, escribimos, leemos y cerramos.
-# Todo está documentado como si le explicaras a un amigo.
-
+import os
 import sqlite3
-import queue
 import threading
-import streamlit as st
+import logging
 from pathlib import Path
+from contextlib import contextmanager
+from datetime import datetime, date, time
+
+log = logging.getLogger("db")
+
+# Volvemos al nombre original para recuperar los datos
+DB_PATH = Path("data/asistencia.db")
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+_local = threading.local()
+
+def _q(sql: str) -> str:
+    return sql.replace("%s", "?")
 
 
-# La base de datos vive en data/asistencia.db.
-# Si la carpeta no existe, la creamos.
-RUTA_BASE_DATOS = Path("data/asistencia.db")
-RUTA_BASE_DATOS.parent.mkdir(parents=True, exist_ok=True)
-
-
-# ─────────────────────────────────────────────────────────────
-# CONEXIÓN A LA BASE DE DATOS
-# ─────────────────────────────────────────────────────────────
-
-@st.cache_resource
+# 
 def obtener_conexion():
-    """
-    Abre la conexión a SQLite una sola vez y la reutiliza.
-    El decorador @st.cache_resource hace que Streamlit guarde
-    esta conexión en memoria y no la vuelva a abrir en cada
-    interacción del usuario. Esto ahorra mucha RAM.
-    """
-    conexion = sqlite3.connect(
-        str(RUTA_BASE_DATOS),
-        timeout=30,
-        check_same_thread=False,  # Necesario para compartir entre hilos
-        isolation_level=None,
-    )
-    conexion.row_factory = sqlite3.Row
-
-    # WAL permite leer mientras se escribe. Muy importante para
-    # que el escaneo no se bloquee cuando hay varias personas.
-    conexion.execute("PRAGMA journal_mode=WAL")
-    conexion.execute("PRAGMA synchronous=NORMAL")
-    conexion.execute("PRAGMA busy_timeout=5000")
-    conexion.execute("PRAGMA foreign_keys=ON")
-    return conexion
+    con = getattr(_local, "con", None)
+    if con is None:
+        con = sqlite3.connect(
+            str(DB_PATH),
+            timeout=30,
+            check_same_thread=False,
+            isolation_level=None,
+        )
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=5000")
+        cur.execute("PRAGMA foreign_keys=ON")
+        _local.con = con
+    return con
 
 
-# ─────────────────────────────────────────────────────────────
-# LECTURA (SELECT)
-# ─────────────────────────────────────────────────────────────
+def liberar_conexion(con):
+    try:
+        if con.in_transaction:
+            con.commit()
+    except Exception:
+        pass
+class CursorWrapper:
+    """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
+    def __init__(self, cursor):
+        self._cur = cursor
+        self.lastrowid = None
+        self.description = None
 
-def leer_dataframe(consulta, parametros=()):
-    """
-    Ejecuta una consulta SELECT y devuelve un DataFrame de pandas.
-    Si no hay resultados, devuelve un DataFrame vacío.
-    """
-    import pandas as pd
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(consulta, parametros)
-    filas = cursor.fetchall()
-    if not filas:
-        return pd.DataFrame()
-    return pd.DataFrame([dict(fila) for fila in filas])
+    def execute(self, sql, params=()):
+        r = self._cur.execute(_q(sql), params)
+        self.lastrowid = self._cur.lastrowid
+        self.description = self._cur.description
+        return r
 
+    def executemany(self, sql, seq):
+        r = self._cur.executemany(_q(sql), seq)
+        self.lastrowid = self._cur.lastrowid
+        self.description = self._cur.description
+        return r
 
-def leer_uno(consulta, parametros=()):
-    """
-    Ejecuta una consulta SELECT y devuelve la primera fila
-    como diccionario, o None si no hay resultados.
-    """
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(consulta, parametros)
-    fila = cursor.fetchone()
-    return dict(fila) if fila else None
+    def fetchone(self):
+        return self._cur.fetchone()
 
+    def fetchall(self):
+        return self._cur.fetchall()
 
-def leer_varios(consulta, parametros=()):
-    """
-    Ejecuta una consulta SELECT y devuelve todas las filas
-    como una lista de diccionarios.
-    """
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(consulta, parametros)
-    return [dict(fila) for fila in cursor.fetchall()]
+    def fetchmany(self, size=None):
+        return self._cur.fetchmany(size) if size else self._cur.fetchmany()
 
-# ESCRITURA (INSERT, UPDATE, DELETE) — CON COLA
+    def close(self):
+        return self._cur.close()
 
-#
-# ¿Por qué una cola?
-# Porque SQLite no permite que dos personas escriban al mismo
-# tiempo. Si 6 auxiliares escanean a la vez, las escrituras
-# chocan y la base de datos se bloquea ("database is locked").
-#
-# La solución es una cola: cada escritura se pone en una fila
-# y un solo trabajador las procesa una por una. Es como la
-# fila del banco: todos esperan su turno, pero nadie choca.
-#
-# El escaneo NO espera a que la escritura termine. Solo la
-# encola y sigue. Por eso el escaneo es rápido.
-
-COLA_ESCRITURA = queue.Queue()
+    def __iter__(self):
+        return iter(self._cur)
 
 
-def _trabajador_escrituras():
-    """
-    Este es el trabajador que procesa la cola.
-    Se ejecuta en un hilo aparte, en segundo plano.
-    """
-    while True:
-        consulta, parametros = COLA_ESCRITURA.get()
+@contextmanager
+def cursor(dict_rows=True):
+    con = obtener_conexion()
+    cur = CursorWrapper(con.cursor())
+    try:
+        yield con, cur
+    except Exception:
         try:
-            conexion = obtener_conexion()
-            conexion.execute(consulta, parametros)
-            conexion.commit()
-        except Exception as error:
-            print(f"Error al escribir en la base de datos: {error}")
-        finally:
-            COLA_ESCRITURA.task_done()
+            con.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            if con.in_transaction:
+                con.commit()
+        except Exception:
+            pass
 
 
-# Iniciamos el trabajador una sola vez cuando se carga el módulo.
-# El parámetro daemon=True hace que el hilo se cierre cuando
-# la app se cierra.
-HILO_ESCRITURA = threading.Thread(
-    target=_trabajador_escrituras,
-    daemon=True
-)
-HILO_ESCRITURA.start()
+def escribir(sql, params=()):
+  
+    with cursor() as (con, cur):
+        cur.execute(sql, params)
+        con.commit()
 
 
-def escribir_seguro(consulta, parametros=()):
-    """
-    Encola una escritura (INSERT, UPDATE, DELETE).
-    No espera a que termine. Es rápido.
-    Úsalo en el flujo de escaneo.
-    """
-    COLA_ESCRITURA.put((consulta, parametros))
+def leer_df(sql, params=(), con=None):
+    import pandas as pd
+    con_local = con or obtener_conexion()
+    cur = con_local.cursor()
+    cur.execute(_q(sql), params)
+    filas = cur.fetchall()
+    if not filas:
+        cols = [d[0] for d in cur.description] if cur.description else []
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame([dict(r) for r in filas])
 
 
-def escribir_y_esperar(consulta, parametros=()):
-    """
-    Encola una escritura y ESPERA a que termine.
-    Devuelve el lastrowid (el ID del registro insertado).
-    Úsalo solo cuando necesites el ID del nuevo registro
-    (por ejemplo, al crear una incidencia y luego asociarle
-    decomisos). NO lo uses en el flujo de escaneo.
-    """
-    conexion = obtener_conexion()
-    cursor = conexion.execute(consulta, parametros)
-    conexion.commit()
-    return cursor.lastrowid
+def to_time(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, time):
+        return v.strftime("%H:%M")
+    if isinstance(v, datetime):
+        return v.strftime("%H:%M")
+    return str(v)[:5]
 
 
-# ─────────────────────────────────────────────────────────────
-# FUNCIONES DE FECHA Y HORA
-# ─────────────────────────────────────────────────────────────
-
-def obtener_fecha_hora_actual():
-    """
-    Devuelve la fecha y hora actual en hora de Perú (UTC-5).
-    Uso timezone.utc porque así es como Streamlit Cloud
-    maneja la hora internamente.
-    """
-    from datetime import datetime, timedelta, timezone
-    return datetime.now(timezone.utc) - timedelta(hours=5)
+def to_date(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d")
+    if isinstance(v, date):
+        return v.strftime("%Y-%m-%d")
+    return str(v)[:10]
 
 
-def obtener_fecha_actual():
-    """Devuelve solo la fecha de hoy (YYYY-MM-DD) en hora de Perú."""
-    return obtener_fecha_hora_actual().strftime("%Y-%m-%d")
+def to_ts(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    return str(v)[:19]
 
 
-def obtener_hora_actual():
-    """Devuelve solo la hora actual (HH:MM) en hora de Perú."""
-    return obtener_fecha_hora_actual().strftime("%H:%M")
-
-
-def obtener_timestamp_actual():
-    """Devuelve fecha y hora completas (YYYY-MM-DD HH:MM:SS)."""
-    return obtener_fecha_hora_actual().strftime("%Y-%m-%d %H:%M:%S")
-
-
-# ─────────────────────────────────────────────────────────────
-# FORMATO DE FECHAS Y HORAS (para mostrar en la UI)
-# ─────────────────────────────────────────────────────────────
-
-def formatear_fecha(valor):
-    """Convierte una fecha a texto YYYY-MM-DD."""
-    if valor is None:
+def fmt_time(v, con_seg=False):
+    if v is None:
         return ""
-    from datetime import datetime, date
-    if isinstance(valor, datetime):
-        return valor.strftime("%Y-%m-%d")
-    if isinstance(valor, date):
-        return valor.strftime("%Y-%m-%d")
-    return str(valor)[:10]
+    if isinstance(v, time):
+        return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
+    if isinstance(v, datetime):
+        return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
+    s = str(v)
+    return s[:8] if con_seg else (s[:5] if len(s) >= 5 else s)
 
 
-def formatear_hora(valor):
-    """Convierte una hora a texto HH:MM."""
-    if valor is None:
+def fmt_date(v):
+    if v is None:
         return ""
-    from datetime import datetime, time
-    if isinstance(valor, datetime):
-        return valor.strftime("%H:%M")
-    if isinstance(valor, time):
-        return valor.strftime("%H:%M")
-    texto = str(valor)
-    return texto[:5] if len(texto) >= 5 else texto
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d")
+    if isinstance(v, date):
+        return v.strftime("%Y-%m-%d")
+    return str(v)[:10]
 
 
-def formatear_timestamp(valor):
-    """Convierte un timestamp a texto YYYY-MM-DD HH:MM:SS."""
-    if valor is None:
+def fmt_ts(v):
+    if v is None:
         return ""
-    from datetime import datetime
-    if isinstance(valor, datetime):
-        return valor.strftime("%Y-%m-%d %H:%M:%S")
-    return str(valor)[:19]
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    return str(v)[:19]
+
+
+def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
+    out = dict(d)
+    for k in campos_time:
+        if k in out:
+            out[k] = fmt_time(out[k])
+    for k in campos_date:
+        if k in out:
+            out[k] = fmt_date(out[k])
+    for k in campos_ts:
+        if k in out:
+            out[k] = fmt_ts(out[k])
+    return out
+
+
+
+def ping():
+    try:
+        with cursor() as (con, cur):
+            cur.execute("SELECT 1")
+        return True
+    except Exception as e:
+        log.warning(f"ping fallo: {e}")
+        reset_pool()
+        try:
+            with cursor() as (con, cur):
+                cur.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+
+
+def reset_pool():
+    con = getattr(_local, "con", None)
+    if con is not None:
+        try:
+            con.close()
+        except Exception:
+            pass
+        _local.con = None
+
+
+def descargar_bd_si_no_existe():
+    # Si el archivo local ya existe y no está vacío, NO descargues de R2
+    if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
+        return True
+    
+    # Si no existe, intenta descargarlo de R2
+    try:
+        from sync import descargar_bd
+        ok = descargar_bd(DB_PATH)
+        if ok:
+            log.info("BD descargada desde R2")
+            reset_pool()
+        return ok
+    except Exception as e:
+        log.warning(f"No se pudo descargar BD desde R2: {e}")
+        return False
+
+
+def subir_bd_a_r2():
+    try:
+        from sync import subir_bd
+        return subir_bd(DB_PATH)
+    except Exception as e:
+        log.error(f"Error subiendo BD a R2: {e}")
+        return False
