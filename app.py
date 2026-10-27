@@ -5040,14 +5040,13 @@ def vista_auditoria():
         
         periodo_activo = obtener_periodo_activo()
         if periodo_activo:
-            st.success(f"✅ Periodo activo actual: **{periodo_activo['nombre']}** "
+            st.success(f"✅ Periodo activo: **{periodo_activo['nombre']}** "
                        f"({periodo_activo['fecha_inicio']} al {periodo_activo['fecha_fin']})")
         else:
             st.warning("⚠️ No hay ningún periodo activo. El sistema está bloqueado.")
             
         st.markdown("---")
         st.subheader("Crear Nuevo Periodo")
-        st.info("Si el sistema está bloqueado o necesitas empezar un año nuevo, crea el periodo aquí.")
         
         with st.form("form_crear_periodo_manual"):
             c1, c2, c3 = st.columns(3)
@@ -5064,13 +5063,20 @@ def vista_auditoria():
                 if not nombre.strip():
                     st.error("El nombre es obligatorio.")
                 else:
-                    ok, msg = crear_periodo_manual(nombre, fi, ff, usuario)
-                    if ok:
-                        st.toast(msg)
+                    try:
+                        with cursor() as (con, cur):
+                            cur.execute("UPDATE periodos SET activo = 0")
+                            cur.execute(
+                                "INSERT INTO periodos(nombre, fecha_inicio, fecha_fin, activo, cerrado) "
+                                "VALUES(?, ?, ?, 1, 0)",
+                                (nombre, to_date(fi), to_date(ff))
+                            )
+                        auditar(usuario["usuario"], f"Creó periodo manual: {nombre}")
+                        st.success("Periodo creado y activado.")
                         time.sleep(1)
                         st.rerun()
-                    else:
-                        st.error(msg)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
         st.markdown("---")
         st.subheader("Historial de Periodos")
@@ -6407,7 +6413,6 @@ def main():
             return
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
-            st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
         if st.session_state["user"].get("debe_cambiar_password"):
             vista_cambio_password_obligatorio()
@@ -6415,17 +6420,17 @@ def main():
         if modo_mantenimiento() and st.session_state["user"]["rol"] != "Admin":
             vista_mantenimiento()
             return
+            
+        # AQUI ESTA EL CAMBIO PARA QUE NO TE BLOQUEE
         if sistema_bloqueado():
-            st.warning("El sistema no esta configurado. No hay periodo activo "
-                       "con alumnos cargados.")
+            st.warning("El sistema no esta configurado. No hay periodo activo con alumnos.")
             if st.session_state["user"]["rol"] == "Admin":
-                st.info("Ve a Auditoria -> Periodos para crear un periodo y subir "
-                        "el Excel de alumnos.")
-                st.session_state["menu"] = "Auditoria"
-                _enrutar("Auditoria", st.session_state["user"])
+                st.info("Ve a Auditoria para crear un periodo y subir el Excel.")
+                vista_auditoria() # Forzamos la vista para que puedas crear el periodo
             else:
                 st.info("Contacta al Administrador.")
             return
+            
         _control_faltas()
         op = menu_lateral()
         if op:
@@ -6433,6 +6438,3 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
-if __name__ == "__main__":
-    main()
