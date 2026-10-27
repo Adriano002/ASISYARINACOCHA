@@ -2543,7 +2543,10 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
-    f_frase = _font(46, bold=True, italic=True) 
+    
+    # 👇 EL TRUCO: Le subimos el tamaño a 55 y le quitamos las comillas para que quepa bien grande
+    f_frase = _font(55, bold=True, italic=True) 
+    
     f_label = _font(26, bold=True)
 
     esc_size = int(FRANJA_W * 0.75)
@@ -2677,49 +2680,21 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE EN CURVA Y CON DIBUJOS REDONDOS 👇
+    # 👇 FRASE GIGANTE, RECTA Y SIN ADORNOS 👇
     # =====================================================================
-    frase = '"Ser del CNY, es ser mejor"'
+    frase = 'Ser del CNY, es ser mejor'
     
     try:
         bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
-        fh = bbox[3] - bbox[1]
     except Exception:
-        fw = 450
-        fh = 46
+        fw = 500
 
     frase_centro_x = DER_X + espacio_d // 2
-    frase_y = ALTO_PX - 75
+    frase_x = frase_centro_x - (fw // 2)
+    frase_y = ALTO_PX - 70 # Bien posicionada abajo
 
-    # 1. CREAMOS LA CURVA TIPO WORD (Sonrisa suave)
-    lienzo_texto = Image.new("L", (fw + 20, fh + 20), 0)
-    draw_texto = ImageDraw.Draw(lienzo_texto)
-    draw_texto.text((10, 10), frase, font=f_frase, fill=255)
-
-    lienzo_curva = Image.new("L", (fw + 20, fh + 20), 0)
-    draw_curva = ImageDraw.Draw(lienzo_curva)
-    radio_curva = 1200 
-    draw_curva.ellipse(
-        [10 - radio_curva, 10 - radio_curva, 10 + fw + radio_curva, 10 + fh + radio_curva], 
-        fill=255
-    )
-    
-    lienzo_texto = Image.composite(lienzo_texto, Image.new("L", (fw + 20, fh + 20), 0), lienzo_curva)
-    
-    texto_curvo_final = Image.new("RGBA", (fw + 20, fh + 20), (0,0,0,0))
-    texto_curvo_final.paste(NARANJA_FRANJA, (0,0), lienzo_texto)
-
-    # 2. PEGAMOS LA FRASE EN EL CARNET
-    img.paste(texto_curvo_final, (frase_centro_x - fw // 2 - 10, frase_y - 10), texto_curvo_final)
-
-    # 3. DIBUJAMOS LAS VIÑETAS REDONDAS (Usando los rombos de Arial que son perfectos)
-    f_vineta = _font(32, bold=True)
-    
-    # Una viñeta a la izquierda
-    _dibujar_texto(frase_centro_x - (fw // 2) - 45, frase_y, "✦", f_vineta, NARANJA_FRANJA)
-    # Una viñeta a la derecha
-    _dibujar_texto(frase_centro_x + (fw // 2) + 20, frase_y, "✦", f_vineta, NARANJA_FRANJA)
+    _dibujar_texto(frase_x, frase_y, frase, f_frase, NARANJA_FRANJA)
 
     return img
     def _dibujar_texto(x, y, texto, font, color):
