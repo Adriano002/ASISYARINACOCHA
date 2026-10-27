@@ -2542,10 +2542,12 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
 
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
+    
+    # TÍTULO DE ARRIBA (TAMAÑO 32)
     f_titulo = _font(32, bold=True)
     
-    # 👇 TAMAÑO 32 (igual que el título) Y EN CURSIVA
-    f_frase = _font(32, bold=True, italic=True) 
+    # 👇 FRASE TAMAÑO 32 EXACTO (Igual que el título) SIN CURSIVA 👇
+    f_frase = _font(32, bold=True, italic=False) 
     
     f_label = _font(26, bold=True)
 
@@ -2680,9 +2682,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE RECTA, TAMAÑO 32 (igual al título) Y CON COMILLAS DOBLES 👇
+    # 👇 FRASE TAMAÑO 32 (Igual que el título) SIN COMILLAS Y RECTA 👇
     # =====================================================================
-    frase = '"Ser del CNY, es ser mejor"'
+    frase = 'Ser del CNY, es ser mejor'
     
     frase_centro_x = DER_X + espacio_d // 2
     frase_y = ALTO_PX - 55 
@@ -2693,7 +2695,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         fw = 500
 
-    # Dibujado directo, recto y centrado
     _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase, NARANJA_FRANJA)
 
     return img
