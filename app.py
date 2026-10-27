@@ -6401,9 +6401,9 @@ def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
-    try:
-        from db import descargar_bd_si_no_existe
-        descargar_bd_si_no_existe()
+    #try:
+       # from db import descargar_bd_si_no_existe
+        #descargar_bd_si_no_existe()
 
         inicializar_bd()
         aplicar_estilos()
