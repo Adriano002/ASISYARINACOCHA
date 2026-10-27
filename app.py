@@ -2544,7 +2544,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     
-    # 👇 TAMAÑO EXACTO DEL TÍTULO (32) Y EN CURSIVA
+    # 👇 TAMAÑO 32 (igual que el título) Y EN CURSIVA
     f_frase = _font(32, bold=True, italic=True) 
     
     f_label = _font(26, bold=True)
@@ -2680,7 +2680,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE CON COMILLAS, TAMAÑO DEL TÍTULO (32) Y EN CURSIVA 👇
+    # 👇 FRASE RECTA, TAMAÑO 32 (igual al título) Y CON COMILLAS DOBLES 👇
     # =====================================================================
     frase = '"Ser del CNY, es ser mejor"'
     
@@ -2693,7 +2693,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         fw = 500
 
-    # Lo dibujamos perfectamente centrado
+    # Dibujado directo, recto y centrado
     _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase, NARANJA_FRANJA)
 
     return img
