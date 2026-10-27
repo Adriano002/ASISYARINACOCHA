@@ -2525,13 +2525,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             return base_font.font_variant(size=size)
         except Exception:
             return ImageFont.load_default()
-
+    
     def _dibujar_texto(x, y, texto, font, color):
-        if "Ñ" not in texto and "ñ" not in texto:
-            draw.text((x, y), texto, fill=color, font=font)
-            return
-        texto_base = texto.replace("Ñ", "N").replace("ñ", "n")
-        draw.text((x, y), texto_base, fill=color, font=font)
+      draw.text((x, y), texto, fill=color, font=font)
 
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
@@ -2621,8 +2617,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         while size > 10:
             f = _font(size, bold=bold)
             try:
-                ancho = draw.textlength(
-                    texto.replace("Ñ", "N").replace("ñ", "n"), font=f)
+                ancho = draw.textlength(texto, font=f)
             except Exception:
                 ancho = len(texto) * size * 0.55
             if ancho <= max_ancho:
