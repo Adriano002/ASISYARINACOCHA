@@ -2478,6 +2478,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     NEGRO = (17, 17, 17)
     GRIS_LABEL = (90, 60, 30)
     GRIS_TXT = (150, 150, 150)
+    
+    DORADO = (180, 140, 60) # Detalle decorativo
 
     img = Image.new("RGB", (ANCHO_PX, ALTO_PX), FONDO)
     draw = ImageDraw.Draw(img)
@@ -2545,7 +2547,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_titulo = _font(32, bold=True)
     f_label = _font(26, bold=True)
 
-    # ESCUDO GRANDE SIN FONDO BLANCO
     esc_size = int(FRANJA_W * 0.75)
     esc_x = (FRANJA_W - esc_size) // 2
     espacio = ALTO_PX - FOTO_H
@@ -2598,8 +2599,15 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     except Exception:
         tw = 280
     espacio_d = ANCHO_PX - DER_X
-    _dibujar_texto(DER_X + (espacio_d - tw) // 2, 10, titulo_txt,
-                   f_titulo, NEGRO)
+    titulo_x = DER_X + (espacio_d - tw) // 2
+    
+    # ── DETALLE 1: Líneas doradas sutiles a los lados del título ──
+    line_y = 28
+    line_len = 40
+    draw.line([(titulo_x - line_len - 10, line_y), (titulo_x - 10, line_y)], fill=DORADO, width=2)
+    draw.line([(titulo_x + tw + 10, line_y), (titulo_x + tw + line_len + 10, line_y)], fill=DORADO, width=2)
+
+    _dibujar_texto(titulo_x, 10, titulo_txt, f_titulo, NEGRO)
 
     ap_p = (alumno.get('apellido_paterno') or "").upper()
     ap_m = (alumno.get('apellido_materno') or "").upper()
@@ -2641,9 +2649,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    # ── DATOS COMPACTADOS PARA LIBERAR ESPACIO ABAJO ──
     INFO_Y = 95
-    alto_linea = 52 
+    alto_linea = 60 
     
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
@@ -2675,21 +2682,29 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
                                back_color="white").convert("RGB").resize(
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
     
-    # ── QR BAJADO A LA ALTURA DEL NOMBRE (y=55) ──
-    img.paste(qr_img_pil, (qr_x, 55))
+    img.paste(qr_img_pil, (qr_x, 65))
 
-    # ── FRASE GIGANTE Y BIEN ABAJO ──
     frase = '"Ser del CNY, es ser mejor"'
-    f_frase_gigante = _font(52, bold=True, italic=True)
+    f_frase = _font(46, bold=True, italic=True)
     
     try:
-        bbox = draw.textbbox((0, 0), frase, font=f_frase_gigante)
+        bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
         fw = 500
         
-    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 75, frase,
-                   f_frase_gigante, NARANJA_FRANJA)
+    frase_x = DER_X + (espacio_d - fw) // 2
+    
+    # ── DETALLE 2: Puntitos dorados a los lados de la frase ──
+    frase_y = ALTO_PX - 65
+    draw.ellipse([frase_x - 20, frase_y + 25, frase_x - 12, frase_y + 33], fill=DORADO)
+    draw.ellipse([frase_x + fw + 12, frase_y + 25, frase_x + fw + 20, frase_y + 33], fill=DORADO)
+
+    _dibujar_texto(frase_x, frase_y, frase, f_frase, NARANJA_FRANJA)
+
+    # ── DETALLE 3: Borde decorativo sutil ──
+    draw.rectangle([2, 2, ANCHO_PX - 3, ALTO_PX - 3], outline=DORADO, width=1)
+    draw.rectangle([6, 6, ANCHO_PX - 7, ALTO_PX - 7], outline=DORADO, width=1)
 
     return img
     
