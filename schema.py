@@ -1,12 +1,6 @@
-# schema.py
-"""Schema SQLite. Idempotente: se puede ejecutar siempre."""
 import logging
-
-from db import cursor
-
+from db import obtener_conexion
 log = logging.getLogger("asistencia.schema")
-
-
 TABLAS = [
     """
     CREATE TABLE IF NOT EXISTS periodos (
@@ -231,27 +225,39 @@ TABLAS = [
         valor TEXT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS cierres_ventana (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ventana_id INTEGER NOT NULL,
+        fecha TEXT NOT NULL,
+        marcado_en TEXT NOT NULL,
+        UNIQUE(ventana_id, fecha)
+    )
+    """,
 ]
 
 
 INDICES = [
-    "CREATE INDEX IF NOT EXISTS idx_ast_f ON asistencias(fecha)",
-    "CREATE INDEX IF NOT EXISTS idx_ast_a ON asistencias(alumno_id)",
-    "CREATE INDEX IF NOT EXISTS idx_tard_a ON tardanzas(alumno_id)",
-    "CREATE INDEX IF NOT EXISTS idx_tard_f ON tardanzas(fecha)",
-    "CREATE INDEX IF NOT EXISTS idx_al_dni ON alumnos(dni)",
-    "CREATE INDEX IF NOT EXISTS idx_al_sec ON alumnos(seccion_id)",
-    "CREATE INDEX IF NOT EXISTS idx_vent_t ON ventanas(turno_id, tipo)",
-    "CREATE INDEX IF NOT EXISTS idx_bloq_a ON bloqueos(alumno_id, activo)",
-    "CREATE INDEX IF NOT EXISTS idx_aud_f ON auditoria(fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_ast_fecha ON asistencias(fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_ast_alumno ON asistencias(alumno_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ast_alumno_fecha_tipo ON asistencias(alumno_id, fecha, tipo)",
+    "CREATE INDEX IF NOT EXISTS idx_tardanzas_alumno ON tardanzas(alumno_id)",
+    "CREATE INDEX IF NOT EXISTS idx_tardanzas_fecha ON tardanzas(fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_tardanzas_alumno_fecha ON tardanzas(alumno_id, fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_alumnos_dni ON alumnos(dni)",
+    "CREATE INDEX IF NOT EXISTS idx_alumnos_seccion ON alumnos(seccion_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ventanas_turno_tipo ON ventanas(turno_id, tipo)",
+    "CREATE INDEX IF NOT EXISTS idx_bloqueos_alumno_activo ON bloqueos(alumno_id, activo)",
+    "CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_permisos_alumno_activo ON permisos(alumno_id, activo, fecha_inicio, fecha_fin)",
 ]
-
-
 def aplicar_schema():
-    """Ejecuta todo el schema (idempotente)."""
-    with cursor() as (con, cur):
-        for sql in TABLAS:
-            cur.execute(sql)
-        for sql in INDICES:
-            cur.execute(sql)
-    log.info("schema aplicado (SQLite)")
+    """Crea todas las tablas e índices si no existen."""
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    for sentencia in TABLAS:
+        cursor.execute(sentencia)
+    for sentencia in INDICES:
+        cursor.execute(sentencia)
+    conexion.commit()
+    log.info("Esquema de base de datos aplicado.")
