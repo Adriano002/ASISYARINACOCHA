@@ -6410,14 +6410,17 @@ def main():
     try:
         inicializar_bd()
         aplicar_estilos()
+        inicializar_sesion()
         
-        # Si no hay usuario, mostramos login
         if not st.session_state.get("user"):
             vista_login()
             return
             
+        refrescar_sesion_si_necesario()
+        
         if not _verificar_admin_activo():
             st.error("No hay Admin principal activo en el sistema.")
+            st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
             
         if st.session_state["user"].get("debe_cambiar_password"):
@@ -6428,16 +6431,32 @@ def main():
             vista_mantenimiento()
             return
             
-        # --- AQUI ESTABA EL BUCLE, YA NO ESTÁ ---
+        # --- BLOQUEO DE SEGURIDAD PERO CON ACCESO A CONFIGURACIÓN ---
         if sistema_bloqueado():
             st.warning("⚠️ El sistema no está configurado. No hay periodo activo con alumnos cargados.")
+            
             if st.session_state["user"]["rol"] == "Admin":
                 st.info("Ve a Auditoria -> Periodos para crear un periodo y subir el Excel de alumnos.")
-                menu_lateral() # Solo dibuja el menú
             else:
                 st.info("Contacta al Administrador.")
-            return
+                st.stop() # Los que no son admin se quedan atascados aquí
+
+            # El truco: Dibujamos el menú lateral y dejamos que el Admin navegue
+            op = menu_lateral()
             
+            if op == "Auditoria":
+                _enrutar("Auditoria", st.session_state["user"])
+            elif op == "Mi cuenta":
+                _enrutar("Mi cuenta", st.session_state["user"])
+            elif op == "Backup":
+                _enrutar("Backup", st.session_state["user"])
+            else:
+                # Si intenta ir a Puerta, Alumnos, etc., le mostramos el mensaje otra vez
+                st.stop()
+            
+            return # Detenemos la ejecución para que no siga al resto de la app
+            
+        # --- FLUJO NORMAL (Si ya hay periodo y alumnos) ---
         _control_faltas()
         op = menu_lateral()
         if op:
