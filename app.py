@@ -2544,8 +2544,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
     
-    # La frase será tamaño 46, NEGRITA pero SIN CURSIVA (para que ocupe menos)
-    f_frase = _font(46, bold=True, italic=False) 
+    # 👇 TAMAÑO EXACTO DEL TÍTULO (32) Y EN CURSIVA
+    f_frase = _font(32, bold=True, italic=True) 
     
     f_label = _font(26, bold=True)
 
@@ -2680,22 +2680,21 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     img.paste(qr_img_pil, (qr_x, 65))
 
     # =====================================================================
-    # 👇 FRASE EN UNA SOLA LÍNEA, GRANDE Y CENTRADA AUTOMÁTICAMENTE 👇
+    # 👇 FRASE CON COMILLAS, TAMAÑO DEL TÍTULO (32) Y EN CURSIVA 👇
     # =====================================================================
-    frase = 'Ser del CNY es ser mejor'
-    frase_centro_x = DER_X + espacio_d // 2
-    frase_y = ALTO_PX - 65 
-
-    # Usamos _ajustar para que crezca lo máximo posible sin salirse del carnet
-    f_frase_final = _ajustar(frase, 46, espacio_d - 20, True)
+    frase = '"Ser del CNY, es ser mejor"'
     
+    frase_centro_x = DER_X + espacio_d // 2
+    frase_y = ALTO_PX - 55 
+
     try:
-        bbox = draw.textbbox((0, 0), frase, font=f_frase_final)
+        bbox = draw.textbbox((0, 0), frase, font=f_frase)
         fw = bbox[2] - bbox[0]
     except Exception:
         fw = 500
 
-    _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase_final, NARANJA_FRANJA)
+    # Lo dibujamos perfectamente centrado
+    _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase, NARANJA_FRANJA)
 
     return img
 def _render_carnets(filas, titulo=None):
