@@ -2524,7 +2524,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         for n in nombres:
             try:
                 return ImageFont.truetype(str(BASE_DIR / n), size)
-            except Exception as e:
+            except Exception:
                 pass
 
         fallback = ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -2543,8 +2543,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
     f_titulo = _font(32, bold=True)
-    # 👇 AUMENTAMOS EL TAMAÑO DE LA FRASE
-    f_frase = _font(38, bold=True, italic=True) 
     f_label = _font(26, bold=True)
 
     # ESCUDO GRANDE SIN FONDO BLANCO
@@ -2643,9 +2641,9 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
             size -= 1
         return _font(10, bold=bold)
 
-    # 👇 AJUSTAMOS LA ALTURA PARA QUE ESTÉ A LA ALTURA DEL QR
-    INFO_Y = 90
-    alto_linea = 58 # Un poco más compacto para que quepa bien
+    # ── DATOS COMPACTADOS PARA LIBERAR ESPACIO ABAJO ──
+    INFO_Y = 95
+    alto_linea = 52 
     
     ap_full = ap_p + " " + ap_m
     _dibujar_texto(info_x, INFO_Y, ap_full,
@@ -2676,18 +2674,22 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     qr_img_pil = qr.make_image(fill_color="black",
                                back_color="white").convert("RGB").resize(
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
-    # 👇 EL QR TAMBIÉN LO SUBIMOS UN POCO PARA QUE SE VEA CENTRADO
-    img.paste(qr_img_pil, (qr_x, 40))
+    
+    # ── QR BAJADO A LA ALTURA DEL NOMBRE (y=55) ──
+    img.paste(qr_img_pil, (qr_x, 55))
 
+    # ── FRASE GIGANTE Y BIEN ABAJO ──
     frase = '"Ser del CNY, es ser mejor"'
+    f_frase_gigante = _font(52, bold=True, italic=True)
+    
     try:
-        bbox = draw.textbbox((0, 0), frase, font=f_frase)
+        bbox = draw.textbbox((0, 0), frase, font=f_frase_gigante)
         fw = bbox[2] - bbox[0]
     except Exception:
-        fw = 350
-    # 👇 LA FRASE LA PONEMOS MÁS ABAJO Y CENTRADA
-    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 60, frase,
-                   f_frase, NARANJA_FRANJA)
+        fw = 500
+        
+    _dibujar_texto(DER_X + (espacio_d - fw) // 2, ALTO_PX - 75, frase,
+                   f_frase_gigante, NARANJA_FRANJA)
 
     return img
     
