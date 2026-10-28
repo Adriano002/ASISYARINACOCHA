@@ -6648,7 +6648,16 @@ def _enrutar(op, usuario):
         
     v()
 
-
+def _control_faltas():
+    ult = st.session_state.get("_ultimo_control_faltas")
+    t = time.time()
+    if ult and (t - ult) < 300:
+        return
+    st.session_state["_ultimo_control_faltas"] = t
+    try:
+        marcar_faltas_al_cierre()
+    except Exception as e:
+        log.warning(f"No se pudieron procesar faltas al cierre: {e}")
 # ─── MAIN ──────────────────────────────────────────────────────────────────
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
