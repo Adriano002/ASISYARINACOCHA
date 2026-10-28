@@ -1564,8 +1564,14 @@ def escaner_qr_continuo(key="qr_scanner"):
     st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
                 '<div class="scan-sub">Apunta al código del alumno</div></div>',
                 unsafe_allow_html=True)
-    mount_id = st.session_state.get("_qr_mount_id", 0)
-    result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
+
+    # 🆕 Si acabamos de desbloquear, NO montamos el escáner todavía para que se lea el mensaje
+    if st.session_state.get("_qr_desbloqueo_exitoso"):
+        result = None
+    else:
+        mount_id = st.session_state.get("_qr_mount_id", 0)
+        result = qr_scanner(key=f"qr_{key}_{mount_id}", on_scan=lambda: None)
+
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
@@ -1599,6 +1605,7 @@ def escaner_qr_continuo(key="qr_scanner"):
         if st.button("OK, entendido", key="ok_desbloq_msg",
                      type="secondary"):
             st.session_state.pop("_qr_desbloqueo_exitoso", None)
+            st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
             st.rerun()
 
     mensajes = st.session_state.get("_qr_mensajes", [])
