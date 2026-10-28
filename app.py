@@ -3586,7 +3586,7 @@ def vista_bloqueados():
         
         clave_man = "bloq_man"
         
-        # 🆕 Verificamos si hay un alumno seleccionado para mostrarle sus datos
+        # Verificamos si hay un alumno seleccionado
         al_man_id = st.session_state.get("bloq_man_sel_id")
         
         if not al_man_id:
@@ -3602,7 +3602,7 @@ def vista_bloqueados():
             if not al_man:
                 return
         else:
-            # Si ya hay uno seleccionado, lo buscamos directamente
+            # Si ya hay uno seleccionado, lo buscamos
             with cursor() as (con, cur):
                 cur.execute("""
                     SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
@@ -3612,6 +3612,7 @@ def vista_bloqueados():
                     WHERE a.id=?
                 """, (al_man_id,))
                 al_man_row = cur.fetchone()
+                
             if not al_man_row:
                 st.session_state.pop("bloq_man_sel_id", None)
                 st.rerun()
@@ -3646,7 +3647,7 @@ def vista_bloqueados():
                     crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
                     st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
                     
-                    # 🆕 LIMPIAMOS TODOS LOS ESTADOS DEL SELECTOR PARA QUE APAREZCAN LOS BOTONES DE NUEVO
+                    # 🆕 LIMPIEZA TOTAL DE MEMORIA PARA QUE APAREZCAN LOS BOTONES DE NUEVO
                     st.session_state.pop("bloq_man_sel_id", None)
                     _reset_selector(clave_man)
                     st.rerun()
