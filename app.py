@@ -1579,9 +1579,8 @@ def escaner_qr_continuo(key="qr_scanner"):
             st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
             
-            # 🆕 Solo forzamos recarga de pantalla si el alumno está bloqueado 
-            # (para mostrar los botones de desbloqueo). 
-            # Si es puntual/tardanza, el mensaje sale fluido sin matar la cámara.
+            # 🆕 SOLO recargamos si el alumno está bloqueado (para ver los botones).
+            # Si es puntual, tardanza o error, NO recargamos para que la cámara fluya.
             m = st.session_state.get("_qr_mensajes", [{}])[0]
             if m.get("tipo") == "BLOQUEADO":
                 st.rerun()
@@ -6617,18 +6616,16 @@ def _enrutar(op, usuario):
         st.error("Sin permisos.")
         auditar(usuario["usuario"], "Intento acceso no autorizado a " + op)
         return
+        
     if op != "Reportes":
         st.session_state.pop("_rep_iniciado", None)
+        
+    # 🆕 DESTRUIR CÁMARA AL SALIR DE PUERTA
+    # Si el usuario cambia de pestaña, forzamos la destrucción del componente de la cámara
+    if op != "Puerta":
+        st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
+        
     v()
-
-
-def _control_faltas():
-    ult = st.session_state.get("_ultimo_control_faltas")
-    t = time.time()
-    if ult and (t - ult) < 300:
-        return
-    st.session_state["_ultimo_control_faltas"] = t
-    marcar_faltas_al_cierre()
 
 
 # ─── MAIN ──────────────────────────────────────────────────────────────────
