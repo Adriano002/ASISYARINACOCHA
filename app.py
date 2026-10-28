@@ -3511,95 +3511,124 @@ def vista_bloqueados():
     )
     usuario = st.session_state["user"]
 
-    df = listar_bloqueados()
-    st.metric("Total bloqueados", len(df))
+    tabs = st.tabs(["Lista de Bloqueados", "Bloquear Nuevo Alumno"])
 
-    if df.empty:
-        st.success("No hay alumnos bloqueados actualmente.")
-        return
+    # PESTAÑA 1: VER Y DESBLOQUEAR
+    with tabs[0]:
+        df = listar_bloqueados()
+        st.metric("Total bloqueados", len(df))
 
-    st.dataframe(df, width='stretch', hide_index=True)
-
-    st.markdown("---")
-    st.subheader("Desbloquear alumno")
-
-    clave = "bloq_sel"
-    idsec = _selector_grado_seccion(clave, "Elige el grado del alumno a desbloquear")
-    if not idsec:
-        return
-
-    al = _selector_alumno_accion(
-        clave, idsec,
-        texto_boton="Seleccionar",
-        key_boton="bloq_sel_btn",
-        on_click_key="bloq_al_sel_id")
-    if not al:
-        return
-
-    bloq = alumno_bloqueado(al["id"])
-    if not bloq:
-        st.warning("Este alumno ya no esta bloqueado.")
-        if st.button("Volver", key="bloq_volver_sin_bloqueo"):
-            _reset_selector(clave, "bloq_al_sel_id")
-            st.rerun()
-        return
-
-    st.markdown("---")
-    st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
-                f"{(al['apellido_materno'] or '')}, {al['nombres']}")
-    st.markdown(f"**DNI:** {al['dni']}  \n"
-                f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
-
-    desde = _fecha_ultimo_desbloqueo(al["id"])
-    reincidente = desde is not None
-    n_ciclo = contar_tardanzas_desde_ultimo_desbloqueo(al["id"])
-    limite = calcular_limite(reincidente)
-
-    st.info(f"Motivo del bloqueo: **{bloq['motivo']}**  \n"
-            f"Fecha de bloqueo: **{bloq['fecha_inicio']}**")
-    if reincidente:
-        st.warning(f"Este alumno es **REINCIDENTE**. Al desbloquear tendra "
-                   f"solo **{limite} oportunidad**. "
-                   f"Tardanzas en el ciclo actual: {n_ciclo}.")
-    else:
-        st.info(f"Alumno **nuevo**. Al desbloquear tendra **{limite} oportunidades**. "
-                f"Tardanzas en el ciclo actual: {n_ciclo}.")
-
-    with st.expander("Historial completo de bloqueos", expanded=False):
-        st.dataframe(historial_bloqueos_alumno(al["id"]), width='stretch',
-                     hide_index=True)
-
-    with st.expander("Tardanzas recientes", expanded=False):
-        with cursor() as (con, cur):
-            cur.execute("""
-                SELECT fecha, hora, numero AS "N", accion, justificada
-                FROM tardanzas WHERE alumno_id=?
-                ORDER BY fecha DESC, hora DESC LIMIT 20
-            """, (al["id"],))
-            tard = [dict(r) for r in cur.fetchall()]
-        if tard:
-            st.dataframe(pd.DataFrame(tard), width='stretch', hide_index=True)
+        if df.empty:
+            st.success("No hay alumnos bloqueados actualmente.")
         else:
-            st.write("Sin tardanzas registradas.")
+            st.dataframe(df, width='stretch', hide_index=True)
 
-    st.markdown("---")
-    motivo = st.text_input("Motivo de desbloqueo (obligatorio)",
-                            key=f"bloq_motivo_{al['id']}")
+            st.markdown("---")
+            st.subheader("Desbloquear alumno")
 
-    if confirmar_accion(f"bloq_{al['id']}",
-                        texto_boton="Desbloquear alumno",
-                        texto_check="¿Estas seguro de desbloquear a este alumno?"):
-        if not motivo.strip():
-            st.error("El motivo es obligatorio.")
-        else:
-            liberar_bloqueo(al["id"], usuario, motivo.strip())
-            st.toast(f"Alumno {al['nombres']} desbloqueado.")
-            _reset_selector(clave, "bloq_al_sel_id")
+            clave = "bloq_sel"
+            idsec = _selector_grado_seccion(clave, "Elige el grado del alumno a desbloquear")
+            if not idsec:
+                return
+
+            al = _selector_alumno_accion(
+                clave, idsec,
+                texto_boton="Seleccionar",
+                key_boton="bloq_sel_btn",
+                on_click_key="bloq_al_sel_id")
+            if not al:
+                return
+
+            bloq = alumno_bloqueado(al["id"])
+            if not bloq:
+                st.warning("Este alumno ya no esta bloqueado.")
+                if st.button("Volver", key="bloq_volver_sin_bloqueo"):
+                    _reset_selector(clave, "bloq_al_sel_id")
+                    st.rerun()
+                return
+
+            st.markdown("---")
+            st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
+                        f"{(al['apellido_materno'] or '')}, {al['nombres']}")
+            st.markdown(f"**DNI:** {al['dni']}  \n"
+                        f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
+
+            st.info(f"Motivo del bloqueo: **{bloq['motivo']}**  \n"
+                    f"Fecha de bloqueo: **{bloq['fecha_inicio']}**")
+
+            with st.expander("Historial completo de bloqueos", expanded=False):
+                st.dataframe(historial_bloqueos_alumno(al["id"]), width='stretch',
+                             hide_index=True)
+
+            st.markdown("---")
+            motivo = st.text_input("Motivo de desbloqueo (obligatorio)",
+                                    key=f"bloq_motivo_{al['id']}")
+
+            if confirmar_accion(f"bloq_{al['id']}",
+                                texto_boton="Desbloquear alumno",
+                                texto_check="¿Estas seguro de desbloquear a este alumno?"):
+                if not motivo.strip():
+                    st.error("El motivo es obligatorio.")
+                else:
+                    liberar_bloqueo(al["id"], usuario, motivo.strip())
+                    st.toast(f"Alumno {al['nombres']} desbloqueado.")
+                    _reset_selector(clave, "bloq_al_sel_id")
+                    st.rerun()
+
+            if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
+                _reset_selector(clave, "bloq_al_sel_id")
+                st.rerun()
+
+    # PESTAÑA 2: BLOQUEAR MANUALMENTE
+    with tabs[1]:
+        st.subheader("Bloquear a un alumno manualmente")
+        st.caption("Usa esta opcion si necesitas bloquear a alguien por faltas graves, acumulacion, etc.")
+        
+        clave_man = "bloq_man"
+        idsec_man = _selector_grado_seccion(clave_man, "Elige el grado del alumno a bloquear")
+        if not idsec_man:
+            return
+
+        al_man = _selector_alumno_accion(
+            clave_man, idsec_man,
+            texto_boton="Seleccionar",
+            key_boton="bloq_man_btn",
+            on_click_key="bloq_man_sel_id")
+        if not al_man:
+            return
+
+        bloq_man = alumno_bloqueado(al_man["id"])
+        if bloq_man:
+            st.warning(f"Este alumno ya esta bloqueado (Motivo: {bloq_man['motivo']}).")
+            if st.button("Volver", key="bloq_man_volver"):
+                _reset_selector(clave_man, "bloq_man_sel_id")
+                st.rerun()
+            return
+
+        st.markdown("---")
+        st.markdown(f"### Bloquear a {al_man['apellido_paterno']} "
+                    f"{(al_man['apellido_materno'] or '')}, {al_man['nombres']}")
+        st.markdown(f"**DNI:** {al_man['dni']}  \n"
+                    f"**{al_man['grado']} {al_man['seccion']}** — Turno {al_man['turno']}")
+
+        st.markdown("---")
+        motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)",
+                                       key=f"bloq_man_motivo_{al_man['id']}")
+
+        if confirmar_accion(f"bloq_man_{al_man['id']}",
+                            texto_boton="Bloquear Alumno Ahora",
+                            texto_check="¿Estas seguro de BLOQUEAR a este alumno?"):
+            if not motivo_manual.strip():
+                st.error("El motivo es obligatorio.")
+            else:
+                crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
+                st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
+                _reset_selector(clave_man, "bloq_man_sel_id")
+                st.rerun()
+
+        if st.button("Cancelar", key=f"bloq_man_cancel_{al_man['id']}"):
+            _reset_selector(clave_man, "bloq_man_sel_id")
             st.rerun()
-
-    if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
-        _reset_selector(clave, "bloq_al_sel_id")
-        st.rerun()
 
 
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
