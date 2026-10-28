@@ -1795,7 +1795,7 @@ def _perfil_alumno(idal):
     # BLOQUEO MANUAL
     st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Gestion de Bloqueo Manual</div>', unsafe_allow_html=True)
     if d["bloqueado"]:
-        st.error(f"Este alumno esta BLOQUEADO\n\nMotivo: {d['bloqueo_info'].get('motivo', 'No especificado') if d.get('bloqueo_info') else 'No especificado'}")
+        st.error("Este alumno esta BLOQUEADO actualmente.")
         if st.button("Desbloquear Alumno Ahora", type="primary", width='stretch', key="btn_desbloq_manual"):
             liberar_bloqueo(al["id"], usuario, "Desbloqueado manualmente desde perfil")
             st.toast("Alumno desbloqueado.")
