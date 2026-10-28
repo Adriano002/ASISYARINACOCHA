@@ -2705,10 +2705,13 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     _dibujar_texto(frase_centro_x - (fw // 2), frase_y, frase, f_frase, NARANJA_FRANJA)
 
     return img
+    
 def _render_carnets(filas, titulo=None):
     import tempfile
     import os
-    # 🆕 Usamos un archivo temporal en el disco duro en lugar de la memoria RAM
+    import gc
+
+    # Guardamos el PDF en un archivo temporal, NO en la RAM
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     temp_path = temp_file.name
     temp_file.close()
@@ -2734,25 +2737,30 @@ def _render_carnets(filas, titulo=None):
     if titulo:
         el.append(Paragraph(f"<b>{titulo}</b>", est["Heading2"]))
         el.append(Spacer(1, 6))
+    
     sep_x = 6
     sep_y = 10
     caben_x = 2
     alto_hoja = A4[1] - 2 * m
     caben_y = max(1, int((alto_hoja + sep_y) // (ALTO + sep_y)))
     
-    # Generamos las imágenes una por una
-    fotochecks = [_fotocheck(a) for a in filas]
-    
-    for i in range(0, len(fotochecks), caben_x * caben_y):
-        lote = fotochecks[i:i + caben_x * caben_y]
+    # 👇 AQUÍ ESTÁ EL TRUCO: Procesamos de 2 en 2, no todos de golpe
+    for i in range(0, len(filas), caben_x * caben_y):
+        lote = filas[i:i + caben_x * caben_y]
+        
+        # Generamos SOLO las imágenes de este lote
+        fotochecks_lote = [_fotocheck(a) for a in lote]
+        
         tabla_filas = []
-        for j in range(0, len(lote), caben_x):
-            fila = lote[j:j + caben_x]
+        for j in range(0, len(fotochecks_lote), caben_x):
+            fila = fotochecks_lote[j:j + caben_x]
             while len(fila) < caben_x:
                 fila.append("")
             tabla_filas.append(fila)
+            
         while len(tabla_filas) < caben_y:
             tabla_filas.append([""] * caben_x)
+            
         t = Table(tabla_filas, colWidths=[ANCHO, ANCHO],
                   rowHeights=[ALTO] * len(tabla_filas), hAlign="CENTER")
         t.setStyle(TableStyle([
@@ -2764,12 +2772,17 @@ def _render_carnets(filas, titulo=None):
             ("BOTTOMPADDING", (0, 0), (-1, -1), sep_y / 2),
         ]))
         el.append(t)
-        if i + caben_x * caben_y < len(fotochecks):
+        
+        if i + caben_x * caben_y < len(filas):
             el.append(PageBreak())
             
+        # 👇 LIBERAMOS LA MEMORIA DE ESTE LOTE
+        del fotochecks_lote
+        gc.collect()
+
     doc.build(el)
     
-    # 🆕 Leemos el archivo temporal y lo devolvemos como bytes, luego lo borramos
+    # Leemos el archivo y lo devolvemos
     with open(temp_path, "rb") as f:
         pdf_bytes = f.read()
     
