@@ -3585,51 +3585,76 @@ def vista_bloqueados():
         st.caption("Usa esta opcion si necesitas bloquear a alguien por faltas graves, acumulacion, etc.")
         
         clave_man = "bloq_man"
-        idsec_man = _selector_grado_seccion(clave_man, "Elige el grado del alumno a bloquear")
-        if not idsec_man:
-            return
+        
+        # 🆕 Verificamos si hay un alumno seleccionado para mostrarle sus datos
+        al_man_id = st.session_state.get("bloq_man_sel_id")
+        
+        if not al_man_id:
+            idsec_man = _selector_grado_seccion(clave_man, "Elige el grado del alumno a bloquear")
+            if not idsec_man:
+                return
 
-        al_man = _selector_alumno_accion(
-            clave_man, idsec_man,
-            texto_boton="Seleccionar",
-            key_boton="bloq_man_btn",
-            on_click_key="bloq_man_sel_id")
-        if not al_man:
-            return
-
-        bloq_man = alumno_bloqueado(al_man["id"])
-        if bloq_man:
-            st.warning(f"Este alumno ya esta bloqueado (Motivo: {bloq_man['motivo']}).")
-            if st.button("Volver", key="bloq_man_volver"):
-                _reset_selector(clave_man, "bloq_man_sel_id")
+            al_man = _selector_alumno_accion(
+                clave_man, idsec_man,
+                texto_boton="Seleccionar",
+                key_boton="bloq_man_btn",
+                on_click_key="bloq_man_sel_id")
+            if not al_man:
+                return
+        else:
+            # Si ya hay uno seleccionado, lo buscamos directamente
+            with cursor() as (con, cur):
+                cur.execute("""
+                    SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
+                           g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
+                    FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+                    JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id
+                    WHERE a.id=?
+                """, (al_man_id,))
+                al_man_row = cur.fetchone()
+            if not al_man_row:
+                st.session_state.pop("bloq_man_sel_id", None)
                 st.rerun()
-            return
+                return
+            al_man = dict(al_man_row)
 
-        st.markdown("---")
-        st.markdown(f"### Bloquear a {al_man['apellido_paterno']} "
-                    f"{(al_man['apellido_materno'] or '')}, {al_man['nombres']}")
-        st.markdown(f"**DNI:** {al_man['dni']}  \n"
-                    f"**{al_man['grado']} {al_man['seccion']}** — Turno {al_man['turno']}")
+            bloq_man = alumno_bloqueado(al_man["id"])
+            if bloq_man:
+                st.warning(f"Este alumno ya esta bloqueado (Motivo: {bloq_man['motivo']}).")
+                if st.button("Volver a buscar", key="bloq_man_volver_buscar"):
+                    st.session_state.pop("bloq_man_sel_id", None)
+                    _reset_selector(clave_man)
+                    st.rerun()
+                return
 
-        st.markdown("---")
-        motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)",
-                                       key=f"bloq_man_motivo_{al_man['id']}")
+            st.markdown("---")
+            st.markdown(f"### Bloquear a {al_man['apellido_paterno']} "
+                        f"{(al_man['apellido_materno'] or '')}, {al_man['nombres']}")
+            st.markdown(f"**DNI:** {al_man['dni']}  \n"
+                        f"**{al_man['grado']} {al_man['seccion']}** — Turno {al_man['turno']}")
 
-        if confirmar_accion(f"bloq_man_{al_man['id']}",
-                            texto_boton="Bloquear Alumno Ahora",
-                            texto_check="¿Estas seguro de BLOQUEAR a este alumno?"):
-            if not motivo_manual.strip():
-                st.error("El motivo es obligatorio.")
-            else:
-                crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
-                st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
-                _reset_selector(clave_man, "bloq_man_sel_id")
+            st.markdown("---")
+            motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)",
+                                           key=f"bloq_man_motivo_{al_man['id']}")
+
+            if confirmar_accion(f"bloq_man_{al_man['id']}",
+                                texto_boton="Bloquear Alumno Ahora",
+                                texto_check="¿Estas seguro de BLOQUEAR a este alumno?"):
+                if not motivo_manual.strip():
+                    st.error("El motivo es obligatorio.")
+                else:
+                    crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
+                    st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
+                    
+                    # 🆕 LIMPIAMOS TODOS LOS ESTADOS DEL SELECTOR PARA QUE APAREZCAN LOS BOTONES DE NUEVO
+                    st.session_state.pop("bloq_man_sel_id", None)
+                    _reset_selector(clave_man)
+                    st.rerun()
+
+            if st.button("Cancelar", key=f"bloq_man_cancel_{al_man['id']}"):
+                st.session_state.pop("bloq_man_sel_id", None)
+                _reset_selector(clave_man)
                 st.rerun()
-
-        if st.button("Cancelar", key=f"bloq_man_cancel_{al_man['id']}"):
-            _reset_selector(clave_man, "bloq_man_sel_id")
-            st.rerun()
-
 
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
