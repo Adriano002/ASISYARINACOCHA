@@ -1659,14 +1659,13 @@ def _render_mensaje_qr(msg):
     html += f'<div class="qr-texto">{mensaje}</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # 🆕 Botones Sí/No al escanear un alumno BLOQUEADO
     if tipo == "BLOQUEADO" and alumno and alumno.get("id"):
         alumno_id = alumno.get("id")
         dni = alumno.get("dni")
+        st.warning("¿Deseas desbloquear a este estudiante ahora?")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("✅ Sí, desbloquear ahora",
-                         key=f"desbloq_si_{alumno_id}",
+            if st.button("Si, desbloquear", key=f"desbloq_si_{alumno_id}",
                          type="primary", width='stretch'):
                 liberar_bloqueo(alumno_id,
                                 st.session_state["user"],
@@ -1680,14 +1679,13 @@ def _render_mensaje_qr(msg):
                 st.session_state.pop("_qr_mensajes", None)
                 st.rerun()
         with c2:
-            if st.button("❌ No, dejarlo bloqueado",
+            if st.button("No, dejarlo bloqueado",
                          key=f"desbloq_no_{alumno_id}",
                          width='stretch'):
                 if st.session_state.get("_qr_mensajes"):
                     st.session_state["_qr_mensajes"] = \
                         st.session_state["_qr_mensajes"][1:]
                 st.rerun()
-
 # ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
 def _perfil_alumno(idal):
     d = perfil_alumno_datos(idal)
@@ -1792,7 +1790,9 @@ def _perfil_alumno(idal):
                     st.session_state["_reac_al"] = True
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # BLOQUEO MANUAL
+    # ==========================================
+    # ZONA DE BLOQUEO MANUAL (SIN EMOJIS)
+    # ==========================================
     st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Gestion de Bloqueo Manual</div>', unsafe_allow_html=True)
     if d["bloqueado"]:
         st.error("Este alumno esta BLOQUEADO actualmente.")
@@ -1812,6 +1812,7 @@ def _perfil_alumno(idal):
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # ==========================================
     if st.session_state.get("_desac_al"):
         with st.expander("Confirmar desactivacion", expanded=True):
             if confirmar_accion("desac_al", "Confirmar",
