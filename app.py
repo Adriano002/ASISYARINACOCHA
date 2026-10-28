@@ -6664,7 +6664,13 @@ def main():
             else:
                 st.info("Contacta al Administrador.")
             return
-        _control_faltas()
+        
+        # 🆕 Blinde para que no tumbe la app si la BD se traba
+        try:
+            _control_faltas()
+        except Exception as e:
+            log.warning(f"No se pudieron procesar faltas: {e}")
+            
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
