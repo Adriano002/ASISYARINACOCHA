@@ -1565,7 +1565,6 @@ def escaner_qr_continuo(key="qr_scanner"):
                 '<div class="scan-sub">Apunta al código del alumno</div></div>',
                 unsafe_allow_html=True)
 
-    # 🆕 Si acabamos de desbloquear, NO montamos el escáner todavía para que se lea el mensaje
     if st.session_state.get("_qr_desbloqueo_exitoso"):
         result = None
     else:
@@ -1575,9 +1574,18 @@ def escaner_qr_continuo(key="qr_scanner"):
     if result is not None and getattr(result, "qr_dni", None):
         dni = str(result.qr_dni).strip()
         ult = st.session_state.get("_ultimo_qr_scan", {})
+        
         if not (ult.get("dni") == dni and (time.time() - ult.get("ts", 0)) < 5.0):
             st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
+            
+            # 🆕 Solo forzamos recarga de pantalla si el alumno está bloqueado 
+            # (para mostrar los botones de desbloqueo). 
+            # Si es puntual/tardanza, el mensaje sale fluido sin matar la cámara.
+            m = st.session_state.get("_qr_mensajes", [{}])[0]
+            if m.get("tipo") == "BLOQUEADO":
+                st.rerun()
+                
             sp = st.session_state.get("_qr_sonido_pendiente") or {}
             kind = sp.get("kind", "")
             if kind:
@@ -1593,22 +1601,22 @@ def escaner_qr_continuo(key="qr_scanner"):
                     </script>
                 """, height=0)
                 st.session_state.pop("_qr_sonido_pendiente", None)
-            st.rerun()
 
-    # 🆕 Mensaje de desbloqueo exitoso
     desbloq = st.session_state.get("_qr_desbloqueo_exitoso")
     if desbloq:
-        st.success(
-            f"✅ **{desbloq['nombre']}** desbloqueado con éxito. "
-            f"**Vuelve a escanear su QR** para registrar su asistencia."
-        )
-        if st.button("OK, entendido", key="ok_desbloq_msg",
-                     type="secondary"):
+        st.success(f"✅ **{desbloq['nombre']}** desbloqueado con éxito. **Vuelve a escanear su QR**.")
+        if st.button("OK, entendido", key="ok_desbloq_msg", type="secondary", width='stretch'):
             st.session_state.pop("_qr_desbloqueo_exitoso", None)
             st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
             st.rerun()
 
     mensajes = st.session_state.get("_qr_mensajes", [])
+    
+    # 🆕 OPTIMIZACIÓN RAM: Limitamos a 5 mensajes para no acumular texto
+    if len(mensajes) > 5:
+        st.session_state["_qr_mensajes"] = mensajes[:5]
+        mensajes = mensajes[:5]
+
     if mensajes:
         m = mensajes[0]
         if (time.time() - m.get("ts", 0)) < 8:
@@ -1616,7 +1624,7 @@ def escaner_qr_continuo(key="qr_scanner"):
         if len(mensajes) > 1:
             st.markdown('<div class="scan-ultimos">Últimos escaneos</div>',
                         unsafe_allow_html=True)
-            for msg in mensajes[1:6]:
+            for msg in mensajes[1:5]:
                 _render_mensaje_qr(msg)
 
 
@@ -3354,6 +3362,7 @@ def _puerta_escanear(usuario, fecha):
     if not ok:
         (st.info if "Feriado" in msg else st.warning)(msg)
         return
+        
     with cursor() as (con, cur):
         cur.execute("""
             SELECT d.descripcion, d.hora_entrada,
@@ -3370,7 +3379,12 @@ def _puerta_escanear(usuario, fecha):
             st.info(f"Evento: **{ev['descripcion']}** — "
                     f"entrada {fmt_time(ev['hora_entrada'])} — "
                     f"{ev['turno']} — {ev['alcance']}")
-    escaner_qr_continuo(key="puerta_qr")
+            
+    # 🆕 FIX CÁMARA: Forzamos un ID de montaje único
+    if "puerta_qr_mount" not in st.session_state:
+        st.session_state["puerta_qr_mount"] = 0
+        
+    escaner_qr_continuo(key=f"puerta_qr_{st.session_state['puerta_qr_mount']}")
 
 
 def _puerta_manual_alumnos(idsec, usuario):
@@ -3448,15 +3462,23 @@ def vista_puerta():
         <div class="fecha">{fecha}</div>
     </div>
     """, unsafe_allow_html=True)
+    
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
+        
     modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
                     horizontal=True, label_visibility="collapsed")
+                    
     if modo == "Escanear QR":
+        # 🆕 FIX CÁMARA: Si acaba de entrar al escáner, forzamos un reinicio limpio
+        if st.session_state.get("_ultimo_modo") != "Escanear QR":
+            st.session_state["puerta_qr_mount"] = st.session_state.get("puerta_qr_mount", 0) + 1
+            st.session_state["_ultimo_modo"] = "Escanear QR"
+            
         _puerta_escanear(usuario, fecha)
     else:
+        st.session_state["_ultimo_modo"] = "Manual"
         _puerta_manual(usuario, fecha)
-
 
 # ─── BLOQUEADOS ────────────────────────────────────────────────────────────
 def vista_bloqueados():
