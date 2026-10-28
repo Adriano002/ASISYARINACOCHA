@@ -1792,6 +1792,26 @@ def _perfil_alumno(idal):
                     st.session_state["_reac_al"] = True
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # BLOQUEO MANUAL
+    st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Gestion de Bloqueo Manual</div>', unsafe_allow_html=True)
+    if d["bloqueado"]:
+        st.error(f"Este alumno esta BLOQUEADO\n\nMotivo: {d['bloqueo_info'].get('motivo', 'No especificado') if d.get('bloqueo_info') else 'No especificado'}")
+        if st.button("Desbloquear Alumno Ahora", type="primary", width='stretch', key="btn_desbloq_manual"):
+            liberar_bloqueo(al["id"], usuario, "Desbloqueado manualmente desde perfil")
+            st.toast("Alumno desbloqueado.")
+            st.rerun()
+    else:
+        st.info("El alumno no esta bloqueado actualmente. Puedes bloquearlo manualmente si es necesario.")
+        motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)", key="motivo_bloq_manual", placeholder="Ej: Falta grave, acumulacion de faltas, etc.")
+        if st.button("Bloquear Alumno Ahora", type="primary", width='stretch', key="btn_bloq_manual"):
+            if not motivo_manual.strip():
+                st.error("El motivo es obligatorio.")
+            else:
+                crear_bloqueo(al["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
+                st.toast(f"Alumno {al['nombres']} bloqueado manualmente.")
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if st.session_state.get("_desac_al"):
         with st.expander("Confirmar desactivacion", expanded=True):
             if confirmar_accion("desac_al", "Confirmar",
@@ -1910,12 +1930,12 @@ def _perfil_alumno(idal):
                           to_date(perm['fecha_fin'])))
                     aplicado = (cur.fetchone()["n"] or 0) > 0
                 if not activo:
-                    estado_txt = "🔴 Anulado"
+                    estado_txt = "Anulado"
                 elif aplicado:
-                    estado_txt = "🔒 Aplicado"
+                    estado_txt = "Aplicado"
                 else:
-                    estado_txt = "🟢 Pendiente"
-                c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
+                    estado_txt = "Pendiente"
+                c1.write(f"**{perm['fecha_inicio']} -> {perm['fecha_fin']}** - {perm['motivo']}")
                 c2.write(estado_txt)
                 if activo and not aplicado:
                     if c3.button("Anular", key=f"anul_perm_{perm['id']}"):
@@ -1953,10 +1973,10 @@ def _perfil_alumno(idal):
                 except (ValueError, TypeError):
                     v = 0
                 if v == 1:
-                    return "🔒 Aplicada"
+                    return "Aplicada"
                 if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
+                    return "Anulada"
+                return "Pendiente"
 
             dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
             st.caption(f"{len(dj)} justificacion(es) previa(s). "
