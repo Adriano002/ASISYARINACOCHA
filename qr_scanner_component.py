@@ -47,29 +47,6 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         border-radius: 6px;
         background: #f8d7da;
     }
-    #qr-reader button {
-        background: #E65100 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 6px !important;
-        padding: 8px 16px !important;
-        font-weight: 600 !important;
-        cursor: pointer !important;
-        margin: 4px !important;
-    }
-    #qr-reader button:hover {
-        background: #BF360C !important;
-    }
-    #qr-reader select {
-        border-radius: 6px !important;
-        padding: 6px 10px !important;
-        margin: 4px !important;
-        border: 1px solid #ccc !important;
-    }
-    #qr-reader a {
-        color: #E65100 !important;
-        font-weight: 600 !important;
-    }
     """,
     js="""
     export default function(component) {
@@ -77,9 +54,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         let scanner = null;
         let iniciado = false;
         let pausado = false;
-        let isRestarting = false; // 🆕 Candado para evitar bucles de reinicio
+        let isRestarting = false; 
 
-        // ═══ EDGE DETECTION (mismo DNI no re-emitir antes de 5s) ═══
         const COOLDOWN_MS = 5000;
         let ultimoDniEmitido = null;
         let ultimoTimestampEmision = 0;
@@ -90,9 +66,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             if (!audioCtx) {
                 try {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                } catch (e) {
-                    console.warn('[QR] no se pudo crear AudioContext:', e);
-                }
+                } catch (e) {}
             }
             if (audioCtx && audioCtx.state === 'suspended') {
                 audioCtx.resume().catch(() => {});
@@ -116,9 +90,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             osc.stop(t0 + dur + 0.02);
         }
 
-        // Click inmediato (feedback local)
         function sonidoClick() { _tono(880, 0.05, 'sine', 0.25, 0); }
-        // Sonidos especificos (los dispara Python)
         function sonidoPuntual() {
             _tono(523, 0.10, 'sine', 0.40, 0);
             _tono(659, 0.10, 'sine', 0.40, 0.10);
@@ -153,18 +125,13 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                     case "error":
                     default:            sonidoError();       break;
                 }
-            } catch (e) {
-                console.error('[QR] reproducir error:', e);
-            }
+            } catch (e) {}
         }
 
-        // Exponer para que Python lo dispare via JS inyectado
         window.__qrFeedback = reproducir;
         try {
             window.parent.__qrFeedback = reproducir;
-        } catch (e) {
-            console.warn('[QR] no se pudo registrar en parent:', e);
-        }
+        } catch (e) {}
 
         // ═══ UTILIDADES ═══
         function setStatus(t) {
@@ -176,12 +143,11 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             const s = document.getElementById('qr-status');
             if (e) { e.textContent = t; e.style.display = 'block'; }
             if (s) s.style.display = 'none';
-            console.error('[QR]', t);
         }
         function destruirScanner() {
             pausado = false;
             if (scanner) {
-                try { scanner.clear(); } catch (e) {}
+                try { scanner.stop().then(() => scanner.clear()).catch(()=>{}); } catch (e) {}
                 scanner = null;
             }
             iniciado = false;
@@ -192,7 +158,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         // ═══ SCANNER ═══
         function iniciarScanner() {
             if (iniciado || isRestarting) return;
-            if (typeof Html5QrcodeScanner === 'undefined') {
+            if (typeof Html5Qrcode === 'undefined') {
                 setError('Libreria QR no cargada.');
                 return;
             }
@@ -209,75 +175,45 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             destruirScanner();
             reader.innerHTML = '';
             iniciado = true;
-
             getAudioCtx();
 
             setTimeout(() => {
                 if (!iniciado) return;
 
-                scanner = new Html5QrcodeScanner(
-                    "qr-reader",
-                    {
-                        fps: 20,
-                        qrbox: { width: 200, height: 200 },
-                        aspectRatio: 1.0,
-                        rememberLastUsedCamera: true,
-                        videoConstraints: { facingMode: "environment" },
-                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-                    },
-                    false
-                );
-
-                const onScanSuccess = (texto) => {
-                    try {
-                        const m = texto.match(/\\b(\\d{8})\\b/);
-                        if (!m) return;
-                        const dni = m[1];
-
-                        const ahora = Date.now();
-                        const esMismoDni = (dni === ultimoDniEmitido);
-                        const dentroCooldown = (ahora - ultimoTimestampEmision) < COOLDOWN_MS;
-
-                        if (esMismoDni && dentroCooldown) return;
-
-                        ultimoDniEmitido = dni;
-                        ultimoTimestampEmision = ahora;
-
-                        // Click inmediato local
-                        try {
-                            getAudioCtx();
-                            _tono(880, 0.05, 'sine', 0.25, 0);
-                        } catch(e) {}
-
-                        setStatus('QR: ' + dni);
-                        setTriggerValue("qr_dni", dni);
-                    } catch (e) {
-                        console.error('[QR] error en onScanSuccess:', e);
-                    }
-                };
-
-                const onScanError = () => {};
-
-                let resultado;
+                // 🆕 Usamos Html5Qrcode crudo (como en Incidencias) para evitar NotReadableError
                 try {
-                    resultado = scanner.render(onScanSuccess, onScanError);
+                    scanner = new Html5Qrcode("qr-reader", { verbose: false });
+                    scanner.start(
+                        { facingMode: "environment" },
+                        { fps: 20, qrbox: { width: 250, height: 250 } },
+                        (texto) => {
+                            try {
+                                const m = texto.match(/\\b(\\d{8})\\b/);
+                                if (!m) return;
+                                const dni = m[1];
+                                const ahora = Date.now();
+                                const esMismoDni = (dni === ultimoDniEmitido);
+                                const dentroCooldown = (ahora - ultimoTimestampEmision) < COOLDOWN_MS;
+                                if (esMismoDni && dentroCooldown) return;
+
+                                ultimoDniEmitido = dni;
+                                ultimoTimestampEmision = ahora;
+                                try { getAudioCtx(); _tono(880, 0.05, 'sine', 0.25, 0); } catch(e) {}
+                                setStatus('QR: ' + dni);
+                                setTriggerValue("qr_dni", dni);
+                            } catch (e) {}
+                        },
+                        () => {}
+                    ).catch((e) => {
+                        const msg = (e && e.message) ? e.message : String(e);
+                        setError('Error camara: ' + msg);
+                        iniciado = false;
+                    });
+                    setStatus('Camara activa.');
                 } catch (e) {
                     const msg = (e && e.message) ? e.message : String(e);
                     setError('Error al iniciar: ' + msg);
                     iniciado = false;
-                    return;
-                }
-
-                if (resultado && typeof resultado.then === 'function') {
-                    resultado
-                        .then(() => setStatus('Camara activa.'))
-                        .catch((e) => {
-                            const msg = (e && e.message) ? e.message : String(e);
-                            setError('Error camara: ' + msg);
-                            iniciado = false;
-                        });
-                } else {
-                    setStatus('Camara activa.');
                 }
             }, 500);
         }
@@ -290,7 +226,6 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                 pausado = true;
                 setStatus('Camara en pausa.');
             } catch (e) {
-                console.warn('[QR] pause fallo:', e);
                 destruirScanner();
             }
         }
@@ -305,18 +240,14 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
                 pausado = false;
                 setStatus('Camara activa.');
             } catch (e) {
-                console.warn('[QR] resume fallo, reiniciando:', e);
                 destruirScanner();
                 iniciarScanner();
             }
         }
 
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                pausarScanner();
-            } else if (document.visibilityState === 'visible') {
-                reanudarScanner();
-            }
+            if (document.visibilityState === 'hidden') pausarScanner();
+            else if (document.visibilityState === 'visible') reanudarScanner();
         });
 
         window.addEventListener('blur', () => {
@@ -326,16 +257,13 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             if (document.visibilityState === 'visible') reanudarScanner();
         });
 
-        // ═══ FIX PARA EL NotReadableError (CÁMARA OCUPADA) ═══
+        // ═══ FIX PARA EL NotReadableError ═══
         window.addEventListener('error', function(e) {
             if (e.message && (e.message.includes('NotReadableError') || e.message.includes('Could not start video source'))) {
                 if (isRestarting) return;
-                console.warn('[QR] Cámara ocupada. Reiniciando hardware en 1.5s...');
                 isRestarting = true;
                 setStatus('Reiniciando cámara (ocupada)...');
                 destruirScanner();
-                
-                // Esperamos 1.5 segundos para que el celular libere la cámara
                 setTimeout(() => {
                     isRestarting = false;
                     iniciarScanner();
@@ -346,7 +274,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         // ═══ CARGA DE LIBRERIA ═══
         window.addEventListener('beforeunload', destruirScanner);
 
-        if (window.__qrV18Listo && typeof Html5QrcodeScanner !== 'undefined') {
+        if (window.Html5Qrcode) {
             iniciarScanner();
             return;
         }
@@ -354,9 +282,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             let n = 0;
             const t = setInterval(() => {
                 n++;
-                if (typeof Html5QrcodeScanner !== 'undefined') {
+                if (window.Html5Qrcode) {
                     clearInterval(t);
-                    window.__qrV18Listo = true;
                     window.__qrV18Cargando = false;
                     iniciarScanner();
                 } else if (n > 100) {
@@ -369,14 +296,13 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         }
         window.__qrV18Cargando = true;
         const s = document.createElement('script');
-        s.src = 'https://unpkg.com/html5-qrcode';
+        s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
         s.async = true;
         s.onload = () => {
-            window.__qrV18Listo = true;
             window.__qrV18Cargando = false;
             setTimeout(() => {
-                if (typeof Html5QrcodeScanner === 'undefined') {
-                    setError('Libreria cargada pero sin Html5QrcodeScanner.');
+                if (typeof Html5Qrcode === 'undefined') {
+                    setError('Libreria cargada pero sin Html5Qrcode.');
                     return;
                 }
                 iniciarScanner();
