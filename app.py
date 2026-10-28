@@ -5070,38 +5070,69 @@ def _frag_importar_excel():
 def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
+    
+    # Pestañas de Auditoría
     tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
+    
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
         if not df.empty:
             st.dataframe(df, width='stretch')
+            
     with tabs[1]:
+        # 🆕 SECCIÓN PARA CREAR EL PERIODO
+        st.subheader("Crear nuevo periodo")
+        with st.form("crear_periodo_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                nom = st.text_input("Nombre del periodo (ej: 2026)")
+            with c2:
+                fi = st.date_input("Fecha de inicio", ahora().date())
+            with c3:
+                ff = st.date_input("Fecha de fin", ahora().date() + timedelta(days=270))
+            
+            if st.form_submit_button("Crear y Activar Periodo", type="primary"):
+                if not nom.strip():
+                    st.error("Ingresa un nombre para el periodo.")
+                elif (ff - fi).days < 30:
+                    st.error("El periodo debe durar mínimo 1 mes.")
+                else:
+                    with cursor() as (con, cur):
+                        cur.execute("INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) VALUES(?,?,?,1,0)", 
+                                    (nom.strip(), to_date(fi), to_date(ff)))
+                        nuevo_id = cur.lastrowid
+                        cur.execute("UPDATE periodos SET activo=0 WHERE id!=?", (nuevo_id,))
+                    auditar(usuario["usuario"], f"Creo periodo {nom}", tb="periodos", rid=nuevo_id)
+                    st.success(f"Periodo '{nom}' creado y activado con éxito.")
+                    time.sleep(1)
+                    st.rerun()
+
+        st.markdown("---")
         st.subheader("Periodos registrados")
-        st.caption("Los periodos se crean automaticamente al cerrar el año "
-                   "escolar. No se pueden crear manualmente desde aqui.")
         df_info = info_periodo_con_alumnos()
         if df_info.empty:
-            st.info("Sin periodos creados.")
+            st.info("Aún no hay periodos creados.")
         else:
             st.dataframe(df_info, width='stretch', hide_index=True)
 
         st.markdown("---")
-        st.markdown("### Cargar alumnos al periodo activo")
+        st.subheader("Cargar alumnos al periodo activo")
         p = obtener_periodo_activo()
         if p:
-            st.info(f"Periodo activo: **{p['nombre']}** "
-                    f"({p['fecha_inicio']} - {p['fecha_fin']})")
+            st.info(f"Periodo activo: **{p['nombre']}** ({p['fecha_inicio']} - {p['fecha_fin']})")
             if periodo_tiene_alumnos(p["id"]):
                 st.success("El periodo ya tiene alumnos cargados.")
             else:
-                st.warning("El periodo NO tiene alumnos.")
+                st.warning("El periodo NO tiene alumnos. Sube el Excel aquí abajo.")
+            
+            # 🆕 SECCIÓN PARA IMPORTAR EL EXCEL
             _frag_importar_excel()
         else:
-            st.info("No hay periodo activo.")
+            st.warning("Primero debes crear un periodo arriba para poder cargar alumnos.")
 
         st.markdown("---")
-        st.markdown("### Activar periodo (solo no cerrados)")
+        st.subheader("Activar otro periodo (solo no cerrados)")
         df2 = listar_periodos()
         df2 = df2[df2["cerrado"] == 0]
         if not df2.empty:
@@ -5109,11 +5140,11 @@ def vista_auditoria():
             for _, r in df2.iterrows():
                 et = f"{r['nombre']} ({r['fecha_inicio']} - {r['fecha_fin']})"
                 if r["activo"]:
-                    et += " ACTIVO"
+                    et += " [ACTIVO]"
                 ops[et] = r["id"]
-            sel = st.selectbox("Periodo a activar", list(ops.keys()),
+            sel = st.selectbox("Selecciona el periodo a activar", list(ops.keys()),
                                key="act_periodo_sel")
-            if confirmar_accion("activar_periodo", "Activar",
+            if confirmar_accion("activar_periodo", "Activar periodo",
                                  "¿Estas seguro de activar este periodo?"):
                 ok, msg = activar_periodo(ops[sel], usuario)
                 if ok:
@@ -5121,16 +5152,18 @@ def vista_auditoria():
                     st.rerun()
                 else:
                     st.error(msg)
+        else:
+            st.info("No hay otros periodos abiertos para activar.")
+
     with tabs[2]:
         st.subheader("Cierre de año escolar")
-        st.warning("Al cerrar el periodo se desactivan TODOS los alumnos y "
-                   "se crea uno nuevo.")
+        st.warning("Al cerrar el periodo se desactivan TODOS los alumnos y se crea uno nuevo.")
         p = obtener_periodo_activo()
         if not p:
             st.info("No hay periodo activo.")
             return
-        st.info(f"Periodo activo: {p['nombre']} "
-                f"({p['fecha_inicio']} - {p['fecha_fin']})")
+        st.info(f"Periodo activo: {p['nombre']} ({p['fecha_inicio']} - {p['fecha_fin']})")
+        
         st.markdown("Reporte resumen del periodo:")
         df_rep = reporte_cierre_anual(p["id"])
         if not df_rep.empty:
@@ -5159,19 +5192,15 @@ def vista_auditoria():
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            nn = st.text_input("Nombre nuevo periodo",
-                                value=str(ahora().year + 1))
+            nn = st.text_input("Nombre nuevo periodo", value=str(ahora().year + 1))
         with c2:
-            fi = st.date_input("Inicio nuevo",
-                                date(ahora().year + 1, 3, 1))
+            fi = st.date_input("Inicio nuevo", date(ahora().year + 1, 3, 1))
         with c3:
-            ff = st.date_input("Fin nuevo",
-                                date(ahora().year + 1, 12, 31))
+            ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
         conf = st.text_input("Escribe CERRAR para confirmar")
 
-        if confirmar_accion(
-                "cerrar_ano", "Cerrar año escolar",
-                "¿Estas seguro de cerrar el año escolar?"):
+        if confirmar_accion("cerrar_ano", "Cerrar año escolar",
+                             "¿Estas seguro de cerrar el año escolar?"):
             if not desc:
                 st.error("Primero debes descargar el reporte anual.")
             elif conf.strip() != "CERRAR":
