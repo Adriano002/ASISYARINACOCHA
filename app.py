@@ -2706,9 +2706,15 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
 
     return img
 def _render_carnets(filas, titulo=None):
-    buf = BytesIO()
+    import tempfile
+    import os
+    # 🆕 Usamos un archivo temporal en el disco duro en lugar de la memoria RAM
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    temp_path = temp_file.name
+    temp_file.close()
+
     m = 5
-    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=m, leftMargin=m,
+    doc = SimpleDocTemplate(temp_path, pagesize=A4, rightMargin=m, leftMargin=m,
                             topMargin=m, bottomMargin=m)
     est = getSampleStyleSheet()
     MM = 2.8346
@@ -2733,7 +2739,10 @@ def _render_carnets(filas, titulo=None):
     caben_x = 2
     alto_hoja = A4[1] - 2 * m
     caben_y = max(1, int((alto_hoja + sep_y) // (ALTO + sep_y)))
+    
+    # Generamos las imágenes una por una
     fotochecks = [_fotocheck(a) for a in filas]
+    
     for i in range(0, len(fotochecks), caben_x * caben_y):
         lote = fotochecks[i:i + caben_x * caben_y]
         tabla_filas = []
@@ -2757,10 +2766,19 @@ def _render_carnets(filas, titulo=None):
         el.append(t)
         if i + caben_x * caben_y < len(fotochecks):
             el.append(PageBreak())
+            
     doc.build(el)
-    buf.seek(0)
-    return buf.getvalue()
-
+    
+    # 🆕 Leemos el archivo temporal y lo devolvemos como bytes, luego lo borramos
+    with open(temp_path, "rb") as f:
+        pdf_bytes = f.read()
+    
+    try:
+        os.remove(temp_path)
+    except Exception:
+        pass
+        
+    return pdf_bytes
 
 def _filas_alumnos_por_seccion(idsec):
     with cursor() as (con, cur):
