@@ -5496,29 +5496,55 @@ def _frag_justificacion_previa(usuario):
 
 def _render_registrar_jp(usuario):
     clave = "jp_sel"
-    idsec = _selector_grado_seccion(clave, "Elige el grado")
-    if not idsec:
-        return
-    al = _selector_alumno_accion(
-        clave, idsec,
-        texto_boton="Seleccionar",
-        key_boton="jp_sel_btn",
-        on_click_key="jp_al_sel_id")
-    if not al:
-        return
+    
+    # 🆕 Lógica mejorada: Si ya hay alumno seleccionado, saltamos directo al formulario
+    al_sel_id = st.session_state.get("jp_al_sel_id")
+    
+    if not al_sel_id:
+        idsec = _selector_grado_seccion(clave, "Elige el grado")
+        if not idsec:
+            return
+        al = _selector_alumno_accion(
+            clave, idsec,
+            texto_boton="Seleccionar",
+            key_boton="jp_sel_btn",
+            on_click_key="jp_al_sel_id")
+        if not al:
+            return
+    else:
+        # Traemos los datos del alumno seleccionado
+        with cursor() as (con, cur):
+            cur.execute("""
+                SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
+                       a.seccion_id, a.nombre_apoderado, a.telefono_apoderado,
+                       g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
+                FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+                JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id
+                WHERE a.id=?
+            """, (al_sel_id,))
+            al_row = cur.fetchone()
+        if not al_row:
+            st.session_state.pop("jp_al_sel_id", None)
+            _reset_selector(clave)
+            st.rerun()
+            return
+        al = dict(al_row)
 
     bloq = alumno_bloqueado(al["id"])
     if bloq:
         st.error("Este alumno esta BLOQUEADO: " + (bloq.get("motivo") or ""))
-    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") +
-              ", " + al['nombres']).strip(", ")
-    st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} "
-                f"{al['seccion']} | Turno {al['turno']}",
-                unsafe_allow_html=True)
+        
+    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
+    st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} {al['seccion']} | Turno {al['turno']}", unsafe_allow_html=True)
+    
     if al.get("nombre_apoderado"):
-        st.caption("Apoderado: " + al["nombre_apoderado"] +
-                   (" - Tel: " + al["telefono_apoderado"]
-                    if al.get("telefono_apoderado") else ""))
+        st.caption("Apoderado: " + al["nombre_apoderado"] + (" - Tel: " + al["telefono_apoderado"] if al.get("telefono_apoderado") else ""))
+
+    # Botón para regresar y buscar a otro alumno
+    if st.button("← Buscar otro alumno", key="jp_volver_buscar"):
+        st.session_state.pop("jp_al_sel_id", None)
+        _reset_selector(clave)
+        st.rerun()
 
     try:
         df_prev = leer_df("""
@@ -5566,55 +5592,6 @@ def _render_registrar_jp(usuario):
                 st.rerun()
             else:
                 st.error(msg)
-
-    if not df_prev.empty:
-        st.markdown("---")
-        st.markdown("**Anular / Reactivar (de este alumno)**")
-        opciones_anular = {}
-        opciones_reactivar = {}
-        for _, r in df_prev.iterrows():
-            et = f"{r['Fecha objetivo']} - {r['Motivo']} - {r['Estado']}"
-            if r["Estado"] == "Anulada":
-                opciones_reactivar[et] = int(r["id"])
-            elif r["Estado"] == "Pendiente":
-                opciones_anular[et] = int(r["id"])
-
-        if opciones_anular:
-            sel = st.selectbox("Anular justificacion (solo PENDIENTES)",
-                                list(opciones_anular.keys()),
-                                key="jp_al_sel_anular")
-            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                         key="jp_al_motivo_anular")
-            if confirmar_accion("jp_al_anular", "Confirmar anulacion",
-                                 "¿Estas seguro de anular esta justificacion?"):
-                ok, msg = anular_justificacion_previa(
-                    opciones_anular[sel], usuario, motivo_anul)
-                st.session_state.pop("jp_al_motivo_anular", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-        else:
-            st.info("Este alumno no tiene justificaciones previas pendientes "
-                    "para anular.")
-
-        if opciones_reactivar:
-            sel_r = st.selectbox("Reactivar justificacion",
-                                 list(opciones_reactivar.keys()),
-                                 key="jp_al_sel_reactivar")
-            motivo_nuevo = st.text_input("Motivo nuevo (opcional)",
-                                          key="jp_al_motivo_reactivar")
-            if confirmar_accion("jp_al_reactivar", "Confirmar reactivacion",
-                                 "¿Estas seguro de reactivar esta justificacion?"):
-                ok, msg = reactivar_justificacion_previa(
-                    opciones_reactivar[sel_r], usuario, motivo_nuevo)
-                st.session_state.pop("jp_al_motivo_reactivar", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
 
 
 def _render_historial_global_jp(usuario):
@@ -5770,24 +5747,50 @@ def _frag_permisos(usuario):
 
 def _render_registrar_perm(usuario):
     clave = "perm_sel"
-    idsec = _selector_grado_seccion(clave, "Elige el grado")
-    if not idsec:
-        return
-    al = _selector_alumno_accion(
-        clave, idsec,
-        texto_boton="Seleccionar",
-        key_boton="perm_sel_btn",
-        on_click_key="perm_al_sel_id")
-    if not al:
-        return
+    
+    # 🆕 Lógica mejorada: Si ya hay alumno seleccionado, mostramos el formulario directo
+    al_sel_id = st.session_state.get("perm_al_sel_id")
+    
+    if not al_sel_id:
+        idsec = _selector_grado_seccion(clave, "Elige el grado")
+        if not idsec:
+            return
+        al = _selector_alumno_accion(
+            clave, idsec,
+            texto_boton="Seleccionar",
+            key_boton="perm_sel_btn",
+            on_click_key="perm_al_sel_id")
+        if not al:
+            return
+    else:
+        with cursor() as (con, cur):
+            cur.execute("""
+                SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
+                       a.seccion_id, a.nombre_apoderado, a.telefono_apoderado,
+                       g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
+                FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+                JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id
+                WHERE a.id=?
+            """, (al_sel_id,))
+            al_row = cur.fetchone()
+        if not al_row:
+            st.session_state.pop("perm_al_sel_id", None)
+            _reset_selector(clave)
+            st.rerun()
+            return
+        al = dict(al_row)
 
     bloq = alumno_bloqueado(al["id"])
     if bloq:
         st.error("Este alumno esta BLOQUEADO: " + (bloq.get("motivo") or ""))
-    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") +
-              ", " + al['nombres']).strip(", ")
-    st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} "
-                f"{al['seccion']}", unsafe_allow_html=True)
+        
+    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
+    st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} {al['seccion']}", unsafe_allow_html=True)
+
+    if st.button("← Buscar otro alumno", key="perm_volver_buscar"):
+        st.session_state.pop("perm_al_sel_id", None)
+        _reset_selector(clave)
+        st.rerun()
 
     try:
         df_perm = leer_df("""
@@ -5837,40 +5840,6 @@ def _render_registrar_perm(usuario):
                 st.rerun()
             else:
                 st.error(msg)
-
-    if not df_perm.empty:
-        st.markdown("---")
-        st.markdown("**Anular un permiso de este alumno**")
-        opciones = {}
-        for _, r in df_perm.iterrows():
-            if r["Estado"] == "Activo":
-                with cursor() as (con, cur):
-                    cur.execute("""
-                        SELECT COUNT(*) AS n FROM asistencias
-                        WHERE alumno_id=? AND fecha BETWEEN ? AND ?
-                          AND estado='Permiso'
-                    """, (al["id"], to_date(r['Inicio']), to_date(r['Fin'])))
-                    aplicado = (cur.fetchone()["n"] or 0) > 0
-                if not aplicado:
-                    et = f"{r['Inicio']} -> {r['Fin']} - {r['Motivo']}"
-                    opciones[et] = int(r["id"])
-        if opciones:
-            sel = st.selectbox("Selecciona permiso (solo pendientes)",
-                                list(opciones.keys()),
-                                key="perm_al_sel_anular")
-            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                         key="perm_al_motivo_anular")
-            if confirmar_accion("perm_al_anular", "Confirmar anulacion",
-                                 "¿Estas seguro de anular este permiso?"):
-                ok, msg = eliminar_permiso(opciones[sel], usuario, motivo_anul)
-                st.session_state.pop("perm_al_motivo_anular", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-        else:
-            st.info("Este alumno no tiene permisos pendientes para anular.")
 
 
 def _render_historial_global_perm(usuario):
