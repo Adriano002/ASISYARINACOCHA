@@ -1,4 +1,5 @@
 import streamlit as st
+
 QR_SCANNER_COMPONENT = st.components.v2.component(
     name="mi_qr_scanner_v18",
     isolate_styles=False,
@@ -76,6 +77,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         let scanner = null;
         let iniciado = false;
         let pausado = false;
+        let isRestarting = false; // 🆕 Candado para evitar bucles de reinicio
 
         // ═══ EDGE DETECTION (mismo DNI no re-emitir antes de 5s) ═══
         const COOLDOWN_MS = 5000;
@@ -189,7 +191,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
 
         // ═══ SCANNER ═══
         function iniciarScanner() {
-            if (iniciado) return;
+            if (iniciado || isRestarting) return;
             if (typeof Html5QrcodeScanner === 'undefined') {
                 setError('Libreria QR no cargada.');
                 return;
@@ -323,6 +325,23 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         window.addEventListener('focus', () => {
             if (document.visibilityState === 'visible') reanudarScanner();
         });
+
+        // ═══ FIX PARA EL NotReadableError (CÁMARA OCUPADA) ═══
+        window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('NotReadableError') || e.message.includes('Could not start video source'))) {
+                if (isRestarting) return;
+                console.warn('[QR] Cámara ocupada. Reiniciando hardware en 1.5s...');
+                isRestarting = true;
+                setStatus('Reiniciando cámara (ocupada)...');
+                destruirScanner();
+                
+                // Esperamos 1.5 segundos para que el celular libere la cámara
+                setTimeout(() => {
+                    isRestarting = false;
+                    iniciarScanner();
+                }, 1500);
+            }
+        }, true);
 
         // ═══ CARGA DE LIBRERIA ═══
         window.addEventListener('beforeunload', destruirScanner);
