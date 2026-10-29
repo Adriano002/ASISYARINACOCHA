@@ -3718,14 +3718,34 @@ def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
     
+    # 🆕 HEADER MÁS ANGOSTO Y CON LETRA MÁS PEQUEÑA
     st.markdown(f"""
-    <div class="puerta-header">
-        <div class="titulo">Control de Puerta</div>
-        <div class="fecha">{fecha}</div>
+    <div style="
+        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
+        border-radius: 12px;
+        padding: 15px 25px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(232,123,74,0.2);
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    ">
+        <div style="font-size: 20px; font-weight: 800;">Control de Puerta</div>
+        <div style="
+            background: rgba(255,255,255,0.2); 
+            padding: 6px 12px; 
+            border-radius: 8px; 
+            font-size: 14px; 
+            font-weight: bold;
+        ">{fecha}</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Llamada al buscador (ahora se verá solo el texto formal)
+    # Llamada al buscador rápido
     _buscador_rapido_puerta()
 
     if "puerta_modo" not in st.session_state:
