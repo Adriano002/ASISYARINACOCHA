@@ -3908,27 +3908,30 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         st.session_state.pop("rep_tipo", None)
         st.rerun()
         return
-    if st.button("← Regresar a tipos de reporte",
-                 key="rep_volver_tipos_desde_mostrar"):
+    if st.button("← Regresar a tipos de reporte", key="rep_volver_tipos_desde_mostrar"):
         st.session_state.pop("rep_tipo", None)
         st.session_state.pop("rep_idsec_val", None)
         st.rerun()
 
     if tipo == "diario":
         st.subheader(f"Reporte Diario - {sec['grado']} {sec['seccion']}")
-        st.caption(f"Fecha: {ahora().date()}")
-        hojas = _generar_hojas_diario(hoy_str(), [idsec])
+        
+        # 🆕 SELECTOR DE FECHA
+        fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
+        fecha_str = fecha_sel.strftime("%Y-%m-%d")
+        
+        hojas = _generar_hojas_diario(fecha_str, [idsec])
         if not hojas:
-            st.info("Sin datos para hoy.")
+            st.info(f"Sin datos para el día {fecha_str}.")
             return
-        pdf = generar_pdf_multilhoja(hojas,
-                                      "Reporte Diario - " + str(ahora().date()))
+            
+        pdf = generar_pdf_multilhoja(hojas, f"Reporte Diario - {fecha_str}")
         c1, c2 = st.columns(2)
         with c1:
             st.download_button(
                 "Descargar PDF", pdf,
-                f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{hoy_str()}.pdf",
-                "application/pdf", key="rep_dl_diario_pdf")
+                f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{fecha_str}.pdf",
+                "application/pdf", key="rep_dl_diario_pdf", type="primary")
         with c2:
             hojas_xlsx = {}
             for nombre, bloques in hojas.items():
@@ -3938,25 +3941,34 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
                 st.download_button(
                     "Descargar Excel",
                     df_a_xlsx_multilhoja(hojas_xlsx),
-                    f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{hoy_str()}.xlsx",
+                    f"Reporte_diario_{sec['grado']}_{sec['seccion']}_{fecha_str}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="rep_dl_diario_xlsx")
+
     elif tipo == "mensual":
         hoy = ahora().date()
-        st.subheader(f"Cierre Mensual {MESES_ES[hoy.month]} {hoy.year} - "
-                     f"{sec['grado']} {sec['seccion']}")
-        hojas = _generar_hojas_mensual(hoy.month, hoy.year, [idsec])
+        st.subheader(f"Cierre Mensual - {sec['grado']} {sec['seccion']}")
+        
+        # 🆕 SELECTOR DE MES Y AÑO
+        c1, c2 = st.columns(2)
+        with c1:
+            mes_sel = st.selectbox("Mes", range(1, 13), index=hoy.month - 1, format_func=lambda x: MESES_ES[x], key="rep_mes_sel")
+        with c2:
+            ano_sel = st.number_input("Año", min_value=2020, max_value=2030, value=hoy.year, key="rep_ano_sel")
+            
+        hojas = _generar_hojas_mensual(mes_sel, ano_sel, [idsec])
         if not hojas:
             st.info("Sin datos para este mes.")
             return
+            
         pdf = generar_pdf_multilhoja(
-            hojas, f"Cierre Mensual {MESES_ES[hoy.month]} {hoy.year}")
+            hojas, f"Cierre Mensual {MESES_ES[mes_sel]} {ano_sel}")
         c1, c2 = st.columns(2)
         with c1:
             st.download_button(
                 "Descargar PDF", pdf,
-                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[hoy.month]}.pdf",
-                "application/pdf", key="rep_dl_mensual_pdf")
+                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.pdf",
+                "application/pdf", key="rep_dl_mensual_pdf", type="primary")
         with c2:
             hojas_xlsx = {}
             for nombre, bloques in hojas.items():
@@ -3966,12 +3978,12 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
                 st.download_button(
                     "Descargar Excel",
                     df_a_xlsx_multilhoja(hojas_xlsx),
-                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}.xlsx",
+                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="rep_dl_mensual_xlsx")
+                    
     elif tipo == "general":
         _rep_general_por_turno_admin()
-
 
 def _rep_general_por_turno_admin():
     st.subheader("Reporte general por auxiliar")
