@@ -24,11 +24,12 @@ def _get_r2_client():
 
 # ══════════════════════════════════════════════════════════════════
 # FORZAR CHECKPOINT DEL WAL ANTES DE SUBIR
+# Usa PASSIVE para NO bloquear escrituras durante el backup
 # ══════════════════════════════════════════════════════════════════
 def _forzar_checkpoint(ruta_local):
     try:
-        con = sqlite3.connect(ruta_local, timeout=10)
-        con.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        con = sqlite3.connect(str(ruta_local), timeout=10)
+        con.execute("PRAGMA wal_checkpoint(PASSIVE);")
         con.commit()
         con.close()
     except Exception as e:
@@ -39,6 +40,7 @@ def _forzar_checkpoint(ruta_local):
 # 1. SUBIR BACKUP A R2 (Guarda con fecha y también sobrescribe el fijo)
 # ══════════════════════════════════════════════════════════════════
 def subir_bd(ruta_local):
+    ruta_local = str(ruta_local)   # 🆕 normalizar Path → str
     try:
         _forzar_checkpoint(ruta_local)
 
@@ -90,6 +92,7 @@ def listar_backups_r2():
 # 3. DESCARGAR UN BACKUP ESPECÍFICO (Restauración)
 # ══════════════════════════════════════════════════════════════════
 def descargar_bd_especifica(key, ruta_local):
+    ruta_local = str(ruta_local)   # 🆕
     try:
         s3 = _get_r2_client()
         s3.download_file(BUCKET_NAME, key, ruta_local)
@@ -134,13 +137,19 @@ def limpiar_backups_antiguos_r2(meses_a_mantener):
 # ══════════════════════════════════════════════════════════════════
 # 5. DESCARGAR LA BD FIJA AL INICIAR (SIEMPRE sobrescribe con la de R2)
 # ══════════════════════════════════════════════════════════════════
-def descargar_bd_si_no_existe(ruta_local="asistencia.db"):
+def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
     """
     Al arrancar SIEMPRE descarga la versión de R2 (la nube manda).
     Si R2 falla, restaura el backup local como fallback.
     """
+    ruta_local = str(ruta_local)   # 🆕 normalizar Path → str
     try:
         s3 = _get_r2_client()
+
+        # Crear la carpeta si no existe (por si acaso)
+        parent = os.path.dirname(ruta_local)
+        if parent and not os.path.exists(parent):
+            os.makedirs(parent, exist_ok=True)
 
         if os.path.exists(ruta_local):
             try:
@@ -149,7 +158,7 @@ def descargar_bd_si_no_existe(ruta_local="asistencia.db"):
                 pass
 
         s3.download_file(BUCKET_NAME, "asistencia.db", ruta_local)
-        print("✅ BD descargada de R2 al iniciar (versión más reciente).")
+        print(f"✅ BD descargada de R2 a {ruta_local}")
 
         try:
             if os.path.exists(ruta_local + ".bak"):
