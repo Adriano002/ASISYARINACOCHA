@@ -6909,18 +6909,19 @@ def menu_lateral():
     opciones = obtener_opciones_por_rol(usuario)
     
     with st.sidebar:
-        # 🆕 TARJETA DE USUARIO (Diseño corregido y elegante)
+        # 🆕 TARJETA DE USUARIO (Diseño corregido)
         st.markdown(
             f'<div class="encabezado-sidebar" style="padding: 20px 10px 15px 10px !important;">'
             f'  <div class="nombre" style="font-size: 16px; margin-bottom: 6px;">{usuario["nombres"]}</div>'
             f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
         
-        # 🆕 EL ESCUDO (Usando st.image nativo para evitar el cuadro roto)
-        # Lo centramos usando 3 columnas
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # 🆕 EL ESCUDO CON TAMAÑO FIJO (No gigante)
+        # Usamos columnas más amplias para que quepa bien centrado
+        col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            st.image("escudo.png", use_container_width=True)
+            # width=75 significa que medirá 75 píxeles (tamaño perfecto)
+            st.image("escudo.png", width=75)
 
         # Lógica del menú
         if "menu" not in st.session_state or \
@@ -6937,7 +6938,6 @@ def menu_lateral():
             st.rerun()
             
     return op
-
 def _enrutar(op, usuario):
     v = RUTAS.get(op)
     if not v:
