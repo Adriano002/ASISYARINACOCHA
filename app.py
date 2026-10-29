@@ -7391,7 +7391,7 @@ def _control_faltas():
 # ─── MAIN ──────────────────────────────────────────────────────────────────
 
 
-d@st.cache_resource
+@st.cache_resource
 def _iniciar_hilo_backup_una_vez():
     """Arranca el hilo de backup UNA SOLA VEZ por proceso de Python."""
     hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
