@@ -440,6 +440,15 @@ def activar_periodo(idp, usuario):
         cur.execute("UPDATE periodos SET activo=1 WHERE id=?", (idp,))
     auditar(usuario["usuario"], f"Activo periodo id={idp}",
             tb="periodos", rid=idp)
+
+    # 🆕 SUBIR INMEDIATAMENTE A R2
+    try:
+        from sync import subir_bd
+        from db import DB_PATH
+        subir_bd(DB_PATH)
+    except Exception as e:
+        log.error(f"Fallo backup tras activar periodo: {e}")
+
     return True, "Periodo activado."
 
 
@@ -2450,6 +2459,15 @@ def cerrar_ano_escolar(usuario, pid, nuevo_nombre, fi, ff):
         """, (nuevo_nombre, to_date(fi), to_date(ff)))
     auditar(usuario["usuario"], f"Cerro periodo {p['nombre']}",
             tb="periodos", rid=pid)
+
+    # 🆕 SUBIR INMEDIATAMENTE A R2
+    try:
+        from sync import subir_bd
+        from db import DB_PATH
+        subir_bd(DB_PATH)
+    except Exception as e:
+        log.error(f"Fallo backup tras cerrar año: {e}")
+
     return True, f"Periodo '{p['nombre']}' cerrado. Nuevo: '{nuevo_nombre}'."
 
 
@@ -5662,15 +5680,15 @@ def _frag_importar_excel():
 def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
-    
+
     tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
-    
+
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
         if not df.empty:
             st.dataframe(df, width='stretch')
-            
+
     with tabs[1]:
         st.subheader("Crear nuevo periodo")
         with st.form("crear_periodo_form"):
@@ -5681,7 +5699,7 @@ def vista_auditoria():
                 fi = st.date_input("Fecha de inicio", ahora().date())
             with c3:
                 ff = st.date_input("Fecha de fin", ahora().date() + timedelta(days=270))
-            
+
             if st.form_submit_button("Crear y Activar Periodo", type="primary"):
                 if not nom.strip():
                     st.error("Ingresa un nombre para el periodo.")
@@ -5689,11 +5707,20 @@ def vista_auditoria():
                     st.error("El periodo debe durar mínimo 1 mes.")
                 else:
                     with cursor() as (con, cur):
-                        cur.execute("INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) VALUES(?,?,?,1,0)", 
+                        cur.execute("INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) VALUES(?,?,?,1,0)",
                                     (nom.strip(), to_date(fi), to_date(ff)))
                         nuevo_id = cur.lastrowid
                         cur.execute("UPDATE periodos SET activo=0 WHERE id!=?", (nuevo_id,))
                     auditar(usuario["usuario"], f"Creo periodo {nom}", tb="periodos", rid=nuevo_id)
+
+                    # 🆕 SUBIR INMEDIATAMENTE A R2
+                    try:
+                        from sync import subir_bd
+                        from db import DB_PATH
+                        subir_bd(DB_PATH)
+                    except Exception as e:
+                        log.error(f"Fallo backup tras crear periodo: {e}")
+
                     st.success(f"Periodo '{nom}' creado y activado con éxito.")
                     time.sleep(1)
                     st.rerun()
@@ -5715,7 +5742,7 @@ def vista_auditoria():
                 st.success("El periodo ya tiene alumnos cargados.")
             else:
                 st.warning("El periodo NO tiene alumnos. Sube el Excel aquí abajo.")
-            
+
             _frag_importar_excel()
         else:
             st.warning("Primero debes crear un periodo arriba para poder cargar alumnos.")
@@ -5752,7 +5779,7 @@ def vista_auditoria():
             st.info("No hay periodo activo.")
             return
         st.info(f"Periodo activo: {p['nombre']} ({p['fecha_inicio']} - {p['fecha_fin']})")
-        
+
         st.markdown("Reporte resumen del periodo:")
         df_rep = reporte_cierre_anual(p["id"])
         if not df_rep.empty:
@@ -7339,18 +7366,21 @@ def _control_faltas():
     except Exception as e:
         log.warning(f"No se pudieron procesar faltas al cierre: {e}")
 # ─── MAIN ──────────────────────────────────────────────────────────────────
+
+
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
-        from db import descargar_bd_si_no_existe
+        # 🆕 SIEMPRE descarga la BD más reciente de R2 al arrancar
+        from sync import descargar_bd_si_no_existe
         descargar_bd_si_no_existe()
 
         inicializar_bd()
         aplicar_estilos()
 
-        # 🆕 ENCENDEMOS EL RELOJ DE BACKUP (Solo se inicia una vez)
+        # 🆕 ENCENDEMOS EL RELOJ DE BACKUP (9:00 AM y 3:00 PM)
         if "backup_hilo_iniciado" not in st.session_state:
             st.session_state["backup_hilo_iniciado"] = True
             hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
@@ -7361,19 +7391,17 @@ def main():
         if not st.session_state.get("user"):
             token = st.query_params.get("sesion")
             ts_str = st.query_params.get("ts")
-            
+
             if token and ts_str:
                 try:
                     tiempo_ingreso = int(ts_str)
                     ahora_ts = int(time.time())
                     diferencia = ahora_ts - tiempo_ingreso
-                    
-                    # Si pasaron más de 300 segundos (5 minutos), lo pateamos al login
+
                     if diferencia > 300:
                         st.query_params.clear()
                         st.warning("Sesión expirada por inactividad. Vuelve a ingresar.")
                     else:
-                        # Si está dentro de los 5 min, recuperamos al usuario
                         with cursor() as (con, cur):
                             cur.execute("SELECT * FROM usuarios WHERE usuario=? AND activo=1", (token,))
                             f = cur.fetchone()
@@ -7381,31 +7409,29 @@ def main():
                                 u = dict(f)
                                 u["bloqueado_hasta"] = fmt_ts(u.get("bloqueado_hasta"))
                                 st.session_state["user"] = u
-                                # Renovamos el tiempo en cada recarga
                                 st.query_params["ts"] = str(ahora_ts)
                 except Exception:
                     st.query_params.clear()
 
-        # 🆕 SEGURIDAD: SI NO HAY USUARIO, LIMPIAMOS LA URL Y AL LOGIN
         if not st.session_state.get("user"):
             st.query_params.clear()
             vista_login()
             return
-            
+
         # --- VALIDACIONES DE SISTEMA ---
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
             st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
-            
+
         if st.session_state["user"].get("debe_cambiar_password"):
             vista_cambio_password_obligatorio()
             return
-            
+
         if modo_mantenimiento() and st.session_state["user"]["rol"] != "Admin":
             vista_mantenimiento()
             return
-            
+
         if sistema_bloqueado():
             st.warning("El sistema no esta configurado. No hay periodo activo "
                        "con alumnos cargados.")
@@ -7417,17 +7443,16 @@ def main():
             else:
                 st.info("Contacta al Administrador.")
             return
-        
-        # 🆕 _control_faltas() ELIMINADO DEL MAIN (Se ejecuta en las vistas correspondientes)
-            
+
         # Menú y ruteo
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
-            
+
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
+
 
 if __name__ == "__main__":
     main()
