@@ -1763,65 +1763,12 @@ def _perfil_alumno(idal):
     al = d["alumno"]
     usuario = st.session_state["user"]
 
-    # Limpieza de estado
+    # Limpieza de estado al entrar
     ultimo_id = st.session_state.get("_perfil_ultimo_id")
     if ultimo_id != idal:
         for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"):
             st.session_state.pop(k, None)
     st.session_state["_perfil_ultimo_id"] = idal
-
-    # ══════════════════════════════════════════════════════════════════
-    # 1. CSS LOCAL (Para el perfil)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("""<style>
-    .perfil-hero {
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
-        border-radius: 20px;
-        padding: 30px;
-        color: white;
-        display: flex;
-        align-items: center;
-        gap: 25px;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px rgba(232,123,74,0.25);
-    }
-    .perfil-avatar {
-        width: 90px; height: 90px; border-radius: 50%;
-        background: rgba(255,255,255,0.25);
-        border: 3px solid rgba(255,255,255,0.6);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 38px; font-weight: 900; color: white;
-        flex-shrink: 0;
-    }
-    .perfil-nombre { font-size: 28px; font-weight: 900; margin: 0 0 5px 0; color: white !important; }
-    .perfil-meta { font-size: 15px; opacity: 0.9; margin: 0; color: white !important; }
-    .perfil-badge {
-        display: inline-block; margin-top: 10px; padding: 4px 12px;
-        background: rgba(255,255,255,0.2); border-radius: 12px;
-        font-size: 12px; font-weight: 800; letter-spacing: 1px;
-        border: 1px solid rgba(255,255,255,0.4); color: white !important;
-    }
-    
-    .stat-grid {
-        display: grid; grid-template-columns: repeat(4, 1fr);
-        gap: 15px; margin-bottom: 25px;
-    }
-    .stat-card {
-        background: var(--secondary-background-color, #FFF);
-        border-radius: 16px; padding: 20px; text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-bottom: 4px solid #E87B4A;
-    }
-    .stat-num { font-size: 32px; font-weight: 900; color: #E87B4A !important; margin: 0 0 5px 0; }
-    .stat-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-color, #666) !important; opacity: 0.7; }
-    
-    .info-card {
-        background: var(--secondary-background-color, #FFF);
-        border-radius: 16px; padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid rgba(232,123,74,0.2);
-        margin-bottom: 20px;
-    }
-    .info-card h3 { margin-top: 0; color: #E87B4A !important; font-size: 16px; border-bottom: 2px solid rgba(232,123,74,0.2); padding-bottom: 10px; }
-    </style>""", unsafe_allow_html=True)
 
     # Botón Volver
     if st.button("← Volver a la lista", key="volver_perfil"):
@@ -1830,77 +1777,102 @@ def _perfil_alumno(idal):
         st.rerun()
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. HEADER DEL PERFIL
+    # 1. CSS MÍNIMO (Solo tipografía y ajustes de las tarjetas)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("""<style>
+    .perfil-titulo { font-size: 28px; font-weight: 900; color: #E87B4A !important; margin-bottom: 5px; }
+    .perfil-meta { font-size: 15px; opacity: 0.8; margin-bottom: 15px; }
+    
+    /* Grilla para las métricas */
+    .metric-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 15px; margin-bottom: 20px; margin-top: 15px;
+    }
+    .metric-card {
+        background: var(--secondary-background-color); /* Respeta el modo oscuro/claro */
+        border-radius: 12px; padding: 15px; text-align: center;
+        border: 1px solid rgba(128,128,128,0.2);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .metric-num { font-size: 28px; font-weight: 900; margin: 0 0 5px 0; }
+    .metric-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; opacity: 0.7; }
+    </style>""", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 2. TARJETA PRINCIPAL DEL ALUMNO
     # ══════════════════════════════════════════════════════════════════
     nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
     inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
-    estado_txt = "BLOQUEADO" if d["bloqueado"] else "ACTIVO"
-    color_badge = "#EF4444" if d["bloqueado"] else "#22C55E"
-
-    st.markdown(f"""<div class="perfil-hero">
-        <div class="perfil-avatar">{inicial}</div>
-        <div>
-            <h1 class="perfil-nombre">{nombre}</h1>
-            <p class="perfil-meta">{al['grado']} {al['seccion']} &nbsp;|&nbsp; Turno {al['turno']} &nbsp;|&nbsp; DNI: {al['dni']}</p>
-            <span class="perfil-badge" style="background:{color_badge}; border:none;">{estado_txt}</span>
-        </div>
-    </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 3. TARJETAS DE ESTADÍSTICAS (Reemplaza a st.metric)
-    # ══════════════════════════════════════════════════════════════════
-    stats_html = f"""<div class="stat-grid">
-        <div class="stat-card" style="border-bottom-color: #22C55E;"><div class="stat-num" style="color:#22C55E !important;">{d['total_puntuales']}</div><div class="stat-lbl">Puntuales</div></div>
-        <div class="stat-card" style="border-bottom-color: #F59E0B;"><div class="stat-num" style="color:#F59E0B !important;">{d['total_tardanzas']}</div><div class="stat-lbl">Tardanzas</div></div>
-        <div class="stat-card" style="border-bottom-color: #EF4444;"><div class="stat-num" style="color:#EF4444 !important;">{d['total_faltas']}</div><div class="stat-lbl">Faltas</div></div>
-        <div class="stat-card" style="border-bottom-color: #3B82F6;"><div class="stat-num" style="color:#3B82F6 !important;">{d['total_ref_asistio']}</div><div class="stat-lbl">Reforzamiento</div></div>
-    </div>
-    <div class="stat-grid">
-        <div class="stat-card" style="border-bottom-color: #E87B4A;"><div class="stat-num">{d['tard_injust']}</div><div class="stat-lbl">Tard. Injust.</div></div>
-        <div class="stat-card" style="border-bottom-color: #E87B4A;"><div class="stat-num">{d['n_ciclo']}</div><div class="stat-lbl">Tard. desde desbloqueo</div></div>
-        <div class="stat-card" style="border-bottom-color: #E87B4A;"><div class="stat-num">{d['limite']}</div><div class="stat-lbl">Límite permitido</div></div>
-        <div class="stat-card" style="border-bottom-color: #E87B4A;"><div class="stat-num" style="color: {'#EF4444' if d['bloqueado'] else '#22C55E'} !important;">{'SI' if d['bloqueado'] else 'NO'}</div><div class="stat-lbl">Bloqueado</div></div>
-    </div>"""
-    st.markdown(stats_html, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 4. DATOS DEL APODERADO Y ACCIONES
-    # ══════════════════════════════════════════════════════════════════
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        apo = al['nombre_apoderado'] or 'No registrado'
-        tel = al['telefono_apoderado'] or 'No registrado'
-        st.markdown(f"""<div class="info-card">
-            <h3>Datos del Apoderado</h3>
-            <p style="margin:5px 0;"><b>Nombre:</b> {apo}</p>
-            <p style="margin:5px 0;"><b>Teléfono:</b> {tel}</p>
-        </div>""", unsafe_allow_html=True)
-        
-    with c2:
-        st.markdown(f"""<div class="info-card">
-            <h3>Acciones Rápidas</h3>
-            <p style="font-size:13px; opacity:0.8;">Genera documentos o gestiona el estado del alumno.</p>
-        </div>""", unsafe_allow_html=True)
-        # Botones de acción nativos (se estilizan con el CSS local)
-        col_b1, col_b2, col_b3 = st.columns(3)
-        with col_b1:
-            pdf = pdf_carnet_alumno(al["dni"])
-            if pdf:
-                st.download_button("Carnet QR", pdf, f"carnet_{al['dni']}.pdf", "application/pdf", use_container_width=True)
-        with col_b2:
-            st.download_button("Historial", df_a_xlsx(d["asistencias"], "Historial"), f"hist_{al['dni']}.xlsx", use_container_width=True)
-        with col_b3:
+    
+    with st.container(border=True):
+        c_avatar, c_info = st.columns([1, 5])
+        with c_avatar:
+            # Usamos HTML nativo para el círculo del avatar
+            st.markdown(f"""
+            <div style="width: 70px; height: 70px; border-radius: 50%; background: #E87B4A; 
+                        display: flex; align-items: center; justify-content: center; 
+                        font-size: 30px; font-weight: 900; color: white;">
+                {inicial}
+            </div>
+            """, unsafe_allow_html=True)
+        with c_info:
+            st.markdown(f'<div class="perfil-titulo">{nombre}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="perfil-meta">{al["grado"]} {al["seccion"]} | Turno {al["turno"]} | DNI: {al["dni"]}</div>', unsafe_allow_html=True)
+            
+            # Badge de estado (usa st.success/st.error para respetar el tema)
             if d["bloqueado"]:
-                if st.button("Desbloquear", type="primary", use_container_width=True):
-                    liberar_bloqueo(al["id"], usuario, "Desbloqueado desde perfil")
-                    st.rerun()
+                st.error("ESTADO: BLOQUEADO")
             else:
-                if st.button("Bloquear", type="primary", use_container_width=True):
-                    crear_bloqueo(al["id"], "BLOQUEO MANUAL", usuario)
-                    st.rerun()
+                st.success("ESTADO: ACTIVO")
 
     # ══════════════════════════════════════════════════════════════════
-    # 5. TABS (Asistencias, Tardanzas, etc.)
+    # 3. MÉTRICAS (En tarjetas HTML que respetan el tema)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown(f"""
+    <div class="metric-grid">
+        <div class="metric-card"><div class="metric-num" style="color:#22C55E;">{d['total_puntuales']}</div><div class="metric-lbl">Puntuales</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:#F59E0B;">{d['total_tardanzas']}</div><div class="metric-lbl">Tardanzas</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:#EF4444;">{d['total_faltas']}</div><div class="metric-lbl">Faltas</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:#3B82F6;">{d['total_ref_asistio']}</div><div class="metric-lbl">Reforzamiento</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:#F59E0B;">{d['tard_injust']}</div><div class="metric-lbl">Tard. Injust.</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:#E87B4A;">{d['n_ciclo']}</div><div class="metric-lbl">Tard. desde desbloqueo</div></div>
+        <div class="metric-card"><div class="metric-num">{d['limite']}</div><div class="metric-lbl">Límite permitido</div></div>
+        <div class="metric-card"><div class="metric-num" style="color:{'#EF4444' if d['bloqueado'] else '#22C55E'};">{'SI' if d['bloqueado'] else 'NO'}</div><div class="metric-lbl">Bloqueado</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 4. ACCIONES Y APODERADO
+    # ══════════════════════════════════════════════════════════════════
+    col1, col2 = st.columns(2)
+    with col1:
+        with st.container(border=True):
+            st.markdown("**Datos del Apoderado**")
+            st.write(f"Nombre: {al['nombre_apoderado'] or '-'}")
+            st.write(f"Teléfono: {al['telefono_apoderado'] or '-'}")
+            
+    with col2:
+        with st.container(border=True):
+            st.markdown("**Acciones Rápidas**")
+            c_b1, c_b2, c_b3 = st.columns(3)
+            with c_b1:
+                pdf = pdf_carnet_alumno(al["dni"])
+                if pdf:
+                    st.download_button("Carnet", pdf, f"carnet_{al['dni']}.pdf", "application/pdf", use_container_width=True, type="primary")
+            with c_b2:
+                st.download_button("Historial", df_a_xlsx(d["asistencias"], "Historial"), f"hist_{al['dni']}.xlsx", use_container_width=True)
+            with c_b3:
+                if d["bloqueado"]:
+                    if st.button("Desbloquear", type="primary", use_container_width=True, key="btn_desbloqueo"):
+                        liberar_bloqueo(al["id"], usuario, "Desbloqueado desde perfil")
+                        st.rerun()
+                else:
+                    if st.button("Bloquear", type="primary", use_container_width=True, key="btn_bloqueo"):
+                        crear_bloqueo(al["id"], "BLOQUEO MANUAL", usuario)
+                        st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════
+    # 5. TABS (Con st.dataframe nativo y ligero)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("<br>", unsafe_allow_html=True)
     tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos", "Justificaciones"])
@@ -1909,11 +1881,10 @@ def _perfil_alumno(idal):
         if d["asistencias"].empty:
             st.info("Sin asistencias registradas.")
         else:
-            # st.dataframe es interactivo y ligero para mostrar tablas
             df_ast = d["asistencias"][["fecha", "tipo", "estado", "hora", "justificada"]].copy()
             df_ast["justificada"] = df_ast["justificada"].apply(lambda x: "SÍ" if x else "NO")
             st.dataframe(df_ast, use_container_width=True, hide_index=True)
-            
+
     with tabs[1]:
         if d["tardanzas"].empty:
             st.info("Sin tardanzas registradas.")
