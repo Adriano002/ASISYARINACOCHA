@@ -5778,41 +5778,31 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
-    # ══════════════════════════════════════════════════════════════════
-    # 1. CSS MÍNIMO (Solo para centrar y dar un toque elegante al título)
-    # ══════════════════════════════════════════════════════════════════
+    # Fondo degradado sutil que respeta el tema
     st.markdown("""<style>
-    /* Solo ajustamos el título para que sea grande y naranja */
-    .login-title {
-        font-size: 38px; 
-        font-weight: 900; 
-        color: #E87B4A !important;
-        text-align: center;
-        margin-bottom: 5px; 
-        letter-spacing: -1px;
-    }
-    .login-sub { 
-        font-size: 16px; 
-        text-align: center;
-        margin-bottom: 20px; 
-        font-weight: 600; 
-        opacity: 0.7;
+    body::before {
+        content: ""; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: linear-gradient(135deg, rgba(232,123,74,0.1) 0%, rgba(232,123,74,0.2) 100%);
+        z-index: -1; pointer-events: none;
     }
     </style>""", unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA NATIVA (Cero forcéo de fondos)
-    # ══════════════════════════════════════════════════════════════════
-    # Columnas para centrar el contenido
     _, centro, _ = st.columns([1, 1.2, 1])
-    
     with centro:
-        # 🆕 Usamos el contenedor nativo con borde. Streamlit lo pinta perfecto en modo claro y oscuro.
+        # Tarjeta usando st.container (fondo nativo)
         with st.container(border=True):
-            st.markdown('<div class="login-title">asisyarina</div>', unsafe_allow_html=True)
-            st.markdown('<div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>', unsafe_allow_html=True)
+            c_img1, c_img2, c_img3 = st.columns([1, 1.5, 1])
+            with c_img2:
+                # Si tienes el escudo, descomenta la siguiente línea:
+                # st.image("escudo.png", use_container_width=True)
+                pass
             
-            # Formulario nativo
+            st.markdown("""
+            <h1 style='text-align: center; color: #E87B4A; margin-bottom: 0; font-weight: 900;'>asisyarina</h1>
+            <p style='text-align: center; opacity: 0.7; font-weight: 600;'>Sistema de Asistencia I.E. Yarinacocha</p>
+            <br>
+            """, unsafe_allow_html=True)
+            
             with st.form("login"):
                 usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
                 password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
