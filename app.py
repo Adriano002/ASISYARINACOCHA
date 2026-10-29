@@ -2469,6 +2469,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from pathlib import Path
 
     buf = BytesIO()
+    # Márgenes óptimos
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
                             rightMargin=1.5*cm, leftMargin=1.5*cm,
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
@@ -2487,7 +2488,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(PageBreak())
         primera = False
 
-        # CABECERA CON ESCUDO
+        # ─── CABECERA CON ESCUDO A LA DERECHA ───
         cabecera_data = []
         if escudo_path.exists():
             try:
@@ -2510,7 +2511,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#B85C38')),
+            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')), # Línea delgada
         ]))
         el.append(tabla_cabecera)
         el.append(Spacer(1, 12))
@@ -2527,65 +2528,59 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 continue
 
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
-            at = 21 * cm 
-
+            
             if es_hoja_faltas:
-                ancho_grado = 2.0 * cm
-                ancho_alumno = (at - 2 * ancho_grado) / 2
-                col_widths = [ancho_grado, ancho_alumno, ancho_grado, ancho_alumno]
+                # Hoja de faltas: 4 columnas exactas
+                col_widths = [2.0*cm, 8.5*cm, 2.0*cm, 8.5*cm]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 t.setStyle(TableStyle([
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#4CAF50')),
-                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#F44336')),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#E8F5E9')), # Verde suave
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#FFEBEE')), # Rojo suave
                     ("ALIGN", (0, 0), (0, -1), "CENTER"),
                     ("ALIGN", (2, 0), (2, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]))
             else:
-                # 🆕 AJUSTE INTELIGENTE DE ANCHOS (Números angostos, nombres anchos)
+                # 🆕 PROPORCIONES EXACTAS: N y Estado se quedan con lo mínimo
                 col_widths = []
                 for col in df.columns:
                     cl = str(col).lower()
                     if cl == "n":
-                        col_widths.append(1.2 * cm) # Columna "N" angosta
+                        col_widths.append(1.0)  # Peso bajo
                     elif cl == "estado":
-                        col_widths.append(1.8 * cm) # Columna "Estado" angosta
+                        col_widths.append(1.5)  # Peso bajo
                     elif "hora" in cl:
-                        col_widths.append(2.0 * cm)
+                        col_widths.append(2.0)
                     elif "apellido" in cl or "nombre" in cl:
-                        col_widths.append(8.0 * cm) # Nombres anchos
-                    elif "observacion" in cl:
-                        col_widths.append(5.0 * cm)
+                        col_widths.append(10.0) # Peso alto
                     else:
-                        col_widths.append(3.0 * cm)
+                        col_widths.append(3.0)
                 
-                total_w = sum(col_widths)
-                if total_w < at:
-                    sobra = at - total_w
-                    for i, col in enumerate(df.columns):
-                        cl = str(col).lower()
-                        if "apellido" in cl or "nombre" in cl:
-                            col_widths[i] += (sobra / 2)
+                # Convertir pesos a centímetros reales (Ancho total = 21 cm)
+                total_peso = sum(col_widths)
+                col_widths = [(w / total_peso) * 21 * cm for w in col_widths]
                 
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')), # Letras oscuras
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#F5F5F5')), # Fondo gris muy claro
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor('#CCCCCC')), # Línea sutil debajo del título
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')), # Grid gris clarito
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]
                 
+                # Colores para P, T, F
                 col_estado = None
                 for j, c in enumerate(df.columns):
                     if str(c).lower() == "estado":
