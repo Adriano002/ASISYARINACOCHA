@@ -6530,7 +6530,7 @@ def main():
         descargar_bd_si_no_existe()
 
         inicializar_bd()
-        aplicar_estilos()
+        # aplicar_estilos()
 
         if not st.session_state.get("user"):
             vista_login()
