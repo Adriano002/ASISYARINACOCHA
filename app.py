@@ -2523,10 +2523,10 @@ def pdf_carnets_todos():
 
 
 def pdf_carnet_individual(dni):
-    from reportlab.platypus import SimpleDocTemplate
+    from reportlab.pdfgen import canvas as pdfcanvas
     from reportlab.lib.pagesizes import mm
     from io import BytesIO
-    from reportlab.platypus import Image as RLImage
+    from reportlab.lib.utils import ImageReader
     from pathlib import Path
 
     with cursor() as (con, cur):
@@ -2551,20 +2551,17 @@ def pdf_carnet_individual(dni):
     img.save(ib, format="PNG")
     ib.seek(0)
     
-    # Tamaño exacto de un carnet (85mm x 53mm)
     ANCHO_CARNET = 85 * mm
     ALTO_CARNET = 53 * mm
     
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET),
-                            rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0)
-    
-    img_rl = RLImage(ib, width=ANCHO_CARNET, height=ALTO_CARNET)
-    doc.build([img_rl])
+    # 🆕 Usamos Canvas directo (Cero margenes ocultos)
+    c = pdfcanvas.Canvas(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET))
+    c.drawImage(ImageReader(ib), 0, 0, width=ANCHO_CARNET, height=ALTO_CARNET)
+    c.save()
     
     buf.seek(0)
     return buf.getvalue()
-
 
 def pdf_carnet_alumno(dni):
     from reportlab.platypus import SimpleDocTemplate # 🆕 FIX
