@@ -4752,46 +4752,93 @@ def _frag_usuarios_botones():
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
 
-    if soy_principal:
-        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
-                     "es_principal FROM usuarios "
-                     "ORDER BY nombres, usuario")
-    else:
-        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
-                     "es_principal FROM usuarios WHERE id=? OR rol!='Admin' "
-                     "ORDER BY nombres, usuario", (usuario["id"],))
+    st.markdown("### Buscar Usuarios")
+    st.caption("Selecciona un filtro para cargar la lista (ahorra memoria al no mostrar todo de golpe).")
 
-    if df.empty:
-        st.info("Sin usuarios.")
-        return
+    # 🆕 FILTROS
+    c1, c2 = st.columns(2)
+    with c1:
+        roles_disponibles = ["Todos", "Admin", "Direccion", "Auxiliar"]
+        filtro_rol = st.selectbox("Filtrar por Rol", roles_disponibles, key="usr_filtro_rol")
+    with c2:
+        filtro_nombre = st.text_input("Buscar por nombre o usuario", key="usr_filtro_nombre", placeholder="Ej: admin")
 
-    for _, u in df.iterrows():
-        etiqueta_rol = ("Admin (principal)"
-                        if (u["rol"] == "Admin" and u["es_principal"])
-                        else ("Sub Admin" if u["rol"] == "Admin" else u["rol"]))
-        estado = "🟢 Activo" if u["activo"] else "🔴 Inactivo"
+    if st.button("🔍 Buscar Usuarios", type="primary", width='stretch'):
+        st.session_state["_buscar_usuarios_activado"] = True
 
-        with st.container():
-            c1, c2 = st.columns([5, 1])
-            c1.markdown(
-                f"**{u['nombres']}** &nbsp; "
-                f"<span style='color:#6B6B6B;'>({u['usuario']})</span> &nbsp; "
-                f"<span style='color:#B85C38; font-weight:700;'>{etiqueta_rol}</span> "
-                f"&nbsp; {estado}",
-                unsafe_allow_html=True)
-            if c2.button("Ver / Editar", key=f"ver_u_{u['id']}",
-                         width='stretch'):
-                current = st.session_state.get(f"_editando_u_{u['id']}", False)
-                st.session_state[f"_editando_u_{u['id']}"] = not current
-                st.rerun()
+    if st.session_state.get("_buscar_usuarios_activado"):
+        if filtro_rol == "Todos" and not filtro_nombre.strip():
+            st.info("Selecciona un rol o escribe un nombre para buscar.")
+            return
 
-        if st.session_state.get(f"_editando_u_{u['id']}"):
-            ok, msg = puede_gestionar_usuario(usuario, int(u["id"]))
-            if not ok:
-                st.warning(msg)
-            else:
-                _usuario_form_editar(int(u["id"]))
-            st.markdown("---")
+        # Construimos la consulta dinámicamente
+        query = "SELECT id, usuario, rol, nombres, activo, ultimo_login, es_principal FROM usuarios WHERE 1=1"
+        params = []
+        
+        if not soy_principal:
+            # Si no es principal, no puede ver a los otros Admins (excepto a sí mismo)
+            query += " AND (id=? OR rol!='Admin')"
+            params.append(usuario["id"])
+
+        if filtro_rol != "Todos":
+            query += " AND rol=?"
+            params.append(filtro_rol)
+            
+        if filtro_nombre.strip():
+            query += " AND (LOWER(nombres) LIKE ? OR LOWER(usuario) LIKE ?)"
+            pat = f"%{filtro_nombre.strip().lower()}%"
+            params += [pat, pat]
+
+        query += " ORDER BY nombres, usuario"
+        df = leer_df(query, params)
+
+        if df.empty:
+            st.info("No se encontraron usuarios con esos filtros.")
+            return
+
+        st.write(f"**{len(df)} usuarios encontrados**")
+        
+        # 🆕 MOSTRAMOS SOLO UN DATAFRAME (Cero CSS, cero botones gastando RAM)
+        df_mostrar = df.copy()
+        df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "🟢 Activo" if x else "🔴 Inactivo")
+        df_mostrar["rol_ui"] = df_mostrar.apply(
+            lambda r: "Admin (principal)" if (r["rol"] == "Admin" and r["es_principal"]) 
+            else ("Sub Admin" if r["rol"] == "Admin" else r["rol"]), axis=1
+        )
+        
+        # Formateamos las columnas para que se vea limpio
+        df_mostrar = df_mostrar[["nombres", "usuario", "rol_ui", "estado", "ultimo_login"]]
+        df_mostrar.columns = ["Nombres", "Usuario", "Rol", "Estado", "Último Login"]
+        
+        st.dataframe(df_mostrar, width='stretch', hide_index=True)
+
+        st.markdown("---")
+        st.subheader("Editar un usuario")
+        
+        # El único botón que se genera es para el selectbox
+        ops = {f"{r['nombres']} ({r['usuario']})": r["id"] for _, r in df.iterrows()}
+        sel = st.selectbox("Selecciona el usuario a editar", list(ops.keys()))
+        
+        if st.button("Ver / Editar usuario seleccionado", width='stretch'):
+            st.session_state["_editando_u_" + str(ops[sel])] = True
+            st.rerun()
+
+    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Si se seleccionó a alguien)
+    for key in list(st.session_state.keys()):
+        if key.startswith("_editando_u_"):
+            idu = int(key.replace("_editando_u_", ""))
+            if st.session_state[key]:
+                st.markdown("---")
+                ok, msg = puede_gestionar_usuario(usuario, idu)
+                if not ok:
+                    st.warning(msg)
+                    st.session_state[key] = False
+                else:
+                    _usuario_form_editar(idu)
+                
+                if st.button("Cancelar edición", key=f"cancel_edit_{idu}"):
+                    st.session_state[key] = False
+                    st.rerun()
 
 
 def _frag_usuarios_crear():
