@@ -1753,332 +1753,8 @@ def perfil_alumno_datos(idal):
             "limite": calcular_limite(_es_reincidente(idal)),
             "bloqueado": alumno_bloqueado(idal) is not None}
 
-def _perfil_alumno(idal):
-    d = perfil_alumno_datos(idal)
-    if not d:
-        st.warning("Alumno no encontrado.")
-        st.session_state.pop("perfil_alumno_id", None)
-        return
-
-    al = d["alumno"]
-    usuario = st.session_state["user"]
-
-    # Limpieza de estado al entrar
-    ultimo_id = st.session_state.get("_perfil_ultimo_id")
-    if ultimo_id != idal:
-        for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"):
-            st.session_state.pop(k, None)
-    st.session_state["_perfil_ultimo_id"] = idal
-
-    if st.button("← Volver a la lista", key="volver_perfil"):
-        st.session_state.pop("perfil_alumno_id", None)
-        st.session_state.pop("_perfil_ultimo_id", None)
-        st.rerun()
-
-    # Datos principales
-    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
-    inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
-
-    # 🆕 DISEÑO NATIVO STREAMLIT (Sin HTML)
-    with st.container(border=True):
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            # Avatar simulado con Markdown grande
-            st.markdown(f"<h1 style='text-align: center; color: #E87B4A; font-size: 60px; margin: 0;'>{inicial}</h1>", unsafe_allow_html=True)
-        with c2:
-            st.subheader(nombre)
-            st.write(f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
-            estado_txt = "🔴 BLOQUEADO" if d["bloqueado"] else "🟢 ACTIVO"
-            st.markdown(f"**Estado:** {estado_txt}")
-
-    # Datos del Apoderado
-    with st.container(border=True):
-        st.markdown("**Datos del Apoderado**")
-        c1, c2 = st.columns(2)
-        c1.write(f"**Apoderado:** {al['nombre_apoderado'] or '-'}")
-        c2.write(f"**Teléfono:** {al['telefono_apoderado'] or '-'}")
-
-    # Estadísticas
-    with st.container(border=True):
-        st.markdown("**Estadísticas del Periodo**")
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Puntuales", d['total_puntuales'])
-        c2.metric("Tardanzas", d['total_tardanzas'])
-        c3.metric("Faltas", d['total_faltas'])
-        c4.metric("Reforzamiento", d['total_ref_asistio'])
-        c5.metric("Tard. Injust.", d['tard_injust'])
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Tard. desde desbloqueo", d['n_ciclo'])
-        c2.metric("Límite permitido", d['limite'])
-        c3.metric("Reincidente", "SI" if d['reincidente'] else "NO")
-        c4.metric("Bloqueado", "SI" if d['bloqueado'] else "NO")
-
-    # Gestión de Bloqueo y Acciones
-    c_izq, c_der = st.columns(2)
-    with c_izq:
-        with st.container(border=True):
-            st.markdown("**Gestión de Bloqueo Manual**")
-            if d["bloqueado"]:
-                st.error("Este alumno está BLOQUEADO actualmente.")
-                if st.button("Desbloquear Alumno Ahora", type="primary", width='stretch', key="btn_desbloq_manual"):
-                    liberar_bloqueo(al["id"], usuario, "Desbloqueado manualmente desde perfil")
-                    st.toast("Alumno desbloqueado.")
-                    st.rerun()
-            else:
-                st.info("El alumno no está bloqueado.")
-                motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)", key="motivo_bloq_manual", placeholder="Ej: Falta grave...")
-                if st.button("Bloquear Alumno Ahora", type="primary", width='stretch', key="btn_bloq_manual"):
-                    if not motivo_manual.strip():
-                        st.error("El motivo es obligatorio.")
-                    else:
-                        crear_bloqueo(al["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
-                        st.toast(f"Alumno {al['nombres']} bloqueado manualmente.")
-                        st.rerun()
-
-    with c_der:
-        with st.container(border=True):
-            st.markdown("**Acciones**")
-            pdf = pdf_carnet_alumno(al["dni"])
-            if pdf:
-                st.download_button("📄 Carnet QR", pdf, f"carnet_{al['dni']}.pdf", "application/pdf", width='stretch', key="acc_carnet")
-            st.download_button("📊 Historial (Excel)", df_a_xlsx(d["asistencias"], "Historial"), f"historial_{al['dni']}.xlsx", width='stretch', key="acc_hist")
-            pdf_res = pdf_resumen_alumno(al["id"])
-            if pdf_res:
-                st.download_button("📑 Resumen (PDF)", pdf_res, f"resumen_{al['dni']}.pdf", "application/pdf", width='stretch', key="acc_res")
-            
-            if usuario["rol"] == "Admin":
-                if al.get("activo", 1) == 1:
-                    if st.button("❌ Desactivar Alumno", width='stretch', key="acc_desac"):
-                        st.session_state["_desac_al"] = True
-                else:
-                    if st.button("✅ Reactivar Alumno", width='stretch', key="acc_reac"):
-                        st.session_state["_reac_al"] = True
-
-    # Confirmaciones de desactivación/reactivación
-    if st.session_state.get("_desac_al"):
-        with st.expander("Confirmar desactivacion", expanded=True):
-            if confirmar_accion("desac_al", "Confirmar", "¿Estas seguro de desactivar a este alumno?"):
-                ok, msg = retirar_alumno(al["id"], al["dni"], usuario)
-                st.session_state.pop("_desac_al", None)
-                st.toast(msg)
-                st.rerun()
-    if st.session_state.get("_reac_al"):
-        with st.expander("Confirmar reactivacion", expanded=True):
-            if confirmar_accion("reac_al", "Confirmar", "¿Estas seguro de reactivar a este alumno?"):
-                ok, msg = reactivar_alumno(al["id"], al["dni"], usuario)
-                st.session_state.pop("_reac_al", None)
-                st.toast(msg)
-                st.rerun()
-
-    # QR
-    with st.expander("Código QR del Alumno"):
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.image(generar_qr(al["dni"]), width=220)
-
-    # Tabs (Asistencias, Tardanzas, etc.)
-    tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos", "Justificaciones previas"])
-
-    with tabs[0]:
-        if d["asistencias"].empty:
-            st.info("Sin asistencias.")
-        else:
-            for _, ast in d["asistencias"].head(50).iterrows():
-                c1, c2, c3, c4 = st.columns([2, 3, 2, 1])
-                c1.write(f"**{ast['fecha']}**")
-                desc = str(ast['tipo']) + " - " + str(ast['estado'])
-                if ast['tipo'] == "evento" and ast.get("evento_nombre"):
-                    desc += " - " + str(ast['evento_nombre'])
-                c2.write(desc)
-                
-                if ast["estado"] == "Falta":
-                    just_flag = bool(ast["justificada"]) if not pd.isna(ast["justificada"]) else False
-                    just_por = ast.get("justificado_por") or ""
-                    just_txt = "Justificada"
-                    if just_flag and just_por:
-                        just_txt += " por " + str(just_por)
-                    c3.write(just_txt if just_flag else "Sin justificar")
-                else:
-                    c3.write("-")
-                    
-                if ast["estado"] == "Falta":
-                    just_flag = bool(ast["justificada"]) if not pd.isna(ast["justificada"]) else False
-                    if just_flag:
-                        if c4.button("Quitar", key="quitar_" + str(ast['id'])):
-                            ok, msg = quitar_justificacion(ast["id"], usuario)
-                            if ok:
-                                st.toast(msg)
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                    else:
-                        puede, _m = _puede_justificar(
-                            fmt_date(ast["fecha"]),
-                            tipo_asistencia=FALTA,
-                            ventana_id=ast.get("ventana_id"))
-                        if puede:
-                            if c4.button("Justificar", key="just_" + str(ast['id'])):
-                                st.session_state["justif_id"] = ast["id"]
-                                st.rerun()
-                        else:
-                            c4.caption("Cerrada")
-
-            if st.session_state.get("justif_id"):
-                jid = st.session_state["justif_id"]
-                st.markdown("---")
-                st.markdown("Justificar falta")
-                obs = st.text_input("Observacion (obligatoria)", key="justif_obs")
-                cc1, cc2 = st.columns(2)
-                with cc1:
-                    if st.button("Confirmar", type="primary"):
-                        if not obs.strip():
-                            st.error("La observacion es obligatoria.")
-                        else:
-                            ok, msg = justificar_asistencia(jid, obs, usuario)
-                            if ok:
-                                st.session_state.pop("justif_id", None)
-                                st.toast(msg)
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                with cc2:
-                    if st.button("Cancelar"):
-                        st.session_state.pop("justif_id", None)
-                        st.rerun()
-
-    with tabs[1]:
-        if d["tardanzas"].empty:
-            st.info("Sin tardanzas.")
-        else:
-            st.dataframe(d["tardanzas"], width='stretch', hide_index=True)
-
-    with tabs[2]:
-        if d["bloqueos"].empty:
-            st.info("Sin bloqueos.")
-        else:
-            st.dataframe(d["bloqueos"], width='stretch', hide_index=True)
-
-    with tabs[3]:
-        if d["permisos"].empty:
-            st.info("Sin permisos registrados para este alumno.")
-        else:
-            st.caption(f"{len(d['permisos'])} permiso(s) registrado(s). Solo se pueden anular los PENDIENTES (futuros).")
-            for _, perm in d["permisos"].iterrows():
-                c1, c2, c3 = st.columns([4, 2, 1])
-                activo = bool(perm["activo"]) if not pd.isna(perm["activo"]) else False
-                with cursor() as (con, cur):
-                    cur.execute("""
-                        SELECT COUNT(*) AS n FROM asistencias
-                        WHERE alumno_id=? AND fecha BETWEEN ? AND ?
-                          AND estado='Permiso'
-                    """, (al["id"], to_date(perm['fecha_inicio']), to_date(perm['fecha_fin'])))
-                    aplicado = (cur.fetchone()["n"] or 0) > 0
-                if not activo:
-                    estado_txt = "🔴 Anulado"
-                elif aplicado:
-                    estado_txt = "🔒 Aplicado"
-                else:
-                    estado_txt = "🟢 Pendiente"
-                c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
-                c2.write(estado_txt)
-                if activo and not aplicado:
-                    if c3.button("Anular", key=f"anul_perm_{perm['id']}"):
-                        st.session_state["_anular_perm_id"] = int(perm["id"])
-                        st.rerun()
-
-            if st.session_state.get("_anular_perm_id"):
-                pid = st.session_state["_anular_perm_id"]
-                st.markdown("---")
-                st.warning("Vas a anular este permiso (pendiente).")
-                motivo_elim = st.text_input("Motivo de anulacion (opcional)", key=f"anul_perm_motivo_{pid}")
-                if confirmar_accion(f"anul_perm_{pid}", "Confirmar anulacion", "¿Estas seguro de anular este permiso?"):
-                    ok, msg = eliminar_permiso(pid, usuario, motivo_elim)
-                    st.session_state.pop("_anular_perm_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"anul_perm_cancel_{pid}"):
-                    st.session_state.pop("_anular_perm_id", None)
-                    st.rerun()
-
-    with tabs[4]:
-        if d["justificaciones_previas"].empty:
-            st.info("Sin justificaciones previas registradas para este alumno.")
-        else:
-            dj = d["justificaciones_previas"].copy()
-
-            def _estado_jp(v):
-                try:
-                    v = int(v)
-                except (ValueError, TypeError):
-                    v = 0
-                if v == 1:
-                    return "🔒 Aplicada"
-                if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
-
-            dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
-            st.caption(f"{len(dj)} justificacion(es) previa(s). Solo se anulan las PENDIENTES.")
-
-            for _, jp in dj.iterrows():
-                c1, c2, c3, c4 = st.columns([3, 3, 2, 1])
-                c1.write(f"**{jp['fecha_objetivo']}**")
-                c2.write(jp["motivo"])
-                c3.write(jp["estado_txt"])
-                try:
-                    aplicada = int(jp["aplicada"])
-                except (ValueError, TypeError):
-                    aplicada = 0
-                if aplicada == 0:
-                    if c4.button("Anular", key=f"anul_jp_{jp['id']}"):
-                        st.session_state["_anular_jp_id"] = int(jp["id"])
-                        st.rerun()
-                elif aplicada == -1:
-                    if c4.button("Reactivar", key=f"reac_jp_{jp['id']}"):
-                        st.session_state["_reactivar_jp_id"] = int(jp["id"])
-                        st.rerun()
-
-            if st.session_state.get("_anular_jp_id"):
-                jid = st.session_state["_anular_jp_id"]
-                st.markdown("---")
-                st.warning("Vas a anular esta justificacion previa (pendiente).")
-                motivo_anul = st.text_input("Motivo de anulacion (opcional)", key=f"anul_jp_motivo_{jid}")
-                if confirmar_accion(f"anul_jp_{jid}", "Confirmar anulacion", "¿Estas seguro de anular esta justificacion?"):
-                    ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
-                    st.session_state.pop("_anular_jp_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"anul_jp_cancel_{jid}"):
-                    st.session_state.pop("_anular_jp_id", None)
-                    st.rerun()
-
-            if st.session_state.get("_reactivar_jp_id"):
-                jid = st.session_state["_reactivar_jp_id"]
-                st.markdown("---")
-                st.info("Vas a reactivar esta justificacion previa (quedara pendiente).")
-                motivo_nuevo = st.text_input("Motivo nuevo (opcional)", key=f"reac_jp_motivo_{jid}")
-                if confirmar_accion(f"reac_jp_{jid}", "Confirmar reactivacion", "¿Estas seguro de reactivar esta justificacion?"):
-                    ok, msg = reactivar_justificacion_previa(jid, usuario, motivo_nuevo)
-                    st.session_state.pop("_reactivar_jp_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"reac_jp_cancel_{jid}"):
-                    st.session_state.pop("_reactivar_jp_id", None)
-                    st.rerun()
-
 
 # ─── MÉTRICAS ──────────────────────────────────────────────────────────────
-@st.cache_data(ttl=10, show_spinner=False)
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -2141,11 +1817,11 @@ def metricas_dia_turno(fecha, id_turno):
             WHERE b.activo=1 AND s.turno_id=?
         """, (id_turno,))
         bloqueados = cur.fetchone()["n"]
-        
     return {"total": total, "puntuales": puntuales, "tardanzas": tardanzas,
             "faltas": faltas, "ref_asistio": ref_asistio,
             "bloqueados": bloqueados, "justificadas": just_hoy,
             "permisos": permisos}
+
 
 def ultimos_registros_turno(fecha, id_turno, limite=30):
     return leer_df("""
@@ -2845,47 +2521,6 @@ def pdf_carnets_todos():
         filas = [dict(r) for r in cur.fetchall()]
     return _render_carnets(filas, "Carnets - Todos los salones") if filas else None
 
-
-def pdf_carnet_individual(dni):
-    from reportlab.pdfgen import canvas as pdfcanvas
-    from reportlab.lib.pagesizes import mm
-    from io import BytesIO
-    from reportlab.lib.utils import ImageReader
-    from pathlib import Path
-
-    with cursor() as (con, cur):
-        cur.execute("""
-            SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
-            FROM alumnos a
-            JOIN secciones s ON a.seccion_id=s.id
-            JOIN grados g ON s.grado_id=g.id
-            JOIN turnos t ON s.turno_id=t.id
-            WHERE a.dni=? AND a.activo=1
-        """, (dni,))
-        filas = [dict(r) for r in cur.fetchall()]
-        
-    if not filas:
-        return None
-        
-    alumno = filas[0]
-    escudo = Path("escudo.png")
-    img = _generar_fotocheck_pil(alumno, escudo if escudo.exists() else None)
-    
-    ib = BytesIO()
-    img.save(ib, format="PNG")
-    ib.seek(0)
-    
-    ANCHO_CARNET = 85 * mm
-    ALTO_CARNET = 53 * mm
-    
-    buf = BytesIO()
-    # 🆕 Usamos Canvas directo (Cero margenes ocultos)
-    c = pdfcanvas.Canvas(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET))
-    c.drawImage(ImageReader(ib), 0, 0, width=ANCHO_CARNET, height=ALTO_CARNET)
-    c.save()
-    
-    buf.seek(0)
-    return buf.getvalue()
 
 def pdf_carnet_alumno(dni):
     from reportlab.platypus import SimpleDocTemplate # 🆕 FIX
@@ -3682,60 +3317,21 @@ def _puerta_manual(usuario, fecha):
 def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
-
-    # ══════════════════════════════════════════════════════════════════
-    # 1. CSS EXCLUSIVO PARA LA PUERTA (Cero gasto de RAM global)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("""<style>
-    .puerta-header {
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
-        border-radius: 20px;
-        padding: 24px 30px;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px rgba(232,123,74,0.25);
-    }
-    .puerta-header h1 {
-        margin: 0; font-size: 32px; font-weight: 900; color: white !important;
-    }
-    .puerta-header p {
-        margin: 5px 0 0 0; opacity: 0.9; font-size: 15px;
-    }
-    .puerta-fecha {
-        background: rgba(255,255,255,0.2); padding: 8px 20px; 
-        border-radius: 12px; font-size: 18px; font-weight: 800;
-        border: 1px solid rgba(255,255,255,0.4);
-    }
-    </style>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 2. HEADER DE LA VISTA (HTML)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown(f"""<div class="puerta-header">
-        <div>
-            <h1>Control de Puerta</h1>
-            <p>Escanea el QR del estudiante para registrar su asistencia</p>
-        </div>
-        <div class="puerta-fecha">{fecha}</div>
-    </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 3. LÓGICA DE MODOS (Streamlit puro)
-    # ══════════════════════════════════════════════════════════════════
+    st.markdown(f"""
+    <div class="puerta-header">
+        <div class="titulo">Control de Puerta</div>
+        <div class="fecha">{fecha}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
         
-    # Usamos columnas para que el radio no ocupe toda la pantalla
-    _, col_modo, _ = st.columns([1, 2, 1])
-    with col_modo:
-        modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
-                        horizontal=True, label_visibility="collapsed")
+    modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
+                    horizontal=True, label_visibility="collapsed")
                     
     if modo == "Escanear QR":
-        # Forzamos un reinicio limpio de la cámara si acabamos de entrar
+        # 🆕 FIX CÁMARA: Si acaba de entrar al escáner, forzamos un reinicio limpio
         if st.session_state.get("_ultimo_modo") != "Escanear QR":
             st.session_state["puerta_qr_mount"] = st.session_state.get("puerta_qr_mount", 0) + 1
             st.session_state["_ultimo_modo"] = "Escanear QR"
@@ -3750,222 +3346,207 @@ def vista_bloqueados():
     st.title("Alumnos bloqueados")
     st.caption(
         "Reglas automaticas: alumno nuevo → 3 tardanzas → bloqueo al dia siguiente. "
-        "Alumno reincidente → 1 tardanza → bloqueo al dia siguiente."
+        "Alumno reincidente → 1 tardanza → bloqueo al dia siguiente. "
+        "Al desbloquear, el alumno sigue con la misma regla."
     )
     usuario = st.session_state["user"]
 
-    df = listar_bloqueados()
-    st.metric("Total bloqueados", len(df))
+    tabs = st.tabs(["Lista de Bloqueados", "Bloquear Nuevo Alumno"])
 
-    if df.empty:
-        st.success("No hay alumnos bloqueados actualmente.")
-        return
+    # PESTAÑA 1: VER Y DESBLOQUEAR
+    with tabs[0]:
+        df = listar_bloqueados()
+        st.metric("Total bloqueados", len(df))
 
-    st.dataframe(df, width='stretch', hide_index=True)
-
-    st.markdown("---")
-    st.subheader("Desbloquear alumno")
-
-    clave = "bloq_sel"
-    idsec = _selector_grado_seccion(clave, "Elige el grado del alumno a desbloquear")
-    if not idsec:
-        return
-
-    al = _selector_alumno_accion(
-        clave, idsec,
-        texto_boton="Seleccionar",
-        key_boton="bloq_sel_btn",
-        on_click_key="bloq_al_sel_id")
-    if not al:
-        return
-
-    bloq = alumno_bloqueado(al["id"])
-    if not bloq:
-        st.warning("Este alumno ya no esta bloqueado.")
-        if st.button("Volver", key="bloq_volver_sin_bloqueo"):
-            _reset_selector(clave, "bloq_al_sel_id")
-            st.rerun()
-        return
-
-    st.markdown("---")
-    st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
-                f"{(al['apellido_materno'] or '')}, {al['nombres']}")
-    st.markdown(f"**DNI:** {al['dni']}  \n"
-                f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
-
-    st.info(f"Motivo del bloqueo: **{bloq['motivo']}**  \n"
-            f"Fecha de bloqueo: **{bloq['fecha_inicio']}**")
-
-    with st.expander("Historial completo de bloqueos", expanded=False):
-        st.dataframe(historial_bloqueos_alumno(al["id"]), width='stretch',
-                     hide_index=True)
-
-    st.markdown("---")
-    motivo = st.text_input("Motivo de desbloqueo (obligatorio)",
-                            key=f"bloq_motivo_{al['id']}")
-
-    if confirmar_accion(f"bloq_{al['id']}",
-                        texto_boton="Desbloquear alumno",
-                        texto_check="¿Estas seguro de desbloquear a este alumno?"):
-        if not motivo.strip():
-            st.error("El motivo es obligatorio.")
+        if df.empty:
+            st.success("No hay alumnos bloqueados actualmente.")
         else:
-            liberar_bloqueo(al["id"], usuario, motivo.strip())
-            st.toast(f"Alumno {al['nombres']} desbloqueado.")
-            _reset_selector(clave, "bloq_al_sel_id")
+            st.dataframe(df, width='stretch', hide_index=True)
+
+            st.markdown("---")
+            st.subheader("Desbloquear alumno")
+
+            clave = "bloq_sel"
+            idsec = _selector_grado_seccion(clave, "Elige el grado del alumno a desbloquear")
+            if not idsec:
+                return
+
+            al = _selector_alumno_accion(
+                clave, idsec,
+                texto_boton="Seleccionar",
+                key_boton="bloq_sel_btn",
+                on_click_key="bloq_al_sel_id")
+            if not al:
+                return
+
+            bloq = alumno_bloqueado(al["id"])
+            if not bloq:
+                st.warning("Este alumno ya no esta bloqueado.")
+                if st.button("Volver", key="bloq_volver_sin_bloqueo"):
+                    _reset_selector(clave, "bloq_al_sel_id")
+                    st.rerun()
+                return
+
+            st.markdown("---")
+            st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
+                        f"{(al['apellido_materno'] or '')}, {al['nombres']}")
+            st.markdown(f"**DNI:** {al['dni']}  \n"
+                        f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
+
+            st.info(f"Motivo del bloqueo: **{bloq['motivo']}**  \n"
+                    f"Fecha de bloqueo: **{bloq['fecha_inicio']}**")
+
+            with st.expander("Historial completo de bloqueos", expanded=False):
+                st.dataframe(historial_bloqueos_alumno(al["id"]), width='stretch',
+                             hide_index=True)
+
+            st.markdown("---")
+            motivo = st.text_input("Motivo de desbloqueo (obligatorio)",
+                                    key=f"bloq_motivo_{al['id']}")
+
+            if confirmar_accion(f"bloq_{al['id']}",
+                                texto_boton="Desbloquear alumno",
+                                texto_check="¿Estas seguro de desbloquear a este alumno?"):
+                if not motivo.strip():
+                    st.error("El motivo es obligatorio.")
+                else:
+                    liberar_bloqueo(al["id"], usuario, motivo.strip())
+                    st.toast(f"Alumno {al['nombres']} desbloqueado.")
+                    _reset_selector(clave, "bloq_al_sel_id")
+                    st.rerun()
+
+            if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
+                _reset_selector(clave, "bloq_al_sel_id")
+                st.rerun()
+
+    # PESTAÑA 2: BLOQUEAR MANUALMENTE
+    with tabs[1]:
+        st.subheader("Bloquear a un alumno manualmente")
+        st.caption("Usa esta opcion si necesitas bloquear a alguien por faltas graves, acumulacion, etc.")
+        
+        # 🆕 VARIABLE DE CONTROL DE FLUJO
+        if "bloq_man_id_activo" not in st.session_state:
+            st.session_state["bloq_man_id_activo"] = None
+            
+        # Si la bandera de éxito está encendida, limpiamos TODO y recargamos
+        if st.session_state.get("_exito_bloqueo_manual"):
+            st.session_state["_exito_bloqueo_manual"] = False
+            st.session_state["bloq_man_id_activo"] = None
+            st.session_state.pop("bloq_man_sel_id", None)
+            st.session_state.pop("bloq_man_grado", None)
+            st.session_state.pop("bloq_man_idsec", None)
             st.rerun()
 
-    if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
-        _reset_selector(clave, "bloq_al_sel_id")
-        st.rerun()
+        # Si no hay nadie seleccionado, mostramos los selectores
+        if not st.session_state["bloq_man_id_activo"]:
+            clave_man = "bloq_man"
+            idsec_man = _selector_grado_seccion(clave_man, "Elige el grado del alumno a bloquear")
+            if not idsec_man:
+                return
+            al_man = _selector_alumno_accion(
+                clave_man, idsec_man,
+                texto_boton="Seleccionar",
+                key_boton="bloq_man_btn",
+                on_click_key="bloq_man_sel_id")
+            
+            # Si el usuario selecciona a alguien, lo guardamos y recargamos
+            if al_man:
+                st.session_state["bloq_man_id_activo"] = al_man["id"]
+                st.rerun()
+            return
+
+        # Si ya hay alguien seleccionado, mostramos sus datos
+        al_man_id = st.session_state["bloq_man_id_activo"]
+        
+        with cursor() as (con, cur):
+            cur.execute("""
+                SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
+                       g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
+                FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
+                JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id
+                WHERE a.id=?
+            """, (al_man_id,))
+            al_man_row = cur.fetchone()
+            
+        if not al_man_row:
+            st.session_state["bloq_man_id_activo"] = None
+            st.rerun()
+            return
+            
+        al_man = dict(al_man_row)
+        bloq_man = alumno_bloqueado(al_man["id"])
+        
+        if bloq_man:
+            st.warning(f"Este alumno ya esta bloqueado (Motivo: {bloq_man['motivo']}).")
+        else:
+            st.markdown("---")
+            st.markdown(f"### Bloquear a {al_man['apellido_paterno']} {(al_man['apellido_materno'] or '')}, {al_man['nombres']}")
+            st.markdown(f"**DNI:** {al_man['dni']}  \n**{al_man['grado']} {al_man['seccion']}** — Turno {al_man['turno']}")
+            
+            motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)", key=f"bloq_man_motivo_{al_man['id']}")
+            
+            if confirmar_accion(f"bloq_man_{al_man['id']}", texto_boton="Bloquear Alumno Ahora", texto_check="¿Estas seguro de BLOQUEAR a este alumno?"):
+                if not motivo_manual.strip():
+                    st.error("El motivo es obligatorio.")
+                else:
+                    crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
+                    st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
+                    st.session_state["_exito_bloqueo_manual"] = True
+                    st.rerun()
+
+        if st.button("← Buscar otro alumno", key="bloq_man_buscar_otro"):
+            st.session_state["bloq_man_id_activo"] = None
+            st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    # ══════════════════════════════════════════════════════════════════
-    # LÓGICA Y CÁLCULOS
-    # ══════════════════════════════════════════════════════════════════
+    st.title("Panel Direccion")
     fecha = hoy_str()
     turnos_info = _turnos_para_panel()
     if not turnos_info:
         st.info("No hay turnos configurados.")
         return
 
-    etiquetas = [
-        f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})"
-        for info in turnos_info
-    ]
-    sel = st.radio(
-        "Turno", etiquetas, horizontal=True,
-        key="panel_dir_turno", label_visibility="collapsed",
-    )
-    info = turnos_info[etiquetas.index(sel)]
+    etiquetas = []
+    for info in turnos_info:
+        t = info["turno"]
+        est = "EN CURSO" if info["estado"] == "activo" else "CERRADO"
+        etiquetas.append(f"{t['nombre']} ({est})")
+
+    sel = st.radio("Turno", etiquetas, horizontal=True,
+                   key="panel_dir_turno", label_visibility="collapsed")
+    idx = etiquetas.index(sel)
+    info = turnos_info[idx]
     turno = info["turno"]
     ventana = info["ventana"]
     estado = info["estado"]
-    
-    # Llamamos a tus métricas (que ahora están cacheadas por 10 segundos)
+
+    if estado == "activo":
+        st.success(f"Turno **{turno['nombre']}** en curso — "
+                   f"ventana: {ventana['nombre']} "
+                   f"({ventana['hora_apertura']} a {ventana['hora_cierre']})")
+    else:
+        st.info(f"Turno **{turno['nombre']}** ya cerro — "
+                f"ventana: {ventana['nombre']} "
+                f"(cerro a las {ventana['hora_cierre']})")
+
+    if st.button("Actualizar Datos", key="refresh_panel"):
+        marcar_faltas_al_cierre()
+        st.rerun()
+
     m = metricas_dia_turno(fecha, turno["id"])
+    st.subheader(f"Resumen del turno {turno['nombre']}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total alumnos", m["total"])
+    c2.metric("Puntuales", m["puntuales"])
+    c3.metric("Tardanzas", m["tardanzas"])
+    c4.metric("Faltas", m["faltas"])
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Reforzamiento asistio", m["ref_asistio"])
+    c2.metric("Bloqueados", m["bloqueados"])
+    c3.metric("Justificadas hoy", m["justificadas"])
+    c4.metric("Permisos hoy", m["permisos"])
 
-    # ══════════════════════════════════════════════════════════════════
-    # CABECERA
-    # ══════════════════════════════════════════════════════════════════
-    color_estado = "#4CAF50" if estado == "activo" else "#F44336"
-    
-    html_header = f"""<div style="
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 60%, #B85C38 100%);
-        border-radius: 20px;
-        padding: 30px 34px;
-        color: #FFF;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-bottom: 26px;
-        box-shadow: 0 10px 28px rgba(232,123,74,0.22);
-        position: relative;
-        overflow: hidden;
-    ">
-        <div>
-            <h1 style="margin: 0; font-size: 32px; font-weight: 900; color: #FFF; letter-spacing: -0.5px;">Panel de Control</h1>
-            <p style="margin: 6px 0 0 0; opacity: 0.92; font-size: 14px;">Monitoreo en tiempo real · Turno <b>{turno['nombre']}</b> · {fecha}</p>
-        </div>
-        <div style="text-align:right;">
-            <span style="
-                background: rgba(255,255,255,0.20);
-                padding: 6px 16px; border-radius: 20px;
-                font-weight: 800; font-size: 13px;
-                border: 1px solid rgba(255,255,255,0.40);
-                white-space: nowrap;
-            ">
-                <span style="color:{color_estado}; font-size:16px;">●</span> {estado.upper()}
-            </span>
-            <p style="margin-top:8px; font-size:12px;">Ventana: {ventana['nombre']}</p>
-        </div>
-    </div>"""
-    st.markdown(html_header, unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════
-    # BOTÓN ACTUALIZAR (Fuerza bruta: limpia caché y recarga)
-    # ══════════════════════════════════════════════════════════════════
-    c1, c2, c3 = st.columns([2, 1, 2])
-    with c2:
-        if st.button("🔄 Actualizar", key="btn_actualizar_dash", width='stretch'):
-            st.cache_data.clear() # Borra TODA la caché (métricas, asistencias, etc.)
-            st.rerun()            # Vuelve a pintar la pantalla con datos frescos
-
-    # ══════════════════════════════════════════════════════════════════
-    # KPIs (HTML Inline)
-    # ══════════════════════════════════════════════════════════════════
-    def _kpi_card_inline(icon, value, label, color_borde, color_valor):
-        return f"""<div style="
-            background: #FFFFFF;
-            border-radius: 16px;
-            padding: 20px 16px;
-            text-align: center;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-            border-bottom: 5px solid {color_borde};
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 120px;
-            margin-bottom: 5px;
-        ">
-            <span style="font-size: 26px; margin-bottom: 8px; display: block;">{icon}</span>
-            <div style="font-size: 34px; font-weight: 900; line-height: 1.1; margin-bottom: 4px; color: {color_valor};">{value}</div>
-            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #666;">{label}</div>
-        </div>"""
-
-    kpis_fila1 = [
-        ("👥", m["total"],       "Total Alumnos",  "#E87B4A", "#E87B4A"),
-        ("✅", m["puntuales"],   "Puntuales",      "#22C55E", "#22C55E"),
-        ("⏳", m["tardanzas"],   "Tardanzas",      "#F59E0B" if m["tardanzas"] > 0 else "#22C55E", "#F59E0B" if m["tardanzas"] > 0 else "#22C55E"),
-        ("❌", m["faltas"],      "Faltas",         "#EF4444" if m["faltas"] > 0 else "#22C55E", "#EF4444" if m["faltas"] > 0 else "#22C55E"),
-    ]
-    kpis_fila2 = [
-        ("📚", m["ref_asistio"], "Reforzamiento",  "#3B82F6", "#3B82F6"),
-        ("🚫", m["bloqueados"],  "Bloqueados",     "#EF4444" if m["bloqueados"] > 0 else "#22C55E", "#EF4444" if m["bloqueados"] > 0 else "#22C55E"),
-        ("📝", m["justificadas"],"Justificadas",   "#3B82F6", "#3B82F6"),
-        ("📄", m["permisos"],    "Permisos",       "#3B82F6", "#3B82F6"),
-    ]
-
-    html_kpis = '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">'
-    for k in kpis_fila1:
-        html_kpis += _kpi_card_inline(*k)
-    html_kpis += '</div>'
-
-    html_kpis += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">'
-    for k in kpis_fila2:
-        html_kpis += _kpi_card_inline(*k)
-    html_kpis += '</div>'
-
-    st.markdown(html_kpis, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # BARRAS DE PROGRESO
-    # ══════════════════════════════════════════════════════════════════
-    total = m["total"] if m["total"] > 0 else 1
-
-    def _bar_inline(label, valor, color):
-        pct = (valor / total * 100) if total > 0 else 0
-        return f"""<div style="margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 800;">
-                <span>{label}</span>
-                <span style="color: {color};">{valor} / {m["total"]}</span>
-            </div>
-            <div style="background: #FFF0E8; border-radius: 10px; height: 18px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);">
-                <div style="width: {pct:.1f}%; background: {color}; height: 100%; border-radius: 10px; transition: width 0.6s ease;"></div>
-            </div>
-        </div>"""
-
-    html_progress = f"""<div style="background: #FFFFFF; border-radius: 16px; padding: 22px 26px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); margin-bottom: 20px;">
-        <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #E87B4A; margin-bottom: 16px;">Progreso de Asistencia del Turno</div>
-        {_bar_inline("Puntuales", m["puntuales"], "#22C55E")}
-        {_bar_inline("Tardanzas", m["tardanzas"], "#F59E0B")}
-        {_bar_inline("Faltas",    m["faltas"],    "#EF4444")}
-    </div>"""
-    
-    st.markdown(html_progress, unsafe_allow_html=True)
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
@@ -4520,44 +4101,26 @@ def _frag_editar_alumno():
 
 
 def _frag_listar_alumnos():
-    # 1. Mostramos los filtros
     idg, ids, texto = filtros_grado_seccion_nombre("list_al")
-    
-    # 2. Botón para ejecutar la búsqueda
-    st.markdown("---")
-    if st.button("🔍 Buscar Alumnos", type="primary", width='stretch'):
-        st.session_state["_realizar_busqueda_alumnos"] = True
-
-    # 3. Solo mostramos la tabla si se presionó el botón
-    if st.session_state.get("_realizar_busqueda_alumnos"):
-        # Si no hay filtros aplicados, pedimos que seleccione algo
-        if not idg and not ids and not texto:
-            st.info("Selecciona un grado, una sección o escribe un nombre para buscar.")
-            return
-
-        df = buscar_alumnos(texto, idg, ids, limite=500)
-        
-        st.write(f"**{len(df)} alumnos encontrados**")
-        if df.empty:
-            st.info("Sin resultados para esta búsqueda.")
-            return
-
-        # Mostramos la tabla ligera
-        df_mostrar = df[['nombre_completo', 'grado', 'seccion', 'turno', 'dni']].copy()
-        df_mostrar.columns = ["Apellidos y Nombres", "Grado", "Sección", "Turno", "DNI"]
-        st.dataframe(df_mostrar, width='stretch', hide_index=True)
-
-        st.markdown("---")
-        st.subheader("Ver perfil de un alumno")
-        
-        # Selector para elegir al alumno de la lista filtrada
-        ops = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df.iterrows()}
-        sel = st.selectbox("Selecciona el alumno", list(ops.keys()), key="perfil_sel_lista")
-        
-        if st.button("Ver perfil completo", width='stretch'):
-            st.session_state["perfil_alumno_id"] = ops[sel]
-            st.session_state["_realizar_busqueda_alumnos"] = False # Limpiamos la memoria
+    df = buscar_alumnos(texto, idg, ids, limite=5000)
+    st.write(f"{len(df)} alumnos")
+    if df.empty:
+        st.info("Sin resultados.")
+        return
+    mostrar = st.checkbox("Mostrar todos", value=False)
+    lim = len(df) if mostrar else 50
+    for _, al in df.head(lim).iterrows():
+        c1, c2 = st.columns([5, 1])
+        c1.markdown(
+            f"**{al['nombre_completo']}** &nbsp; "
+            f"<span style='color:#B85C38; font-weight:700;'>{al['grado']} "
+            f"{al['seccion']}</span> "
+            f"<span style='color:#757575;'>({al['turno']})</span>",
+            unsafe_allow_html=True)
+        if c2.button("Ver perfil", key="perfil_" + str(al['id'])):
+            st.session_state["perfil_alumno_id"] = al["id"]
             st.rerun()
+
 
 def _perfil_alumno(idal):
     d = perfil_alumno_datos(idal)
@@ -4907,7 +4470,8 @@ def vista_alumnos():
 # ─── GRADOS Y SECCIONES ────────────────────────────────────────────────────
 def vista_grados_secciones():
     st.title("Grados y Secciones")
-    st.caption("Vista de referencia. Las secciones se crean automaticamente al importar el Excel.")
+    st.caption("Vista de referencia. Las secciones se crean automaticamente "
+               "al importar el Excel de alumnos.")
 
     df = leer_df("""
         SELECT g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
@@ -4922,83 +4486,74 @@ def vista_grados_secciones():
         st.info("No hay secciones creadas todavia.")
         return
 
-    # ==========================================
-    # 1. RESUMEN POR GRADO (Gráfico de barras)
-    # ==========================================
-    st.subheader("Alumnos por Grado")
-    resumen_grado = df.groupby("Grado", as_index=False)["Alumnos"].sum()
-    # Usamos st.bar_chart pasando el índice como Grado
-    st.bar_chart(resumen_grado.set_index("Grado"), height=250)
+    st.subheader("Resumen por grado")
+    resumen = df.groupby("Grado", as_index=False)["Alumnos"].sum()
+    resumen.columns = ["Grado", "Total alumnos"]
+    st.dataframe(resumen, width='stretch', hide_index=True)
 
-    # ==========================================
-    # 2. RESUMEN POR TURNO (Métricas rápidas)
-    # ==========================================
-    st.markdown("---")
-    st.subheader("Alumnos por Turno")
-    resumen_turno = df.groupby("Turno", as_index=False)["Alumnos"].sum()
-    
-    c1, c2 = st.columns(2)
-    for i, (_, row) in enumerate(resumen_turno.iterrows()):
-        # Ponemos una métrica en cada columna
-        if i == 0:
-            c1.metric(f"Turno {row['Turno']}", f"{row['Alumnos']} alumnos")
-        elif i == 1:
-            c2.metric(f"Turno {row['Turno']}", f"{row['Alumnos']} alumnos")
+    st.subheader("Resumen por turno")
+    resumen_t = df.groupby("Turno", as_index=False)["Alumnos"].sum()
+    resumen_t.columns = ["Turno", "Total alumnos"]
+    st.dataframe(resumen_t, width='stretch', hide_index=True)
 
-    # ==========================================
-    # 3. DETALLE POR SECCIÓN (Dataframe colapsable)
-    # ==========================================
-    st.markdown("---")
-    with st.expander("Ver detalle completo por sección"):
-        st.dataframe(df, width='stretch', hide_index=True)
+    st.subheader("Detalle por seccion")
+    st.dataframe(df, width='stretch', hide_index=True)
 
-    # ==========================================
-    # 4. TOTALES GENERALES
-    # ==========================================
-    st.markdown("---")
-    st.subheader("Totales Generales")
-    c1, c2 = st.columns(2)
-    c1.metric("Total de secciones", len(df))
-    c2.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
+    st.metric("Total de secciones", len(df))
+    st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
+
 
 # ─── CARNETS ───────────────────────────────────────────────────────────────
 def vista_carnets():
     st.title("Carnets QR")
 
-    # Si ya estamos viendo los alumnos de una sección, mostramos eso
-    if st.session_state.get("carn_ver_seccion"):
-        _carnets_ver_seccion(st.session_state["carn_ver_seccion"])
-        return
-
     st.markdown("### Descargar por sección")
     st.caption("Selecciona un grado para ver sus secciones y generar los carnets.")
 
+    if st.session_state.get("carn_ver_seccion"):
+        _carnets_ver_seccion(st.session_state["carn_ver_seccion"])
+        return
+        
     grados = listar_grados()
     if not grados:
         st.warning("No hay grados registrados.")
         return
 
-    # 🆕 SELECTBOX NATIVO (Cero RAM extra)
-    ops_grados = {g["nombre"]: g["id"] for g in grados}
-    grado_sel = st.selectbox("Selecciona el grado", list(ops_grados.keys()), key="carn_grado_selbox")
-    idg = ops_grados[grado_sel]
-
-    secs = secciones_por_grado(idg)
-    
-    if not secs:
-        st.info(f"El grado {grado_sel} no tiene secciones creadas todavía.")
+    # Control para regresar al menú de grados
+    gid = st.session_state.get("carn_grado_sel")
+    if gid:
+        g = next((x for x in grados if x["id"] == gid), None)
+        if not g:
+            st.session_state.pop("carn_grado_sel", None)
+            st.rerun()
+            return
+            
+        if st.button("← Regresar a grados", key="carn_volver_grados"):
+            st.session_state.pop("carn_grado_sel", None)
+            st.rerun()
+            
+        st.subheader(f"Secciones de {g['nombre']}")
+        secs = secciones_por_grado(g["id"])
+        if not secs:
+            st.info("Sin secciones en este grado.")
+            return
+            
+        for s in secs:
+            n = len(alumnos_de_seccion(s["id"]))
+            if st.button(f"{s['nombre']}  ({n} alumnos)", width='stretch',
+                         key="carn_s_" + str(s['id'])):
+                st.session_state["carn_ver_seccion"] = s["id"]
+                st.rerun()
         return
 
-    st.markdown(f"**Secciones de {grado_sel}:**")
-    st.caption("Selecciona una sección para entrar.")
-    
-    # Mostramos las secciones en un desplegable también para ahorrar RAM
-    ops_secs = {f"{s['nombre']} ({len(alumnos_de_seccion(s['id']))} alumnos)": s["id"] for s in secs}
-    sec_sel = st.selectbox("Selecciona la sección", list(ops_secs.keys()), key="carn_sec_selbox")
-    
-    if st.button("Entrar a la sección", type="primary", width='stretch'):
-        st.session_state["carn_ver_seccion"] = ops_secs[sec_sel]
-        st.rerun()
+    # Si no hay grado seleccionado, mostramos la lista de grados
+    for g in grados:
+        secs = secciones_por_grado(g["id"])
+        if st.button(f"{g['nombre']}  ({len(secs)} secciones)", width='stretch',
+                     key="carn_g_" + str(g['id'])):
+            st.session_state["carn_grado_sel"] = g["id"]
+            st.rerun()
+
 
 def _carnets_ver_seccion(idsec):
     with cursor() as (con, cur):
@@ -5007,131 +4562,69 @@ def _carnets_ver_seccion(idsec):
                        JOIN grados g ON s.grado_id=g.id
                        JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""", (idsec,))
         sec = cur.fetchone()
-        
     if not sec:
         st.warning("Seccion no encontrada.")
         st.session_state.pop("carn_ver_seccion", None)
         return
-        
-    if st.button("← Regresar a grados", key="carn_volver"):
+    if st.button("Regresar a grados", key="carn_volver"):
         st.session_state.pop("carn_ver_seccion", None)
+        st.session_state.pop("carn_sel_alumnos", None)
         st.rerun()
-        
     st.subheader(f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
-    
     df = alumnos_de_seccion(idsec)
     if df.empty:
         st.info("Sin alumnos activos.")
         return
-
-    if "canasta_carnets" not in st.session_state:
-        st.session_state["canasta_carnets"] = []
-
+    st.caption(f"{len(df)} alumnos. Aprieta un nombre para seleccionarlo.")
+    if "carn_sel_alumnos" not in st.session_state:
+        st.session_state["carn_sel_alumnos"] = set()
+    sel = st.session_state["carn_sel_alumnos"]
+    for _, al in df.iterrows():
+        if al["id"] in sel:
+            st.markdown('<div class="btn-sel">', unsafe_allow_html=True)
+            if st.button(al['nombre_completo'],
+                         key="carn_al_" + str(al['id']),
+                         width='stretch'):
+                sel.discard(al["id"])
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            if st.button(al['nombre_completo'],
+                         key="carn_al_" + str(al['id']),
+                         width='stretch'):
+                sel.add(al["id"])
+                st.rerun()
     st.markdown("---")
-    
-    # ==========================================
-    # OPCIÓN 1: CARNET INDIVIDUAL (De este salón)
-    # ==========================================
-    st.markdown("### 1. Generar Carnet Individual (de este salón)")
-    c1, c2 = st.columns([3, 1])
+    st.write(f"Seleccionados: {len(sel)}")
+    c1, c2, c3 = st.columns(3)
     with c1:
-        ops_alumnos = {al["nombre_completo"]: al["id"] for _, al in df.iterrows()}
-        alumno_sel = st.selectbox("Selecciona un alumno", list(ops_alumnos.keys()), label_visibility="collapsed")
+        if sel:
+            if st.button("Descargar seleccionados", type="primary",
+                         width='stretch', key="carn_dl_sel"):
+                pdf = pdf_carnets_seleccionados(
+                    list(sel),
+                    titulo=f"Carnets - {sec['grado']} {sec['seccion']}")
+                if pdf:
+                    st.download_button(
+                        "Guardar PDF", pdf,
+                        f"carnets_sel_{sec['grado']}{sec['seccion']}.pdf",
+                        "application/pdf", width='stretch')
+        else:
+            st.info("Marca al menos un alumno.")
     with c2:
-        id_sel = ops_alumnos[alumno_sel]
-        dni_sel = df[df["id"] == id_sel]["dni"].values[0]
-        pdf_ind = pdf_carnet_individual(dni_sel)
-        if pdf_ind:
-            st.download_button(
-                "⬇️ Descargar Carnet", pdf_ind,
-                f"carnet_{dni_sel}.pdf",
-                "application/pdf", width='stretch')
-
-    st.markdown("---")
-
-    # ==========================================
-    # OPCIÓN 2: SALÓN COMPLETO
-    # ==========================================
-    st.markdown("### 2. Generar PDF de Todo el Salón")
-    st.caption("Genera un PDF con todos los alumnos de esta sección.")
-    if st.button("📄 Generar PDF del Salón Completo", type="primary", width='stretch'):
-        with st.spinner("Generando PDF..."):
+        if st.button("Descargar todo el salon", width='stretch',
+                     key="carn_dl_todo"):
             pdf = pdf_carnets_por_seccion(idsec)
             if pdf:
                 st.download_button(
-                    "⬇️ Guardar PDF del Salón", pdf,
+                    "Guardar PDF", pdf,
                     f"carnets_{sec['grado']}{sec['seccion']}.pdf",
-                    "application/pdf", width='stretch', key="dl_salon")
+                    "application/pdf", width='stretch')
+    with c3:
+        if st.button("Limpiar seleccion", width='stretch', key="carn_limpiar"):
+            st.session_state["carn_sel_alumnos"] = set()
+            st.rerun()
 
-    st.markdown("---")
-
-    # ==========================================
-    # OPCIÓN 3: CANASTA (BUSCADOR GLOBAL)
-    # ==========================================
-    st.markdown("### 3. Generar PDF de Seleccionados (Cualquier Salón)")
-    st.caption("Busca a cualquier alumno del colegio (por nombre o DNI) para agregarlo a la lista.")
-    
-    # 🆕 BUSCADOR GLOBAL
-    busqueda = st.text_input("Buscar alumno por nombre o DNI", key="buscar_al_global", placeholder="Ej: Juan o 74105299")
-    
-    if busqueda:
-        # Buscamos en toda la base de datos
-        df_global = buscar_alumnos(texto=busqueda, limite=10)
-        
-        if df_global.empty:
-            st.info("No se encontraron alumnos con esa búsqueda.")
-        else:
-            # Mostramos los resultados de la búsqueda para seleccionar
-            ops_global = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df_global.iterrows()}
-            al_global_sel = st.selectbox("Selecciona el alumno encontrado", list(ops_global.keys()), key="global_al_sel")
-            
-            if st.button("➕ Agregar a la Lista", width='stretch'):
-                id_agregar = ops_global[al_global_sel]
-                if id_agregar not in st.session_state["canasta_carnets"]:
-                    st.session_state["canasta_carnets"].append(id_agregar)
-                    st.toast(f"{al_global_sel} agregado a la lista.")
-                    st.rerun()
-                else:
-                    st.warning("Ese alumno ya está en la lista.")
-
-    # MOSTRAMOS LA CANASTA
-    canasta = st.session_state["canasta_carnets"]
-    if canasta:
-        st.markdown("---")
-        st.info(f"Tienes **{len(canasta)}** alumno(s) en la lista de seleccionados.")
-        
-        with cursor() as (con, cur):
-            ph = ",".join("?" * len(canasta))
-            cur.execute(f"""
-                SELECT a.id, a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS nombre,
-                       g.nombre AS grado, s.nombre AS seccion
-                FROM alumnos a JOIN secciones s ON a.seccion_id=s.id
-                JOIN grados g ON s.grado_id=g.id
-                WHERE a.id IN ({ph})
-            """, canasta)
-            detalles = [dict(r) for r in cur.fetchall()]
-            
-        for d in detalles:
-            col1, col2 = st.columns([4, 1])
-            col1.write(f"{d['nombre']} ({d['grado']} {d['seccion']})")
-            if col2.button("Quitar", key=f"rm_canasta_{d['id']}"):
-                st.session_state["canasta_carnets"].remove(d["id"])
-                st.rerun()
-                
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("🗑️ Vaciar Lista", width='stretch'):
-                st.session_state["canasta_carnets"] = []
-                st.rerun()
-        with c2:
-            if st.button("📄 Generar PDF de la Lista", type="primary", width='stretch'):
-                with st.spinner("Generando PDF..."):
-                    pdf = pdf_carnets_seleccionados(canasta, titulo="Carnets Seleccionados")
-                    if pdf:
-                        st.download_button(
-                            "⬇️ Guardar PDF Seleccionados", pdf,
-                            "carnets_seleccionados.pdf",
-                            "application/pdf", width='stretch', key="dl_canasta")
 
 # ─── VENTANAS ──────────────────────────────────────────────────────────────
 def vista_ventanas():
@@ -5241,89 +4734,46 @@ def _frag_usuarios_botones():
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
 
-    st.markdown("### Buscar Usuarios")
-    st.caption("Selecciona un filtro para cargar la lista (ahorra memoria al no mostrar todo de golpe).")
+    if soy_principal:
+        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
+                     "es_principal FROM usuarios "
+                     "ORDER BY nombres, usuario")
+    else:
+        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
+                     "es_principal FROM usuarios WHERE id=? OR rol!='Admin' "
+                     "ORDER BY nombres, usuario", (usuario["id"],))
 
-    # 🆕 FILTROS
-    c1, c2 = st.columns(2)
-    with c1:
-        roles_disponibles = ["Todos", "Admin", "Direccion", "Auxiliar"]
-        filtro_rol = st.selectbox("Filtrar por Rol", roles_disponibles, key="usr_filtro_rol")
-    with c2:
-        filtro_nombre = st.text_input("Buscar por nombre o usuario", key="usr_filtro_nombre", placeholder="Ej: admin")
+    if df.empty:
+        st.info("Sin usuarios.")
+        return
 
-    if st.button("🔍 Buscar Usuarios", type="primary", width='stretch'):
-        st.session_state["_buscar_usuarios_activado"] = True
+    for _, u in df.iterrows():
+        etiqueta_rol = ("Admin (principal)"
+                        if (u["rol"] == "Admin" and u["es_principal"])
+                        else ("Sub Admin" if u["rol"] == "Admin" else u["rol"]))
+        estado = "🟢 Activo" if u["activo"] else "🔴 Inactivo"
 
-    if st.session_state.get("_buscar_usuarios_activado"):
-        if filtro_rol == "Todos" and not filtro_nombre.strip():
-            st.info("Selecciona un rol o escribe un nombre para buscar.")
-            return
+        with st.container():
+            c1, c2 = st.columns([5, 1])
+            c1.markdown(
+                f"**{u['nombres']}** &nbsp; "
+                f"<span style='color:#6B6B6B;'>({u['usuario']})</span> &nbsp; "
+                f"<span style='color:#B85C38; font-weight:700;'>{etiqueta_rol}</span> "
+                f"&nbsp; {estado}",
+                unsafe_allow_html=True)
+            if c2.button("Ver / Editar", key=f"ver_u_{u['id']}",
+                         width='stretch'):
+                current = st.session_state.get(f"_editando_u_{u['id']}", False)
+                st.session_state[f"_editando_u_{u['id']}"] = not current
+                st.rerun()
 
-        # Construimos la consulta dinámicamente
-        query = "SELECT id, usuario, rol, nombres, activo, ultimo_login, es_principal FROM usuarios WHERE 1=1"
-        params = []
-        
-        if not soy_principal:
-            query += " AND (id=? OR rol!='Admin')"
-            params.append(usuario["id"])
-
-        if filtro_rol != "Todos":
-            query += " AND rol=?"
-            params.append(filtro_rol)
-            
-        if filtro_nombre.strip():
-            query += " AND (LOWER(nombres) LIKE ? OR LOWER(usuario) LIKE ?)"
-            pat = f"%{filtro_nombre.strip().lower()}%"
-            params += [pat, pat]
-
-        query += " ORDER BY nombres, usuario"
-        df = leer_df(query, params)
-
-        if df.empty:
-            st.info("No se encontraron usuarios con esos filtros.")
-            return
-
-        st.write(f"**{len(df)} usuarios encontrados**")
-        
-        # 🆕 MOSTRAMOS SOLO UN DATAFRAME
-        df_mostrar = df.copy()
-        df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "🟢 Activo" if x else "🔴 Inactivo")
-        df_mostrar["rol_ui"] = df_mostrar.apply(
-            lambda r: "Admin (principal)" if (r["rol"] == "Admin" and r["es_principal"]) 
-            else ("Sub Admin" if r["rol"] == "Admin" else r["rol"]), axis=1
-        )
-        
-        df_mostrar = df_mostrar[["nombres", "usuario", "rol_ui", "estado", "ultimo_login"]]
-        df_mostrar.columns = ["Nombres", "Usuario", "Rol", "Estado", "Último Login"]
-        
-        st.dataframe(df_mostrar, width='stretch', hide_index=True)
-
-        st.markdown("---")
-        st.subheader("Editar un usuario")
-        
-        ops = {f"{r['nombres']} ({r['usuario']})": r["id"] for _, r in df.iterrows()}
-        sel = st.selectbox("Selecciona el usuario a editar", list(ops.keys()))
-        
-        # 🆕 GUARDAMOS EL ID DEL USUARIO QUE SE ESTÁ EDITANDO ACTUALMENTE
-        if st.button("Ver / Editar usuario seleccionado", width='stretch'):
-            st.session_state["_usuario_editando_activo"] = ops[sel]
-            st.rerun()
-
-    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
-    usuario_editando = st.session_state.get("_usuario_editando_activo")
-    if usuario_editando:
-        st.markdown("---")
-        ok, msg = puede_gestionar_usuario(usuario, usuario_editando)
-        if not ok:
-            st.warning(msg)
-            st.session_state.pop("_usuario_editando_activo", None)
-        else:
-            _usuario_form_editar(usuario_editando)
-        
-        if st.button("Cancelar edición", key=f"cancel_edit_activo"):
-            st.session_state.pop("_usuario_editando_activo", None)
-            st.rerun()
+        if st.session_state.get(f"_editando_u_{u['id']}"):
+            ok, msg = puede_gestionar_usuario(usuario, int(u["id"]))
+            if not ok:
+                st.warning(msg)
+            else:
+                _usuario_form_editar(int(u["id"]))
+            st.markdown("---")
 
 
 def _frag_usuarios_crear():
@@ -5980,10 +5430,10 @@ def _render_registrar_jp(usuario):
 
 
 def _render_historial_global_jp(usuario):
-    st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
     hoy_s = hoy_str()
     pasado_s = (ahora().date() + timedelta(days=2)).strftime("%Y-%m-%d")
-    
+
+    st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
     try:
         df_vig = leer_df("""
             SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
@@ -5992,7 +5442,8 @@ def _render_historial_global_jp(usuario):
             jp.motivo AS Motivo,
             CASE WHEN jp.aplicada=1 THEN 'Aplicada'
                  WHEN jp.aplicada=-1 THEN 'Anulada'
-                 ELSE 'Pendiente' END AS Estado
+                 ELSE 'Pendiente' END AS Estado,
+            COALESCE(jp.creado_por,'') AS "Creado por"
             FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
             JOIN secciones s ON a.seccion_id=s.id
             JOIN grados g ON s.grado_id=g.id
@@ -6010,66 +5461,111 @@ def _render_historial_global_jp(usuario):
         st.dataframe(df_vig, width='stretch', hide_index=True)
 
     st.markdown("---")
-    st.markdown("**Buscar en todos los tiempos**")
-    
-    # 🆕 FILTROS Y BÚSQUEDA
-    c1, c2 = st.columns([1, 2])
+    st.markdown("**Todas las justificaciones previas registradas**")
+    c1, c2 = st.columns(2)
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
-                                     ["Todas", "Pendientes", "Aplicadas", "Anuladas"],
+                                     ["Todas", "Pendientes", "Aplicadas",
+                                      "Anuladas"],
                                      key="jp_filtro_estado")
     with c2:
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="jp_filtro_texto",
                                       placeholder="Ej: 12345678 o Quispe")
-    
-    if st.button("🔍 Buscar Justificaciones", type="primary", width='stretch'):
-        st.session_state["_buscar_jp_hist"] = True
 
-    if st.session_state.get("_buscar_jp_hist"):
-        if filtro_estado == "Todas" and not filtro_texto.strip():
-            st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
-            return
+    q = ("""SELECT jp.id AS id, jp.fecha_objetivo AS Fecha, a.dni AS DNI,
+         a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
+         g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
+         jp.motivo AS Motivo,
+         CASE WHEN jp.aplicada=1 THEN 'Aplicada'
+              WHEN jp.aplicada=-1 THEN 'Anulada'
+              ELSE 'Pendiente' END AS Estado,
+         COALESCE(jp.creado_por,'') AS "Creado por"
+         FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
+         JOIN secciones s ON a.seccion_id=s.id
+         JOIN grados g ON s.grado_id=g.id
+         JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
+    params = []
+    if filtro_estado == "Pendientes":
+        q += " AND jp.aplicada=0"
+    elif filtro_estado == "Aplicadas":
+        q += " AND jp.aplicada=1"
+    elif filtro_estado == "Anuladas":
+        q += " AND jp.aplicada=-1"
+    if filtro_texto.strip():
+        q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
+              "OR a.apellido_materno LIKE ?)")
+        pat = "%" + filtro_texto.strip() + "%"
+        params += [pat, pat, pat]
+    q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
 
-        q = ("""SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
-             a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
-             g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
-             jp.motivo AS Motivo,
-             CASE WHEN jp.aplicada=1 THEN 'Aplicada'
-                  WHEN jp.aplicada=-1 THEN 'Anulada'
-                  ELSE 'Pendiente' END AS Estado,
-             COALESCE(jp.creado_por,'') AS "Creado por"
-             FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
-             JOIN secciones s ON a.seccion_id=s.id
-             JOIN grados g ON s.grado_id=g.id
-             JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
-        params = []
-        if filtro_estado == "Pendientes":
-            q += " AND jp.aplicada=0"
-        elif filtro_estado == "Aplicadas":
-            q += " AND jp.aplicada=1"
-        elif filtro_estado == "Anuladas":
-            q += " AND jp.aplicada=-1"
-        if filtro_texto.strip():
-            q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
-                  "OR a.apellido_materno LIKE ?)")
-            pat = "%" + filtro_texto.strip() + "%"
-            params += [pat, pat, pat]
-        q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
+    try:
+        df_all = leer_df(q, params)
+    except Exception as e:
+        log.warning("jp todas fallo: %s", e)
+        st.error(f"Error consultando justificaciones: {e}")
+        df_all = pd.DataFrame()
 
-        try:
-            df_all = leer_df(q, params)
-        except Exception as e:
-            log.warning("jp todas fallo: %s", e)
-            st.error(f"Error consultando justificaciones: {e}")
-            df_all = pd.DataFrame()
+    if df_all.empty:
+        st.info("Sin justificaciones previas.")
+    else:
+        st.write(f"{len(df_all)} justificaciones")
+        for _, r in df_all.iterrows():
+            c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+            c1.write(f"**{r['Fecha']}** - {r['Alumno']}")
+            c2.write(f"{r['Grado']} {r['Seccion']} ({r['Turno']})")
+            c3.write(f"{r['Estado']} - {r['Motivo']}")
+            if r["Estado"] == "Anulada":
+                if c4.button("Reactivar", key=f"reac_jp_glob_{r['id']}"):
+                    st.session_state["_reactivar_jp_global_id"] = int(r["id"])
+                    st.rerun()
+            elif r["Estado"] == "Pendiente":
+                if c4.button("Anular", key=f"anul_jp_glob_{r['id']}"):
+                    st.session_state["_anular_jp_global_id"] = int(r["id"])
+                    st.rerun()
+            elif r["Estado"] == "Aplicada":
+                c4.caption("🔒")
 
-        if df_all.empty:
-            st.info("Sin justificaciones previas con esos filtros.")
-        else:
-            st.write(f"{len(df_all)} justificaciones encontradas")
-            # 🆕 SOLO DATAFRAME (Cero RAM en CSS)
-            st.dataframe(df_all, width='stretch', hide_index=True)
+        if st.session_state.get("_anular_jp_global_id"):
+            jid = st.session_state["_anular_jp_global_id"]
+            st.markdown("---")
+            st.warning("Vas a anular esta justificacion previa (pendiente).")
+            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                         key=f"jp_glob_motivo_anul_{jid}")
+            if confirmar_accion(f"jp_glob_anular_{jid}",
+                                 "Confirmar anulacion",
+                                 "¿Estas seguro de anular esta justificacion?"):
+                ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
+                st.session_state.pop("_anular_jp_global_id", None)
+                if ok:
+                    st.toast(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            if st.button("Cancelar", key=f"jp_glob_cancel_{jid}"):
+                st.session_state.pop("_anular_jp_global_id", None)
+                st.rerun()
+
+        if st.session_state.get("_reactivar_jp_global_id"):
+            jid = st.session_state["_reactivar_jp_global_id"]
+            st.markdown("---")
+            st.info("Vas a reactivar esta justificacion previa.")
+            motivo_nuevo = st.text_input("Motivo nuevo (opcional)",
+                                         key=f"jp_glob_motivo_reactivar_{jid}")
+            if confirmar_accion(f"jp_glob_reactivar_{jid}",
+                                 "Confirmar reactivacion",
+                                 "¿Estas seguro de reactivar esta justificacion?"):
+                ok, msg = reactivar_justificacion_previa(jid, usuario,
+                                                          motivo_nuevo)
+                st.session_state.pop("_reactivar_jp_global_id", None)
+                if ok:
+                    st.toast(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            if st.button("Cancelar", key=f"jp_glob_cancel_reactivar_{jid}"):
+                st.session_state.pop("_reactivar_jp_global_id", None)
+                st.rerun()
 
 
 # ─── PERMISOS ──────────────────────────────────────────────────────────────
@@ -6182,9 +5678,9 @@ def _render_registrar_perm(usuario):
 
 
 def _render_historial_global_perm(usuario):
-    st.markdown("**Permisos vigentes HOY**")
     hoy_s = hoy_str()
-    
+
+    st.markdown("**Permisos vigentes HOY**")
     try:
         df_hoy = leer_df("""
             SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
@@ -6208,10 +5704,33 @@ def _render_historial_global_perm(usuario):
         st.dataframe(df_hoy, width='stretch', hide_index=True)
 
     st.markdown("---")
-    st.markdown("**Buscar en todos los tiempos**")
-    
-    # 🆕 FILTROS Y BÚSQUEDA
-    c1, c2 = st.columns([1, 2])
+    st.markdown(f"**Permisos de los proximos {MAX_DIAS_PERMISO} dias**")
+    limite_s = (ahora().date() + timedelta(days=MAX_DIAS_PERMISO)).strftime("%Y-%m-%d")
+    try:
+        df_prox = leer_df("""
+            SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
+            a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
+            g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
+            COALESCE(p.motivo,'') AS Motivo
+            FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
+            JOIN secciones s ON a.seccion_id=s.id
+            JOIN grados g ON s.grado_id=g.id
+            JOIN turnos t ON s.turno_id=t.id
+            WHERE p.activo=1 AND p.fecha_inicio>? AND p.fecha_inicio<=?
+            ORDER BY p.fecha_inicio, a.apellido_paterno
+        """, (to_date(hoy_s), to_date(limite_s)))
+    except Exception as e:
+        log.warning("perm prox fallo: %s", e)
+        df_prox = pd.DataFrame()
+
+    if df_prox.empty:
+        st.info("Sin permisos programados.")
+    else:
+        st.dataframe(df_prox, width='stretch', hide_index=True)
+
+    st.markdown("---")
+    st.markdown("**Todos los permisos registrados**")
+    c1, c2 = st.columns(2)
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
                                      ["Todos", "Activos", "Inactivos"],
@@ -6220,49 +5739,74 @@ def _render_historial_global_perm(usuario):
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="perm_filtro_texto",
                                       placeholder="Ej: 12345678")
-                                      
-    if st.button("🔍 Buscar Permisos", type="primary", width='stretch'):
-        st.session_state["_buscar_perm_hist"] = True
+    q = ("""SELECT p.id AS id, p.fecha_inicio AS Inicio, p.fecha_fin AS Fin,
+         a.dni AS DNI,
+         a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
+         g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
+         COALESCE(p.motivo,'') AS Motivo,
+         CASE WHEN p.activo=1 THEN 'Activo' ELSE 'Inactivo' END AS Estado
+         FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
+         JOIN secciones s ON a.seccion_id=s.id
+         JOIN grados g ON s.grado_id=g.id
+         JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
+    params = []
+    if filtro_estado == "Activos":
+        q += " AND p.activo=1"
+    elif filtro_estado == "Inactivos":
+        q += " AND p.activo=0"
+    if filtro_texto.strip():
+        q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
+              "OR a.apellido_materno LIKE ?)")
+        pat = "%" + filtro_texto.strip() + "%"
+        params += [pat, pat, pat]
+    q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
 
-    if st.session_state.get("_buscar_perm_hist"):
-        if filtro_estado == "Todos" and not filtro_texto.strip():
-            st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
-            return
+    try:
+        df_all = leer_df(q, params)
+    except Exception as e:
+        log.warning("perm todas fallo: %s", e)
+        st.error(f"Error consultando permisos: {e}")
+        df_all = pd.DataFrame()
 
-        q = ("""SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin,
-             a.dni AS DNI,
-             a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
-             g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
-             COALESCE(p.motivo,'') AS Motivo,
-             CASE WHEN p.activo=1 THEN 'Activo' ELSE 'Inactivo' END AS Estado
-             FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
-             JOIN secciones s ON a.seccion_id=s.id
-             JOIN grados g ON s.grado_id=g.id
-             JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
-        params = []
-        if filtro_estado == "Activos":
-            q += " AND p.activo=1"
-        elif filtro_estado == "Inactivos":
-            q += " AND p.activo=0"
-        if filtro_texto.strip():
-            q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
-                  "OR a.apellido_materno LIKE ?)")
-            pat = "%" + filtro_texto.strip() + "%"
-            params += [pat, pat, pat]
-        q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
+    if df_all.empty:
+        st.info("Sin permisos.")
+    else:
+        st.write(f"{len(df_all)} permisos")
+        st.dataframe(df_all, width='stretch', hide_index=True)
 
-        try:
-            df_all = leer_df(q, params)
-        except Exception as e:
-            log.warning("perm todas fallo: %s", e)
-            st.error(f"Error consultando permisos: {e}")
-            df_all = pd.DataFrame()
-
-        if df_all.empty:
-            st.info("Sin permisos con esos filtros.")
+        st.markdown("---")
+        st.markdown("**Anular un permiso (solo pendientes)**")
+        opciones_anular = {}
+        for _, r in df_all.iterrows():
+            if r["Estado"] == "Activo":
+                with cursor() as (con, cur):
+                    cur.execute("""
+                        SELECT COUNT(*) AS n FROM asistencias
+                        WHERE alumno_id=(SELECT id FROM alumnos WHERE dni=?)
+                          AND fecha BETWEEN ? AND ? AND estado='Permiso'
+                    """, (r["DNI"], to_date(r['Inicio']), to_date(r['Fin'])))
+                    aplicado = (cur.fetchone()["n"] or 0) > 0
+                if not aplicado:
+                    et = f"{r['Inicio']} -> {r['Fin']} - {r['Alumno']} (DNI {r['DNI']})"
+                    opciones_anular[et] = int(r["id"])
+        if opciones_anular:
+            sel_anular = st.selectbox("Selecciona permiso a anular",
+                                       list(opciones_anular.keys()),
+                                       key="perm_sel_anular")
+            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
+                                         key="perm_motivo_anular_global")
+            if confirmar_accion("perm_anular_global", "Confirmar anulacion",
+                                 "¿Estas seguro de anular este permiso?"):
+                ok, msg = eliminar_permiso(
+                    opciones_anular[sel_anular], usuario, motivo_anul)
+                st.session_state.pop("perm_motivo_anular_global", None)
+                if ok:
+                    st.toast(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
         else:
-            st.write(f"{len(df_all)} permisos encontrados")
-            st.dataframe(df_all, width='stretch', hide_index=True)
+            st.info("No hay permisos pendientes con los filtros actuales.")
 
 
 def vista_justificaciones_permisos():
@@ -6282,6 +5826,469 @@ def vista_backup():
     boton_backup()
 
 
+# ─── ESTILOS CSS ───────────────────────────────────────────────────────────
+def aplicar_estilos():
+    st.markdown("""
+    <style>
+    /* ══════════════════════════════════════════════════════════════════
+       IMPORTAR FUENTE NUNITO DESDE GOOGLE FONTS
+       ══════════════════════════════════════════════════════════════════ */
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&display=swap');
+
+    /* ══════════════════════════════════════════════════════════════════
+       VARIABLES GLOBALES
+       ══════════════════════════════════════════════════════════════════ */
+    :root{
+        --primario:       #E87B4A;
+        --primario-dark:  #D66535;
+        --primario-soft:  rgba(232,123,74,.15);
+        --primario-borde: rgba(232,123,74,.35);
+        --acento:         #F5B896;
+        --acento-soft:    rgba(245,184,150,.25);
+        --texto-btn:      #FFFFFF;
+        --texto-titulo:   #C4562A;
+        --texto-suave:    #4A4A4A;
+        --radius:         12px;
+        --radius-sm:      8px;
+        --sombra:         0 2px 8px rgba(0,0,0,.06);
+        --fs-base:        16px;
+        --fs-small:       14px;
+        --fs-label:       12px;
+        --fs-titulo:      30px;
+        --fs-h2:          22px;
+        --fuente:         'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark){
+        :root{
+            --primario:       #F08A5C;
+            --primario-dark:  #E87B4A;
+            --primario-soft:  rgba(240,138,92,.20);
+            --primario-borde: rgba(240,138,92,.45);
+            --acento:         #F5B896;
+            --acento-soft:    rgba(245,184,150,.20);
+            --texto-btn:      #FFFFFF;
+            --texto-titulo:   #F5A582;
+            --texto-suave:    #B8B8B8;
+            --sombra:         0 2px 8px rgba(0,0,0,.30);
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       TIPOGRAFÍA (Nunito) — SIN !important para no romper iconos
+       ══════════════════════════════════════════════════════════════════ */
+    html, body, [class*="css"], .stApp,
+    .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
+    .stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
+    .stNumberInput, .stRadio, .stCheckbox, .stSlider,
+    .stTabs, .stExpander, div[data-testid="stSidebar"],
+    div[data-testid="stMetric"], button, input, textarea, select,
+    h1, h2, h3, h4, h5, h6, p, span, a, label, div{
+        font-family: var(--fuente);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       FIX: ICONOS MATERIAL SYMBOLS (NO tocar)
+       ══════════════════════════════════════════════════════════════════ */
+    span[data-testid="stIconMaterial"],
+    span[data-testid="stIconMaterial"] *,
+    .material-symbols-rounded,
+    .material-symbols-rounded *,
+    [class*="material-symbols"],
+    [class*="material-icons"],
+    [class*="MaterialIcon"]{
+        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+        font-weight: normal !important;
+        font-style: normal !important;
+        font-size: 24px !important;
+        line-height: 1 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        word-wrap: normal !important;
+        direction: ltr !important;
+        -webkit-font-feature-settings: 'liga' !important;
+        -webkit-font-smoothing: antialiased !important;
+    }
+
+    html, body, [class*="css"], .stApp{
+        font-size: var(--fs-base);
+    }
+
+    h1{
+        font-size: var(--fs-titulo) !important;
+        font-weight: 800 !important;
+        color: var(--texto-titulo) !important;
+        -webkit-text-fill-color: var(--texto-titulo) !important;
+        letter-spacing: -0.5px;
+    }
+    h2{
+        font-size: var(--fs-h2) !important;
+        font-weight: 700 !important;
+        color: var(--texto-titulo) !important;
+    }
+    h3{
+        font-size: 19px !important;
+        font-weight: 700 !important;
+        color: var(--texto-titulo) !important;
+    }
+
+    p, span, label, .stMarkdown, .stText, div[data-testid="stMarkdownContainer"]{
+        font-size: var(--fs-base);
+    }
+
+    .stCaption, small, div[data-testid="stCaptionContainer"]{
+        font-size: var(--fs-small) !important;
+        opacity: 0.75;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       SIDEBAR
+       ══════════════════════════════════════════════════════════════════ */
+    section[data-testid="stSidebar"]{
+        border-right: 1px solid var(--primario-borde);
+    }
+    section[data-testid="stSidebar"] .stRadio label{
+        border-radius: var(--radius-sm) !important;
+        padding: 12px 15px !important;
+        font-weight: 600 !important;
+        font-size: var(--fs-small) !important;
+        margin: 2px 0 !important;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        transition: all .15s ease;
+    }
+    section[data-testid="stSidebar"] .stRadio label:hover{
+        background: var(--primario-soft) !important;
+        border-left-color: var(--primario);
+    }
+    section[data-testid="stSidebar"] .stRadio input{display:none;}
+
+    .encabezado-sidebar{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        padding: 20px 16px;
+        margin: 8px 10px 18px 10px;
+        border-radius: var(--radius);
+        text-align: center;
+        color: #FFF;
+        box-shadow: var(--sombra);
+    }
+    .encabezado-sidebar .avatar{
+        width: 58px; height: 58px; border-radius: 50%;
+        background: rgba(255,255,255,.25);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px; font-weight: 800; color: #FFF;
+        margin: 0 auto 10px auto;
+        border: 2px solid rgba(255,255,255,.5);
+    }
+    .encabezado-sidebar .nombre{
+        font-size: 16px; font-weight: 700; color: #FFF !important;
+    }
+    .encabezado-sidebar .rol{
+        display: inline-block; margin-top: 8px; padding: 4px 12px;
+        background: rgba(255,255,255,.25); border-radius: 20px;
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .10em; color: #FFF !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       INPUTS
+       ══════════════════════════════════════════════════════════════════ */
+    .stTextInput input, .stNumberInput input, .stDateInput input,
+    .stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
+        border-radius: var(--radius-sm) !important;
+        min-height: 46px;
+        font-size: var(--fs-base) !important;
+        border: 2px solid var(--primario-borde) !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus{
+        border-color: var(--primario) !important;
+        box-shadow: 0 0 0 3px var(--primario-soft) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       BOTONES
+       ══════════════════════════════════════════════════════════════════ */
+    .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
+        background: var(--primario) !important;
+        color: #FFFFFF !important;
+        border-radius: var(--radius-sm) !important;
+        font-weight: 700 !important;
+        border: none !important;
+        padding: 12px 22px !important;
+        font-size: var(--fs-small) !important;
+        min-height: 46px;
+        box-shadow: 0 2px 6px rgba(232,123,74,.25);
+        transition: all .15s ease;
+    }
+    .stButton > button p,
+    .stFormSubmitButton > button p,
+    .stDownloadButton > button p{
+        color: #FFFFFF !important;
+    }
+    .stButton > button:hover, .stFormSubmitButton > button:hover,
+    .stDownloadButton > button:hover{
+        background: var(--primario-dark) !important;
+        transform: translateY(-1px);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MÉTRICAS
+       ══════════════════════════════════════════════════════════════════ */
+    div[data-testid="stMetric"]{
+        background: var(--primario-soft);
+        border: 1px solid var(--primario-borde);
+        border-radius: var(--radius);
+        padding: 20px 22px !important;
+    }
+    div[data-testid="stMetric"] label{
+        font-size: 12px !important; font-weight: 800 !important;
+        text-transform: uppercase; letter-spacing: .08em !important;
+    }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
+        font-size: 32px !important; font-weight: 800 !important;
+        color: var(--texto-titulo) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       TABS
+       ══════════════════════════════════════════════════════════════════ */
+    .stTabs [data-baseweb="tab-list"]{
+        gap: 4px;
+        border-bottom: 2px solid var(--primario-borde);
+    }
+    .stTabs [data-baseweb="tab"]{
+        font-weight: 700 !important;
+        padding: 12px 18px !important;
+        font-size: var(--fs-small) !important;
+        opacity: 0.7;
+    }
+    .stTabs [aria-selected="true"]{
+        font-weight: 800 !important;
+        color: var(--texto-titulo) !important;
+        border-bottom: 3px solid var(--primario) !important;
+        opacity: 1;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       EXPANDERS
+       ══════════════════════════════════════════════════════════════════ */
+    .streamlit-expanderHeader, details summary{
+        border: 1px solid var(--primario-borde) !important;
+        border-radius: var(--radius-sm) !important;
+        font-weight: 700 !important;
+        padding: 14px 16px !important;
+        font-size: var(--fs-base) !important;
+    }
+    .streamlit-expanderHeader:hover{
+        border-color: var(--primario) !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       HEADERS DE PÁGINA
+       ══════════════════════════════════════════════════════════════════ */
+    .scan-header, .puerta-header{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        padding: 24px 28px;
+        border-radius: var(--radius);
+        margin-bottom: 20px;
+        color: #FFF;
+        box-shadow: var(--sombra);
+    }
+    .scan-header .scan-titulo{ font-size: 26px; font-weight: 800; color:#FFF; }
+    .scan-header .scan-sub{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
+    .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
+    .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
+
+    /* ══════════════════════════════════════════════════════════════════
+       PERFIL HERO
+       ══════════════════════════════════════════════════════════════════ */
+    .perfil-hero{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        border-radius: 14px;
+        padding: 26px 30px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        flex-wrap: wrap;
+        color: #FFF;
+        box-shadow: 0 4px 16px rgba(232,123,74,.20);
+    }
+    .perfil-hero .hero-avatar{
+        width: 84px; height: 84px; border-radius: 50%;
+        background: rgba(255,255,255,.20);
+        border: 2px solid rgba(255,255,255,.45);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 34px; font-weight: 800; color: #FFF;
+        flex-shrink: 0;
+    }
+    .perfil-hero .hero-info{ flex: 1; min-width: 240px; }
+    .perfil-hero .hero-nombre{
+        font-size: 24px; font-weight: 800; color: #FFF !important;
+        margin-bottom: 4px;
+    }
+    .perfil-hero .hero-meta{
+        font-size: 14px; opacity: .95; color: #FFF !important;
+        line-height: 1.5;
+    }
+    .perfil-hero .hero-badge{
+        display: inline-block; margin-top: 10px;
+        padding: 4px 14px; border-radius: 20px;
+        font-size: 10px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .12em;
+        background: rgba(255,255,255,.25);
+        border: 1px solid rgba(255,255,255,.45);
+        color: #FFF !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       BLOQUES / CARDS
+       ══════════════════════════════════════════════════════════════════ */
+    .perfil-bloque{
+        background: var(--secondary-background-color);
+        border: 1px solid var(--primario-borde);
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: var(--sombra);
+    }
+    .perfil-bloque .titulo-seccion{
+        font-size: 12px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .12em; color: var(--texto-titulo);
+        margin-bottom: 14px; padding-bottom: 8px;
+        border-bottom: 1px solid var(--primario-borde);
+    }
+    .info-linea{
+        display: flex; padding: 6px 0;
+        font-size: 14px;
+        border-bottom: 1px solid var(--primario-soft);
+    }
+    .info-linea:last-child{ border-bottom: none; }
+    .info-label{
+        font-size: 12px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .05em;
+        opacity: 0.65;
+        min-width: 130px;
+    }
+    .info-valor{ font-weight: 600; }
+
+    /* ══════════════════════════════════════════════════════════════════
+       KPI CARDS
+       ══════════════════════════════════════════════════════════════════ */
+    .kpi-grid{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 14px;
+    }
+    .kpi-card{
+        background: var(--primario-soft);
+        border: 1px solid var(--primario-borde);
+        border-radius: 10px;
+        padding: 16px 12px;
+        text-align: center;
+        transition: all .15s ease;
+    }
+    .kpi-card:hover{
+        border-color: var(--primario);
+        box-shadow: var(--sombra);
+    }
+    .kpi-card .kpi-num{
+        font-size: 30px; font-weight: 800; color: var(--texto-titulo);
+        line-height: 1; margin-bottom: 6px;
+    }
+    .kpi-card .kpi-lbl{
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .08em; line-height: 1.3;
+        opacity: 0.75;
+    }
+    .kpi-card .kpi-lbl-alerta{ color: #C62828; opacity: 1; }
+    @media (prefers-color-scheme: dark){
+        .kpi-card .kpi-lbl-alerta{ color: #FC8181; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MENSAJES QR
+       ══════════════════════════════════════════════════════════════════ */
+    .scan-ultimos{
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
+        border-bottom: 2px solid var(--primario-borde); color: var(--texto-titulo);
+    }
+    .qr-msg{
+        background: var(--secondary-background-color);
+        padding: 16px 20px;
+        border-radius: var(--radius-sm);
+        margin: 10px 0;
+        border: 1px solid rgba(128,128,128,.15);
+        border-left: 5px solid #808080;
+        font-size: 15px;
+    }
+    .qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+    .qr-texto{ font-size: 15px; font-weight: 600; line-height: 1.4; }
+    .qr-evento{
+        font-size: 12px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .10em; margin-bottom: 5px;
+        color: var(--texto-titulo); display: inline-block;
+        padding: 3px 10px; background: var(--primario-soft); border-radius: 6px;
+    }
+    .qr-puntual   { border-left-color:#22C55E; background: rgba(34,197,94,.06); }
+    .qr-tardanza  { border-left-color:#F59E0B; background: rgba(245,158,11,.06); }
+    .qr-derivado  { border-left-color:#FF9800; background: rgba(255,152,0,.08); }
+    .qr-retenido  { border-left-color:#FF7043; font-weight:700; background: rgba(255,112,67,.08); }
+    .qr-refuerzo  { border-left-color:#42A5F5; background: rgba(66,165,245,.06); }
+    .qr-bloqueado { border-left-color:#EF4444; border:2px solid #EF4444; font-weight:800; background: rgba(239,68,68,.10); }
+    .qr-ultima    { border-left-color:#E87B4A; font-weight:800; background: var(--acento-soft); }
+    .qr-error     { border-left-color:#888888; }
+
+    @media (prefers-color-scheme: dark){
+        .qr-puntual   { background: rgba(34,197,94,.10); }
+        .qr-tardanza  { background: rgba(245,158,11,.10); }
+        .qr-derivado  { background: rgba(255,152,0,.12); }
+        .qr-retenido  { background: rgba(255,112,67,.12); }
+        .qr-refuerzo  { background: rgba(66,165,245,.10); }
+        .qr-bloqueado { background: rgba(239,68,68,.15); }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       BOTÓN SELECCIONADO
+       ══════════════════════════════════════════════════════════════════ */
+    .btn-sel .stButton > button{
+        background: #43A047 !important;
+        color: #FFF !important;
+    }
+    .btn-sel .stButton > button p{
+        color: #FFF !important;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       SEPARADORES
+       ══════════════════════════════════════════════════════════════════ */
+    hr{
+        border: none;
+        height: 1px;
+        background: var(--primario-borde);
+        margin: 20px 0;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       RESPONSIVE
+       ══════════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px){
+        h1{ font-size: 1.5rem !important; }
+        h2{ font-size: 1.2rem !important; }
+        .stButton > button{ width: 100% !important; }
+        .perfil-hero{ padding: 20px; gap: 16px; }
+        .perfil-hero .hero-avatar{ width: 64px; height: 64px; font-size: 26px; }
+        .perfil-hero .hero-nombre{ font-size: 19px; }
+        .kpi-grid{ grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .kpi-card .kpi-num{ font-size: 24px; }
+        .info-linea{ flex-direction: column; }
+        .info-label{ min-width: auto; margin-bottom: 2px; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
     grados = listar_grados()
     c1, c2, c3 = st.columns([2, 2, 3])
@@ -6303,92 +6310,20 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
-    # ══════════════════════════════════════════════════════════════════
-    # 1. CSS LOCAL (Igual al primero, pero sin emojis)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("""<style>
-    /* Fondo crema suave que cubre toda la pantalla */
-    .login-bg {
-        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%);
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
-    }
-    /* Tarjeta central */
-    .login-card {
-        background: #FFFFFF;
-        border-radius: 24px 24px 0 0;
-        padding: 40px 30px 20px 30px;
-        box-shadow: 0 -10px 40px rgba(232,123,74,0.05);
-        border: 1px solid #FFE4D6;
-        border-bottom: none;
-        text-align: center;
-        margin-bottom: -20px; /* Pega la tarjeta con el formulario */
-    }
-    .login-title {
-        font-size: 36px; font-weight: 900; color: #E87B4A !important;
-        margin-bottom: 5px; letter-spacing: -1px;
-    }
-    .login-sub { 
-        font-size: 15px; color: #666 !important; 
-        margin-bottom: 10px; font-weight: 600; 
-    }
-    /* Contenedor del formulario para que se vea como parte de la tarjeta */
-    div[data-testid="stForm"] {
-        background: white !important;
-        border-radius: 0 0 24px 24px !important;
-        padding: 0px 30px 30px 30px !important;
-        box-shadow: 0 20px 40px rgba(232,123,74,0.15) !important;
-        border: 1px solid #FFE4D6 !important;
-        border-top: none !important;
-    }
-    /* Inputs */
-    .stTextInput > div > div > input {
-        border-radius: 10px !important;
-        border: 2px solid #FFE4D6 !important;
-        padding: 10px 15px !important;
-    }
-    /* Botón */
-    .stFormSubmitButton > button {
-        background: #E87B4A !important;
-        color: white !important;
-        border-radius: 10px !important;
-        font-weight: 800 !important;
-        border: none !important;
-        padding: 12px !important;
-        width: 100% !important;
-    }
-    .stFormSubmitButton > button:hover {
-        background: #D66535 !important;
-    }
-    </style>
-    <div class="login-bg"></div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Sin Emojis)
-    # ══════════════════════════════════════════════════════════════════
-    _, centro, _ = st.columns([1, 1.2, 1])
-    
+    st.markdown("""
+    <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
+        <h1 style="font-size:44px; margin-bottom:0; border:none; letter-spacing:-1px;">asisyarina</h1>
+        <p style="opacity:0.6; margin-top:6px; font-size:15px;">Sistema de Asistencia</p>
+    </div>
+    """, unsafe_allow_html=True)
+    _, centro, _ = st.columns([1, 1, 1])
     with centro:
-        # Abrimos la tarjeta
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
-        # El escudo usando st.image (centrado con columnas)
-        c_img1, c_img2, c_img3 = st.columns([1, 1, 1])
-        with c_img2:
-            st.image("escudo.png", use_container_width=True) 
-            
-        # Título y subtítulo
-        st.markdown("""
-            <div class="login-title">asisyarina</div>
-            <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Formulario (Ocultamos los labels para que se vea más limpio)
         with st.form("login"):
-            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario", label_visibility="collapsed")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed")
-            enviado = st.form_submit_button("Ingresar al Sistema")
-            
+            usuario = st.text_input("Usuario", placeholder="tu usuario")
+            password = st.text_input("Contraseña", type="password",
+                                     placeholder="tu contraseña")
+            enviado = st.form_submit_button("Ingresar", type="primary",
+                                            width='stretch')
             if enviado:
                 datos, err = autenticar(usuario, password)
                 if datos:
@@ -6602,7 +6537,7 @@ def main():
         descargar_bd_si_no_existe()
 
         inicializar_bd()
-        # aplicar_estilos()
+        aplicar_estilos()
 
         if not st.session_state.get("user"):
             vista_login()
