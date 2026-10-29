@@ -2469,7 +2469,6 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from pathlib import Path
 
     buf = BytesIO()
-    # Márgenes óptimos
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
                             rightMargin=1.5*cm, leftMargin=1.5*cm,
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
@@ -2488,7 +2487,6 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(PageBreak())
         primera = False
 
-        # ─── CABECERA CON ESCUDO A LA DERECHA ───
         cabecera_data = []
         if escudo_path.exists():
             try:
@@ -2511,7 +2509,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')), # Línea delgada
+            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
         ]))
         el.append(tabla_cabecera)
         el.append(Spacer(1, 12))
@@ -2530,15 +2528,14 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
             
             if es_hoja_faltas:
-                # Hoja de faltas: 4 columnas exactas
                 col_widths = [2.0*cm, 8.5*cm, 2.0*cm, 8.5*cm]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 t.setStyle(TableStyle([
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
-                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#E8F5E9')), # Verde suave
-                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#FFEBEE')), # Rojo suave
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#E8F5E9')),
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#FFEBEE')),
                     ("ALIGN", (0, 0), (0, -1), "CENTER"),
                     ("ALIGN", (2, 0), (2, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -2546,44 +2543,41 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]))
             else:
-                # 🆕 PROPORCIONES EXACTAS: N y Estado se quedan con lo mínimo
+                # 🆕 MATEMÁTICA FORZADA: Si la columna se llama "N", mide 1.2cm exactos.
+                # Si se llama "Estado", mide 1.8cm exactos.
+                # Si se llama "Apellidos" o "Nombres", mide 8.5cm exactos.
                 col_widths = []
                 for col in df.columns:
-                    cl = str(col).lower()
+                    cl = str(col).strip().lower()
                     if cl == "n":
-                        col_widths.append(1.0)  # Peso bajo
+                        col_widths.append(1.2 * cm)
                     elif cl == "estado":
-                        col_widths.append(1.5)  # Peso bajo
-                    elif "hora" in cl:
-                        col_widths.append(2.0)
+                        col_widths.append(1.8 * cm)
+                    elif cl == "hora":
+                        col_widths.append(2.0 * cm)
                     elif "apellido" in cl or "nombre" in cl:
-                        col_widths.append(10.0) # Peso alto
+                        col_widths.append(8.5 * cm)
                     else:
-                        col_widths.append(3.0)
-                
-                # Convertir pesos a centímetros reales (Ancho total = 21 cm)
-                total_peso = sum(col_widths)
-                col_widths = [(w / total_peso) * 21 * cm for w in col_widths]
+                        col_widths.append(3.0 * cm)
                 
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')), # Letras oscuras
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#F5F5F5')), # Fondo gris muy claro
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor('#CCCCCC')), # Línea sutil debajo del título
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')), # Grid gris clarito
+                    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor('#CCCCCC')),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')),
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]
                 
-                # Colores para P, T, F
                 col_estado = None
                 for j, c in enumerate(df.columns):
-                    if str(c).lower() == "estado":
+                    if str(c).strip().lower() == "estado":
                         col_estado = j
                         break
                 if col_estado is not None:
