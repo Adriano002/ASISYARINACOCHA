@@ -4525,53 +4525,40 @@ def vista_grados_secciones():
 def vista_carnets():
     st.title("Carnets QR")
 
-    st.markdown("### Descargar por sección")
-    st.caption("Selecciona un grado para ver sus secciones y generar los carnets.")
-
+    # Si ya estamos viendo los alumnos de una sección, mostramos eso
     if st.session_state.get("carn_ver_seccion"):
         _carnets_ver_seccion(st.session_state["carn_ver_seccion"])
         return
-        
+
+    st.markdown("### Descargar por sección")
+    st.caption("Selecciona un grado para ver sus secciones y generar los carnets.")
+
     grados = listar_grados()
     if not grados:
         st.warning("No hay grados registrados.")
         return
 
-    # Control para regresar al menú de grados
-    gid = st.session_state.get("carn_grado_sel")
-    if gid:
-        g = next((x for x in grados if x["id"] == gid), None)
-        if not g:
-            st.session_state.pop("carn_grado_sel", None)
-            st.rerun()
-            return
-            
-        if st.button("← Regresar a grados", key="carn_volver_grados"):
-            st.session_state.pop("carn_grado_sel", None)
-            st.rerun()
-            
-        st.subheader(f"Secciones de {g['nombre']}")
-        secs = secciones_por_grado(g["id"])
-        if not secs:
-            st.info("Sin secciones en este grado.")
-            return
-            
-        for s in secs:
-            n = len(alumnos_de_seccion(s["id"]))
-            if st.button(f"{s['nombre']}  ({n} alumnos)", width='stretch',
-                         key="carn_s_" + str(s['id'])):
-                st.session_state["carn_ver_seccion"] = s["id"]
-                st.rerun()
+    # 🆕 SELECTBOX NATIVO (Cero RAM extra)
+    ops_grados = {g["nombre"]: g["id"] for g in grados}
+    grado_sel = st.selectbox("Selecciona el grado", list(ops_grados.keys()), key="carn_grado_selbox")
+    idg = ops_grados[grado_sel]
+
+    secs = secciones_por_grado(idg)
+    
+    if not secs:
+        st.info(f"El grado {grado_sel} no tiene secciones creadas todavía.")
         return
 
-    # Si no hay grado seleccionado, mostramos la lista de grados
-    for g in grados:
-        secs = secciones_por_grado(g["id"])
-        if st.button(f"{g['nombre']}  ({len(secs)} secciones)", width='stretch',
-                     key="carn_g_" + str(g['id'])):
-            st.session_state["carn_grado_sel"] = g["id"]
-            st.rerun()
-
+    st.markdown(f"**Secciones de {grado_sel}:**")
+    st.caption("Selecciona una sección para entrar.")
+    
+    # Mostramos las secciones en un desplegable también para ahorrar RAM
+    ops_secs = {f"{s['nombre']} ({len(alumnos_de_seccion(s['id']))} alumnos)": s["id"] for s in secs}
+    sec_sel = st.selectbox("Selecciona la sección", list(ops_secs.keys()), key="carn_sec_selbox")
+    
+    if st.button("Entrar a la sección", type="primary", width='stretch'):
+        st.session_state["carn_ver_seccion"] = ops_secs[sec_sel]
+        st.rerun()
 
 def _carnets_ver_seccion(idsec):
     with cursor() as (con, cur):
@@ -4580,69 +4567,53 @@ def _carnets_ver_seccion(idsec):
                        JOIN grados g ON s.grado_id=g.id
                        JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""", (idsec,))
         sec = cur.fetchone()
+        
     if not sec:
         st.warning("Seccion no encontrada.")
         st.session_state.pop("carn_ver_seccion", None)
         return
-    if st.button("Regresar a grados", key="carn_volver"):
+        
+    if st.button("← Regresar a grados", key="carn_volver"):
         st.session_state.pop("carn_ver_seccion", None)
         st.session_state.pop("carn_sel_alumnos", None)
         st.rerun()
+        
     st.subheader(f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+    
     df = alumnos_de_seccion(idsec)
     if df.empty:
         st.info("Sin alumnos activos.")
         return
-    st.caption(f"{len(df)} alumnos. Aprieta un nombre para seleccionarlo.")
-    if "carn_sel_alumnos" not in st.session_state:
-        st.session_state["carn_sel_alumnos"] = set()
-    sel = st.session_state["carn_sel_alumnos"]
-    for _, al in df.iterrows():
-        if al["id"] in sel:
-            st.markdown('<div class="btn-sel">', unsafe_allow_html=True)
-            if st.button(al['nombre_completo'],
-                         key="carn_al_" + str(al['id']),
-                         width='stretch'):
-                sel.discard(al["id"])
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            if st.button(al['nombre_completo'],
-                         key="carn_al_" + str(al['id']),
-                         width='stretch'):
-                sel.add(al["id"])
-                st.rerun()
-    st.markdown("---")
-    st.write(f"Seleccionados: {len(sel)}")
-    c1, c2, c3 = st.columns(3)
+        
+    st.caption(f"{len(df)} alumnos en total.")
+
+    # 🆕 SELECTORES DESPLEGABLES (Cero RAM en botones)
+    c1, c2 = st.columns(2)
     with c1:
-        if sel:
-            if st.button("Descargar seleccionados", type="primary",
-                         width='stretch', key="carn_dl_sel"):
-                pdf = pdf_carnets_seleccionados(
-                    list(sel),
-                    titulo=f"Carnets - {sec['grado']} {sec['seccion']}")
-                if pdf:
-                    st.download_button(
-                        "Guardar PDF", pdf,
-                        f"carnets_sel_{sec['grado']}{sec['seccion']}.pdf",
-                        "application/pdf", width='stretch')
-        else:
-            st.info("Marca al menos un alumno.")
-    with c2:
-        if st.button("Descargar todo el salon", width='stretch',
-                     key="carn_dl_todo"):
-            pdf = pdf_carnets_por_seccion(idsec)
+        st.markdown("**Descargar carnet individual:**")
+        ops_alumnos = {al["nombre_completo"]: al["id"] for _, al in df.iterrows()}
+        alumno_sel = st.selectbox("Selecciona un alumno", list(ops_alumnos.keys()), label_visibility="collapsed")
+        if st.button("Generar Carnet Individual (PDF)", width='stretch'):
+            pdf = pdf_carnets_seleccionados([ops_alumnos[alumno_sel]])
             if pdf:
                 st.download_button(
-                    "Guardar PDF", pdf,
-                    f"carnets_{sec['grado']}{sec['seccion']}.pdf",
-                    "application/pdf", width='stretch')
-    with c3:
-        if st.button("Limpiar seleccion", width='stretch', key="carn_limpiar"):
-            st.session_state["carn_sel_alumnos"] = set()
-            st.rerun()
-
+                    "⬇️ Guardar PDF", pdf,
+                    f"carnet_{alumno_sel.replace(' ', '_')}.pdf",
+                    "application/pdf", width='stretch', key="dl_individual")
+                
+    with c2:
+        st.markdown("**Descargar todo el salón:**")
+        st.write("Genera un solo PDF con los carnets de todos los alumnos de esta sección.")
+        if st.button("Generar PDF de todo el Salón", type="primary", width='stretch', key="carn_dl_todo"):
+            with st.spinner("Generando PDF del salón..."):
+                pdf = pdf_carnets_por_seccion(idsec)
+                if pdf:
+                    st.download_button(
+                        "⬇️ Guardar PDF del Salón", pdf,
+                        f"carnets_{sec['grado']}{sec['seccion']}.pdf",
+                        "application/pdf", width='stretch', key="dl_salon")
+                else:
+                    st.error("No se pudo generar el PDF.")
 
 # ─── VENTANAS ──────────────────────────────────────────────────────────────
 def vista_ventanas():
@@ -4752,46 +4723,89 @@ def _frag_usuarios_botones():
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
 
-    if soy_principal:
-        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
-                     "es_principal FROM usuarios "
-                     "ORDER BY nombres, usuario")
-    else:
-        df = leer_df("SELECT id,usuario,rol,nombres,activo,ultimo_login,"
-                     "es_principal FROM usuarios WHERE id=? OR rol!='Admin' "
-                     "ORDER BY nombres, usuario", (usuario["id"],))
+    st.markdown("### Buscar Usuarios")
+    st.caption("Selecciona un filtro para cargar la lista (ahorra memoria al no mostrar todo de golpe).")
 
-    if df.empty:
-        st.info("Sin usuarios.")
-        return
+    # 🆕 FILTROS
+    c1, c2 = st.columns(2)
+    with c1:
+        roles_disponibles = ["Todos", "Admin", "Direccion", "Auxiliar"]
+        filtro_rol = st.selectbox("Filtrar por Rol", roles_disponibles, key="usr_filtro_rol")
+    with c2:
+        filtro_nombre = st.text_input("Buscar por nombre o usuario", key="usr_filtro_nombre", placeholder="Ej: admin")
 
-    for _, u in df.iterrows():
-        etiqueta_rol = ("Admin (principal)"
-                        if (u["rol"] == "Admin" and u["es_principal"])
-                        else ("Sub Admin" if u["rol"] == "Admin" else u["rol"]))
-        estado = "🟢 Activo" if u["activo"] else "🔴 Inactivo"
+    if st.button("🔍 Buscar Usuarios", type="primary", width='stretch'):
+        st.session_state["_buscar_usuarios_activado"] = True
 
-        with st.container():
-            c1, c2 = st.columns([5, 1])
-            c1.markdown(
-                f"**{u['nombres']}** &nbsp; "
-                f"<span style='color:#6B6B6B;'>({u['usuario']})</span> &nbsp; "
-                f"<span style='color:#B85C38; font-weight:700;'>{etiqueta_rol}</span> "
-                f"&nbsp; {estado}",
-                unsafe_allow_html=True)
-            if c2.button("Ver / Editar", key=f"ver_u_{u['id']}",
-                         width='stretch'):
-                current = st.session_state.get(f"_editando_u_{u['id']}", False)
-                st.session_state[f"_editando_u_{u['id']}"] = not current
-                st.rerun()
+    if st.session_state.get("_buscar_usuarios_activado"):
+        if filtro_rol == "Todos" and not filtro_nombre.strip():
+            st.info("Selecciona un rol o escribe un nombre para buscar.")
+            return
 
-        if st.session_state.get(f"_editando_u_{u['id']}"):
-            ok, msg = puede_gestionar_usuario(usuario, int(u["id"]))
-            if not ok:
-                st.warning(msg)
-            else:
-                _usuario_form_editar(int(u["id"]))
-            st.markdown("---")
+        # Construimos la consulta dinámicamente
+        query = "SELECT id, usuario, rol, nombres, activo, ultimo_login, es_principal FROM usuarios WHERE 1=1"
+        params = []
+        
+        if not soy_principal:
+            query += " AND (id=? OR rol!='Admin')"
+            params.append(usuario["id"])
+
+        if filtro_rol != "Todos":
+            query += " AND rol=?"
+            params.append(filtro_rol)
+            
+        if filtro_nombre.strip():
+            query += " AND (LOWER(nombres) LIKE ? OR LOWER(usuario) LIKE ?)"
+            pat = f"%{filtro_nombre.strip().lower()}%"
+            params += [pat, pat]
+
+        query += " ORDER BY nombres, usuario"
+        df = leer_df(query, params)
+
+        if df.empty:
+            st.info("No se encontraron usuarios con esos filtros.")
+            return
+
+        st.write(f"**{len(df)} usuarios encontrados**")
+        
+        # 🆕 MOSTRAMOS SOLO UN DATAFRAME
+        df_mostrar = df.copy()
+        df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "🟢 Activo" if x else "🔴 Inactivo")
+        df_mostrar["rol_ui"] = df_mostrar.apply(
+            lambda r: "Admin (principal)" if (r["rol"] == "Admin" and r["es_principal"]) 
+            else ("Sub Admin" if r["rol"] == "Admin" else r["rol"]), axis=1
+        )
+        
+        df_mostrar = df_mostrar[["nombres", "usuario", "rol_ui", "estado", "ultimo_login"]]
+        df_mostrar.columns = ["Nombres", "Usuario", "Rol", "Estado", "Último Login"]
+        
+        st.dataframe(df_mostrar, width='stretch', hide_index=True)
+
+        st.markdown("---")
+        st.subheader("Editar un usuario")
+        
+        ops = {f"{r['nombres']} ({r['usuario']})": r["id"] for _, r in df.iterrows()}
+        sel = st.selectbox("Selecciona el usuario a editar", list(ops.keys()))
+        
+        # 🆕 GUARDAMOS EL ID DEL USUARIO QUE SE ESTÁ EDITANDO ACTUALMENTE
+        if st.button("Ver / Editar usuario seleccionado", width='stretch'):
+            st.session_state["_usuario_editando_activo"] = ops[sel]
+            st.rerun()
+
+    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
+    usuario_editando = st.session_state.get("_usuario_editando_activo")
+    if usuario_editando:
+        st.markdown("---")
+        ok, msg = puede_gestionar_usuario(usuario, usuario_editando)
+        if not ok:
+            st.warning(msg)
+            st.session_state.pop("_usuario_editando_activo", None)
+        else:
+            _usuario_form_editar(usuario_editando)
+        
+        if st.button("Cancelar edición", key=f"cancel_edit_activo"):
+            st.session_state.pop("_usuario_editando_activo", None)
+            st.rerun()
 
 
 def _frag_usuarios_crear():
@@ -5448,10 +5462,10 @@ def _render_registrar_jp(usuario):
 
 
 def _render_historial_global_jp(usuario):
+    st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
     hoy_s = hoy_str()
     pasado_s = (ahora().date() + timedelta(days=2)).strftime("%Y-%m-%d")
-
-    st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
+    
     try:
         df_vig = leer_df("""
             SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
@@ -5460,8 +5474,7 @@ def _render_historial_global_jp(usuario):
             jp.motivo AS Motivo,
             CASE WHEN jp.aplicada=1 THEN 'Aplicada'
                  WHEN jp.aplicada=-1 THEN 'Anulada'
-                 ELSE 'Pendiente' END AS Estado,
-            COALESCE(jp.creado_por,'') AS "Creado por"
+                 ELSE 'Pendiente' END AS Estado
             FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
             JOIN secciones s ON a.seccion_id=s.id
             JOIN grados g ON s.grado_id=g.id
@@ -5479,111 +5492,66 @@ def _render_historial_global_jp(usuario):
         st.dataframe(df_vig, width='stretch', hide_index=True)
 
     st.markdown("---")
-    st.markdown("**Todas las justificaciones previas registradas**")
-    c1, c2 = st.columns(2)
+    st.markdown("**Buscar en todos los tiempos**")
+    
+    # 🆕 FILTROS Y BÚSQUEDA
+    c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
-                                     ["Todas", "Pendientes", "Aplicadas",
-                                      "Anuladas"],
+                                     ["Todas", "Pendientes", "Aplicadas", "Anuladas"],
                                      key="jp_filtro_estado")
     with c2:
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="jp_filtro_texto",
                                       placeholder="Ej: 12345678 o Quispe")
+    
+    if st.button("🔍 Buscar Justificaciones", type="primary", width='stretch'):
+        st.session_state["_buscar_jp_hist"] = True
 
-    q = ("""SELECT jp.id AS id, jp.fecha_objetivo AS Fecha, a.dni AS DNI,
-         a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
-         g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
-         jp.motivo AS Motivo,
-         CASE WHEN jp.aplicada=1 THEN 'Aplicada'
-              WHEN jp.aplicada=-1 THEN 'Anulada'
-              ELSE 'Pendiente' END AS Estado,
-         COALESCE(jp.creado_por,'') AS "Creado por"
-         FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
-         JOIN secciones s ON a.seccion_id=s.id
-         JOIN grados g ON s.grado_id=g.id
-         JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
-    params = []
-    if filtro_estado == "Pendientes":
-        q += " AND jp.aplicada=0"
-    elif filtro_estado == "Aplicadas":
-        q += " AND jp.aplicada=1"
-    elif filtro_estado == "Anuladas":
-        q += " AND jp.aplicada=-1"
-    if filtro_texto.strip():
-        q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
-              "OR a.apellido_materno LIKE ?)")
-        pat = "%" + filtro_texto.strip() + "%"
-        params += [pat, pat, pat]
-    q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
+    if st.session_state.get("_buscar_jp_hist"):
+        if filtro_estado == "Todas" and not filtro_texto.strip():
+            st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
+            return
 
-    try:
-        df_all = leer_df(q, params)
-    except Exception as e:
-        log.warning("jp todas fallo: %s", e)
-        st.error(f"Error consultando justificaciones: {e}")
-        df_all = pd.DataFrame()
+        q = ("""SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
+             a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
+             g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
+             jp.motivo AS Motivo,
+             CASE WHEN jp.aplicada=1 THEN 'Aplicada'
+                  WHEN jp.aplicada=-1 THEN 'Anulada'
+                  ELSE 'Pendiente' END AS Estado,
+             COALESCE(jp.creado_por,'') AS "Creado por"
+             FROM justificaciones_previas jp JOIN alumnos a ON jp.alumno_id=a.id
+             JOIN secciones s ON a.seccion_id=s.id
+             JOIN grados g ON s.grado_id=g.id
+             JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
+        params = []
+        if filtro_estado == "Pendientes":
+            q += " AND jp.aplicada=0"
+        elif filtro_estado == "Aplicadas":
+            q += " AND jp.aplicada=1"
+        elif filtro_estado == "Anuladas":
+            q += " AND jp.aplicada=-1"
+        if filtro_texto.strip():
+            q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
+                  "OR a.apellido_materno LIKE ?)")
+            pat = "%" + filtro_texto.strip() + "%"
+            params += [pat, pat, pat]
+        q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
 
-    if df_all.empty:
-        st.info("Sin justificaciones previas.")
-    else:
-        st.write(f"{len(df_all)} justificaciones")
-        for _, r in df_all.iterrows():
-            c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
-            c1.write(f"**{r['Fecha']}** - {r['Alumno']}")
-            c2.write(f"{r['Grado']} {r['Seccion']} ({r['Turno']})")
-            c3.write(f"{r['Estado']} - {r['Motivo']}")
-            if r["Estado"] == "Anulada":
-                if c4.button("Reactivar", key=f"reac_jp_glob_{r['id']}"):
-                    st.session_state["_reactivar_jp_global_id"] = int(r["id"])
-                    st.rerun()
-            elif r["Estado"] == "Pendiente":
-                if c4.button("Anular", key=f"anul_jp_glob_{r['id']}"):
-                    st.session_state["_anular_jp_global_id"] = int(r["id"])
-                    st.rerun()
-            elif r["Estado"] == "Aplicada":
-                c4.caption("🔒")
+        try:
+            df_all = leer_df(q, params)
+        except Exception as e:
+            log.warning("jp todas fallo: %s", e)
+            st.error(f"Error consultando justificaciones: {e}")
+            df_all = pd.DataFrame()
 
-        if st.session_state.get("_anular_jp_global_id"):
-            jid = st.session_state["_anular_jp_global_id"]
-            st.markdown("---")
-            st.warning("Vas a anular esta justificacion previa (pendiente).")
-            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                         key=f"jp_glob_motivo_anul_{jid}")
-            if confirmar_accion(f"jp_glob_anular_{jid}",
-                                 "Confirmar anulacion",
-                                 "¿Estas seguro de anular esta justificacion?"):
-                ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
-                st.session_state.pop("_anular_jp_global_id", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-            if st.button("Cancelar", key=f"jp_glob_cancel_{jid}"):
-                st.session_state.pop("_anular_jp_global_id", None)
-                st.rerun()
-
-        if st.session_state.get("_reactivar_jp_global_id"):
-            jid = st.session_state["_reactivar_jp_global_id"]
-            st.markdown("---")
-            st.info("Vas a reactivar esta justificacion previa.")
-            motivo_nuevo = st.text_input("Motivo nuevo (opcional)",
-                                         key=f"jp_glob_motivo_reactivar_{jid}")
-            if confirmar_accion(f"jp_glob_reactivar_{jid}",
-                                 "Confirmar reactivacion",
-                                 "¿Estas seguro de reactivar esta justificacion?"):
-                ok, msg = reactivar_justificacion_previa(jid, usuario,
-                                                          motivo_nuevo)
-                st.session_state.pop("_reactivar_jp_global_id", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-            if st.button("Cancelar", key=f"jp_glob_cancel_reactivar_{jid}"):
-                st.session_state.pop("_reactivar_jp_global_id", None)
-                st.rerun()
+        if df_all.empty:
+            st.info("Sin justificaciones previas con esos filtros.")
+        else:
+            st.write(f"{len(df_all)} justificaciones encontradas")
+            # 🆕 SOLO DATAFRAME (Cero RAM en CSS)
+            st.dataframe(df_all, width='stretch', hide_index=True)
 
 
 # ─── PERMISOS ──────────────────────────────────────────────────────────────
@@ -5696,9 +5664,9 @@ def _render_registrar_perm(usuario):
 
 
 def _render_historial_global_perm(usuario):
-    hoy_s = hoy_str()
-
     st.markdown("**Permisos vigentes HOY**")
+    hoy_s = hoy_str()
+    
     try:
         df_hoy = leer_df("""
             SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
@@ -5722,33 +5690,10 @@ def _render_historial_global_perm(usuario):
         st.dataframe(df_hoy, width='stretch', hide_index=True)
 
     st.markdown("---")
-    st.markdown(f"**Permisos de los proximos {MAX_DIAS_PERMISO} dias**")
-    limite_s = (ahora().date() + timedelta(days=MAX_DIAS_PERMISO)).strftime("%Y-%m-%d")
-    try:
-        df_prox = leer_df("""
-            SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
-            a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
-            g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
-            COALESCE(p.motivo,'') AS Motivo
-            FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
-            JOIN secciones s ON a.seccion_id=s.id
-            JOIN grados g ON s.grado_id=g.id
-            JOIN turnos t ON s.turno_id=t.id
-            WHERE p.activo=1 AND p.fecha_inicio>? AND p.fecha_inicio<=?
-            ORDER BY p.fecha_inicio, a.apellido_paterno
-        """, (to_date(hoy_s), to_date(limite_s)))
-    except Exception as e:
-        log.warning("perm prox fallo: %s", e)
-        df_prox = pd.DataFrame()
-
-    if df_prox.empty:
-        st.info("Sin permisos programados.")
-    else:
-        st.dataframe(df_prox, width='stretch', hide_index=True)
-
-    st.markdown("---")
-    st.markdown("**Todos los permisos registrados**")
-    c1, c2 = st.columns(2)
+    st.markdown("**Buscar en todos los tiempos**")
+    
+    # 🆕 FILTROS Y BÚSQUEDA
+    c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
                                      ["Todos", "Activos", "Inactivos"],
@@ -5757,74 +5702,49 @@ def _render_historial_global_perm(usuario):
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="perm_filtro_texto",
                                       placeholder="Ej: 12345678")
-    q = ("""SELECT p.id AS id, p.fecha_inicio AS Inicio, p.fecha_fin AS Fin,
-         a.dni AS DNI,
-         a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
-         g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
-         COALESCE(p.motivo,'') AS Motivo,
-         CASE WHEN p.activo=1 THEN 'Activo' ELSE 'Inactivo' END AS Estado
-         FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
-         JOIN secciones s ON a.seccion_id=s.id
-         JOIN grados g ON s.grado_id=g.id
-         JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
-    params = []
-    if filtro_estado == "Activos":
-        q += " AND p.activo=1"
-    elif filtro_estado == "Inactivos":
-        q += " AND p.activo=0"
-    if filtro_texto.strip():
-        q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
-              "OR a.apellido_materno LIKE ?)")
-        pat = "%" + filtro_texto.strip() + "%"
-        params += [pat, pat, pat]
-    q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
+                                      
+    if st.button("🔍 Buscar Permisos", type="primary", width='stretch'):
+        st.session_state["_buscar_perm_hist"] = True
 
-    try:
-        df_all = leer_df(q, params)
-    except Exception as e:
-        log.warning("perm todas fallo: %s", e)
-        st.error(f"Error consultando permisos: {e}")
-        df_all = pd.DataFrame()
+    if st.session_state.get("_buscar_perm_hist"):
+        if filtro_estado == "Todos" and not filtro_texto.strip():
+            st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
+            return
 
-    if df_all.empty:
-        st.info("Sin permisos.")
-    else:
-        st.write(f"{len(df_all)} permisos")
-        st.dataframe(df_all, width='stretch', hide_index=True)
+        q = ("""SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin,
+             a.dni AS DNI,
+             a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
+             g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
+             COALESCE(p.motivo,'') AS Motivo,
+             CASE WHEN p.activo=1 THEN 'Activo' ELSE 'Inactivo' END AS Estado
+             FROM permisos p JOIN alumnos a ON p.alumno_id=a.id
+             JOIN secciones s ON a.seccion_id=s.id
+             JOIN grados g ON s.grado_id=g.id
+             JOIN turnos t ON s.turno_id=t.id WHERE 1=1""")
+        params = []
+        if filtro_estado == "Activos":
+            q += " AND p.activo=1"
+        elif filtro_estado == "Inactivos":
+            q += " AND p.activo=0"
+        if filtro_texto.strip():
+            q += (" AND (a.dni LIKE ? OR a.apellido_paterno LIKE ? "
+                  "OR a.apellido_materno LIKE ?)")
+            pat = "%" + filtro_texto.strip() + "%"
+            params += [pat, pat, pat]
+        q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
 
-        st.markdown("---")
-        st.markdown("**Anular un permiso (solo pendientes)**")
-        opciones_anular = {}
-        for _, r in df_all.iterrows():
-            if r["Estado"] == "Activo":
-                with cursor() as (con, cur):
-                    cur.execute("""
-                        SELECT COUNT(*) AS n FROM asistencias
-                        WHERE alumno_id=(SELECT id FROM alumnos WHERE dni=?)
-                          AND fecha BETWEEN ? AND ? AND estado='Permiso'
-                    """, (r["DNI"], to_date(r['Inicio']), to_date(r['Fin'])))
-                    aplicado = (cur.fetchone()["n"] or 0) > 0
-                if not aplicado:
-                    et = f"{r['Inicio']} -> {r['Fin']} - {r['Alumno']} (DNI {r['DNI']})"
-                    opciones_anular[et] = int(r["id"])
-        if opciones_anular:
-            sel_anular = st.selectbox("Selecciona permiso a anular",
-                                       list(opciones_anular.keys()),
-                                       key="perm_sel_anular")
-            motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                         key="perm_motivo_anular_global")
-            if confirmar_accion("perm_anular_global", "Confirmar anulacion",
-                                 "¿Estas seguro de anular este permiso?"):
-                ok, msg = eliminar_permiso(
-                    opciones_anular[sel_anular], usuario, motivo_anul)
-                st.session_state.pop("perm_motivo_anular_global", None)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
+        try:
+            df_all = leer_df(q, params)
+        except Exception as e:
+            log.warning("perm todas fallo: %s", e)
+            st.error(f"Error consultando permisos: {e}")
+            df_all = pd.DataFrame()
+
+        if df_all.empty:
+            st.info("Sin permisos con esos filtros.")
         else:
-            st.info("No hay permisos pendientes con los filtros actuales.")
+            st.write(f"{len(df_all)} permisos encontrados")
+            st.dataframe(df_all, width='stretch', hide_index=True)
 
 
 def vista_justificaciones_permisos():
