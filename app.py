@@ -3497,152 +3497,64 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    # ══════════════════════════════════════════════════════════════════
-    # LÓGICA Y CÁLCULOS
-    # ══════════════════════════════════════════════════════════════════
     fecha = hoy_str()
     turnos_info = _turnos_para_panel()
     if not turnos_info:
         st.info("No hay turnos configurados.")
         return
 
-    etiquetas = [
-        f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})"
-        for info in turnos_info
-    ]
-    sel = st.radio(
-        "Turno", etiquetas, horizontal=True,
-        key="panel_dir_turno", label_visibility="collapsed",
-    )
+    etiquetas = [f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})" for info in turnos_info]
+    sel = st.radio("Turno", etiquetas, horizontal=True, key="panel_dir_turno", label_visibility="collapsed")
     info = turnos_info[etiquetas.index(sel)]
     turno = info["turno"]
     ventana = info["ventana"]
     estado = info["estado"]
-    
-    # Llamamos a tus métricas (que ahora están cacheadas por 10 segundos)
     m = metricas_dia_turno(fecha, turno["id"])
 
-    # ══════════════════════════════════════════════════════════════════
-    # CABECERA
-    # ══════════════════════════════════════════════════════════════════
-    color_estado = "#4CAF50" if estado == "activo" else "#F44336"
-    
-    html_header = f"""<div style="
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 60%, #B85C38 100%);
-        border-radius: 20px;
-        padding: 30px 34px;
-        color: #FFF;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-bottom: 26px;
-        box-shadow: 0 10px 28px rgba(232,123,74,0.22);
-        position: relative;
-        overflow: hidden;
-    ">
+    # Header de la NASA con CSS Inline
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%); border-radius: 16px; padding: 25px; color: white; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(232,123,74,0.2);">
         <div>
-            <h1 style="margin: 0; font-size: 32px; font-weight: 900; color: #FFF; letter-spacing: -0.5px;">Panel de Control</h1>
-            <p style="margin: 6px 0 0 0; opacity: 0.92; font-size: 14px;">Monitoreo en tiempo real · Turno <b>{turno['nombre']}</b> · {fecha}</p>
+            <h1 style="margin: 0; font-size: 28px; font-weight: 900; color: white;">Panel de Control</h1>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; color: white;">Turno <b>{turno['nombre']}</b> · {fecha}</p>
         </div>
-        <div style="text-align:right;">
-            <span style="
-                background: rgba(255,255,255,0.20);
-                padding: 6px 16px; border-radius: 20px;
-                font-weight: 800; font-size: 13px;
-                border: 1px solid rgba(255,255,255,0.40);
-                white-space: nowrap;
-            ">
-                <span style="color:{color_estado}; font-size:16px;">●</span> {estado.upper()}
+        <div style="text-align: right;">
+            <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,0.4); color: white;">
+                ● {estado.upper()}
             </span>
-            <p style="margin-top:8px; font-size:12px;">Ventana: {ventana['nombre']}</p>
         </div>
-    </div>"""
-    st.markdown(html_header, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════
-    # BOTÓN ACTUALIZAR (Fuerza bruta: limpia caché y recarga)
-    # ══════════════════════════════════════════════════════════════════
-    c1, c2, c3 = st.columns([2, 1, 2])
-    with c2:
-        if st.button("🔄 Actualizar", key="btn_actualizar_dash", width='stretch'):
-            st.cache_data.clear() # Borra TODA la caché (métricas, asistencias, etc.)
-            st.rerun()            # Vuelve a pintar la pantalla con datos frescos
+    _, c_btn, _ = st.columns([2, 1, 2])
+    with c_btn:
+        if st.button("Actualizar", type="primary", use_container_width=True, key="btn_actualizar_dash"):
+            st.cache_data.clear()
+            st.rerun()
 
-    # ══════════════════════════════════════════════════════════════════
-    # KPIs (HTML Inline)
-    # ══════════════════════════════════════════════════════════════════
-    def _kpi_card_inline(icon, value, label, color_borde, color_valor):
-        return f"""<div style="
-            background: #FFFFFF;
-            border-radius: 16px;
-            padding: 20px 16px;
-            text-align: center;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-            border-bottom: 5px solid {color_borde};
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 120px;
-            margin-bottom: 5px;
-        ">
-            <span style="font-size: 26px; margin-bottom: 8px; display: block;">{icon}</span>
-            <div style="font-size: 34px; font-weight: 900; line-height: 1.1; margin-bottom: 4px; color: {color_valor};">{value}</div>
-            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #666;">{label}</div>
-        </div>"""
+    # Tarjetas de métricas usando CSS Inline (Respetan modo oscuro)
+    def _kpi(title, value, color):
+        return f"""
+        <div style="background: var(--secondary-background-color); border-radius: 16px; padding: 20px; text-align: center; border-bottom: 4px solid {color}; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+            <div style="font-size: 32px; font-weight: 900; color: {color}; margin-bottom: 5px;">{value}</div>
+            <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; opacity: 0.7;">{title}</div>
+        </div>
+        """
 
-    kpis_fila1 = [
-        ("👥", m["total"],       "Total Alumnos",  "#E87B4A", "#E87B4A"),
-        ("✅", m["puntuales"],   "Puntuales",      "#22C55E", "#22C55E"),
-        ("⏳", m["tardanzas"],   "Tardanzas",      "#F59E0B" if m["tardanzas"] > 0 else "#22C55E", "#F59E0B" if m["tardanzas"] > 0 else "#22C55E"),
-        ("❌", m["faltas"],      "Faltas",         "#EF4444" if m["faltas"] > 0 else "#22C55E", "#EF4444" if m["faltas"] > 0 else "#22C55E"),
-    ]
-    kpis_fila2 = [
-        ("📚", m["ref_asistio"], "Reforzamiento",  "#3B82F6", "#3B82F6"),
-        ("🚫", m["bloqueados"],  "Bloqueados",     "#EF4444" if m["bloqueados"] > 0 else "#22C55E", "#EF4444" if m["bloqueados"] > 0 else "#22C55E"),
-        ("📝", m["justificadas"],"Justificadas",   "#3B82F6", "#3B82F6"),
-        ("📄", m["permisos"],    "Permisos",       "#3B82F6", "#3B82F6"),
-    ]
-
-    html_kpis = '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">'
-    for k in kpis_fila1:
-        html_kpis += _kpi_card_inline(*k)
-    html_kpis += '</div>'
-
-    html_kpis += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">'
-    for k in kpis_fila2:
-        html_kpis += _kpi_card_inline(*k)
-    html_kpis += '</div>'
-
-    st.markdown(html_kpis, unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # BARRAS DE PROGRESO
-    # ══════════════════════════════════════════════════════════════════
-    total = m["total"] if m["total"] > 0 else 1
-
-    def _bar_inline(label, valor, color):
-        pct = (valor / total * 100) if total > 0 else 0
-        return f"""<div style="margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 800;">
-                <span>{label}</span>
-                <span style="color: {color};">{valor} / {m["total"]}</span>
-            </div>
-            <div style="background: #FFF0E8; border-radius: 10px; height: 18px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);">
-                <div style="width: {pct:.1f}%; background: {color}; height: 100%; border-radius: 10px; transition: width 0.6s ease;"></div>
-            </div>
-        </div>"""
-
-    html_progress = f"""<div style="background: #FFFFFF; border-radius: 16px; padding: 22px 26px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); margin-bottom: 20px;">
-        <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #E87B4A; margin-bottom: 16px;">Progreso de Asistencia del Turno</div>
-        {_bar_inline("Puntuales", m["puntuales"], "#22C55E")}
-        {_bar_inline("Tardanzas", m["tardanzas"], "#F59E0B")}
-        {_bar_inline("Faltas",    m["faltas"],    "#EF4444")}
-    </div>"""
-    
-    st.markdown(html_progress, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px;">
+        {_kpi("Total Alumnos", m['total'], "#E87B4A")}
+        {_kpi("Puntuales", m['puntuales'], "#22C55E")}
+        {_kpi("Tardanzas", m['tardanzas'], "#F59E0B")}
+        {_kpi("Faltas", m['faltas'], "#EF4444")}
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+        {_kpi("Reforzamiento", m['ref_asistio'], "#3B82F6")}
+        {_kpi("Bloqueados", m['bloqueados'], "#EF4444")}
+        {_kpi("Justificadas", m['justificadas'], "#3B82F6")}
+        {_kpi("Permisos", m['permisos'], "#3B82F6")}
+    </div>
+    """, unsafe_allow_html=True)
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
@@ -4246,7 +4158,6 @@ def _perfil_alumno(idal):
     al = d["alumno"]
     usuario = st.session_state["user"]
 
-    # Limpieza de estado
     ultimo_id = st.session_state.get("_perfil_ultimo_id")
     if ultimo_id != idal:
         for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"):
@@ -4258,54 +4169,56 @@ def _perfil_alumno(idal):
         st.session_state.pop("_perfil_ultimo_id", None)
         st.rerun()
 
-    # ══════════════════════════════════════════════════════════════════
-    # 1. HEADER DEL ALUMNO (Nativo con st.container)
-    # ══════════════════════════════════════════════════════════════════
     nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
-    
-    with st.container(border=True):
-        c1, c2 = st.columns([1, 6])
-        with c1:
-            inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
-            # Un círculo naranja simple
-            st.markdown(f"<div style='background:#E87B4A; color:white; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold;'>{inicial}</div>", unsafe_allow_html=True)
-        with c2:
-            st.subheader(nombre)
-            st.write(f"**{al['grado']} {al['seccion']}** | Turno {al['turno']} | **DNI:** {al['dni']}")
-            
-            # Etiquetas de estado nativas
-            if d["bloqueado"]:
-                st.error("ESTADO: BLOQUEADO")
-            else:
-                st.success("ESTADO: ACTIVO")
+    inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
+    color_estado = "#22C55E" if not d["bloqueado"] else "#EF4444"
+    txt_estado = "ACTIVO" if not d["bloqueado"] else "BLOQUEADO"
 
-    # ══════════════════════════════════════════════════════════════════
-    # 2. ESTADÍSTICAS (Columnas nativas)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("### Estadísticas del Periodo")
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Puntuales", d['total_puntuales'])
-    c2.metric("Tardanzas", d['total_tardanzas'])
-    c3.metric("Faltas", d['total_faltas'])
-    c4.metric("Reforzamiento", d['total_ref_asistio'])
-    c5.metric("Tard. Injust.", d['tard_injust'])
-    
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tard. desbloqueo", d['n_ciclo'])
-    c2.metric("Límite permitido", d['limite'])
-    c3.metric("Reincidente", "SI" if d['reincidente'] else "NO")
-    c4.metric("Bloqueado", "SI" if d['bloqueado'] else "NO")
+    # Header del perfil
+    st.markdown(f"""
+    <div style="background: var(--secondary-background-color); border-radius: 16px; padding: 25px; display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 6px solid {color_estado};">
+        <div style="width: 80px; height: 80px; border-radius: 50%; background: #E87B4A; color: white; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900;">
+            {inicial}
+        </div>
+        <div>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 900; color: var(--text-color);">{nombre}</h1>
+            <p style="margin: 5px 0; opacity: 0.8;">{al['grado']} {al['seccion']} | Turno {al['turno']} | DNI: {al['dni']}</p>
+            <span style="background: {color_estado}; color: white; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;">{txt_estado}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════
-    # 3. APODERADO Y ACCIONES
-    # ══════════════════════════════════════════════════════════════════
+    # Métricas del alumno
+    def _metrica(title, value, color):
+        return f"""
+        <div style="background: var(--secondary-background-color); border-radius: 12px; padding: 15px; text-align: center; border: 1px solid rgba(128,128,128,0.2);">
+            <div style="font-size: 24px; font-weight: 900; color: {color}; margin-bottom: 5px;">{value}</div>
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; opacity: 0.7;">{title}</div>
+        </div>
+        """
+    
+    st.markdown(f"""
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
+        {_metrica("Puntuales", d['total_puntuales'], "#22C55E")}
+        {_metrica("Tardanzas", d['total_tardanzas'], "#F59E0B")}
+        {_metrica("Faltas", d['total_faltas'], "#EF4444")}
+        {_metrica("Reforzamiento", d['total_ref_asistio'], "#3B82F6")}
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+        {_metrica("Tard. Injust.", d['tard_injust'], "#E87B4A")}
+        {_metrica("Tard. desbloqueo", d['n_ciclo'], "#E87B4A")}
+        {_metrica("Límite", d['limite'], "#E87B4A")}
+        {_metrica("Reincidente", "SI" if d['reincidente'] else "NO", "#EF4444" if d['reincidente'] else "#22C55E")}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Apoderado y Acciones
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
             st.markdown("**Datos del Apoderado**")
             st.write(f"**Apoderado:** {al['nombre_apoderado'] or '-'}")
             st.write(f"**Teléfono:** {al['telefono_apoderado'] or '-'}")
-            
     with col2:
         with st.container(border=True):
             st.markdown("**Acciones Rápidas**")
@@ -4325,43 +4238,26 @@ def _perfil_alumno(idal):
                         crear_bloqueo(al["id"], "BLOQUEO MANUAL", usuario)
                         st.rerun()
 
-    # ══════════════════════════════════════════════════════════════════
-    # 4. TABS (Asistencias, Tardanzas, etc.)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("---")
+    # Tabs
     tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos", "Justificaciones"])
-
     with tabs[0]:
-        if d["asistencias"].empty:
-            st.info("Sin asistencias registradas.")
+        if d["asistencias"].empty: st.info("Sin asistencias registradas.")
         else:
             df_ast = d["asistencias"][["fecha", "tipo", "estado", "hora", "justificada"]].copy()
             df_ast["justificada"] = df_ast["justificada"].apply(lambda x: "SÍ" if x else "NO")
             st.dataframe(df_ast, use_container_width=True, hide_index=True)
-
     with tabs[1]:
-        if d["tardanzas"].empty:
-            st.info("Sin tardanzas registradas.")
-        else:
-            st.dataframe(d["tardanzas"], use_container_width=True, hide_index=True)
-
+        if d["tardanzas"].empty: st.info("Sin tardanzas registradas.")
+        else: st.dataframe(d["tardanzas"], use_container_width=True, hide_index=True)
     with tabs[2]:
-        if d["bloqueos"].empty:
-            st.info("Sin bloqueos registrados.")
-        else:
-            st.dataframe(d["bloqueos"], use_container_width=True, hide_index=True)
-
+        if d["bloqueos"].empty: st.info("Sin bloqueos registrados.")
+        else: st.dataframe(d["bloqueos"], use_container_width=True, hide_index=True)
     with tabs[3]:
-        if d["permisos"].empty:
-            st.info("Sin permisos registrados.")
-        else:
-            st.dataframe(d["permisos"], use_container_width=True, hide_index=True)
-
+        if d["permisos"].empty: st.info("Sin permisos registrados.")
+        else: st.dataframe(d["permisos"], use_container_width=True, hide_index=True)
     with tabs[4]:
-        if d["justificaciones_previas"].empty:
-            st.info("Sin justificaciones previas.")
-        else:
-            st.dataframe(d["justificaciones_previas"], use_container_width=True, hide_index=True)
+        if d["justificaciones_previas"].empty: st.info("Sin justificaciones previas.")
+        else: st.dataframe(d["justificaciones_previas"], use_container_width=True, hide_index=True)
 
 
 def vista_alumnos():
