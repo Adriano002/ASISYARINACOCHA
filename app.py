@@ -4525,53 +4525,40 @@ def vista_grados_secciones():
 def vista_carnets():
     st.title("Carnets QR")
 
-    st.markdown("### Descargar por sección")
-    st.caption("Selecciona un grado para ver sus secciones y generar los carnets.")
-
+    # Si ya estamos viendo los alumnos de una sección, mostramos eso
     if st.session_state.get("carn_ver_seccion"):
         _carnets_ver_seccion(st.session_state["carn_ver_seccion"])
         return
-        
+
+    st.markdown("### Descargar por sección")
+    st.caption("Selecciona un grado para ver sus secciones y generar los carnets.")
+
     grados = listar_grados()
     if not grados:
         st.warning("No hay grados registrados.")
         return
 
-    # Control para regresar al menú de grados
-    gid = st.session_state.get("carn_grado_sel")
-    if gid:
-        g = next((x for x in grados if x["id"] == gid), None)
-        if not g:
-            st.session_state.pop("carn_grado_sel", None)
-            st.rerun()
-            return
-            
-        if st.button("← Regresar a grados", key="carn_volver_grados"):
-            st.session_state.pop("carn_grado_sel", None)
-            st.rerun()
-            
-        st.subheader(f"Secciones de {g['nombre']}")
-        secs = secciones_por_grado(g["id"])
-        if not secs:
-            st.info("Sin secciones en este grado.")
-            return
-            
-        for s in secs:
-            n = len(alumnos_de_seccion(s["id"]))
-            if st.button(f"{s['nombre']}  ({n} alumnos)", width='stretch',
-                         key="carn_s_" + str(s['id'])):
-                st.session_state["carn_ver_seccion"] = s["id"]
-                st.rerun()
+    # 🆕 SELECTBOX NATIVO (Cero RAM extra)
+    ops_grados = {g["nombre"]: g["id"] for g in grados}
+    grado_sel = st.selectbox("Selecciona el grado", list(ops_grados.keys()), key="carn_grado_selbox")
+    idg = ops_grados[grado_sel]
+
+    secs = secciones_por_grado(idg)
+    
+    if not secs:
+        st.info(f"El grado {grado_sel} no tiene secciones creadas todavía.")
         return
 
-    # Si no hay grado seleccionado, mostramos la lista de grados
-    for g in grados:
-        secs = secciones_por_grado(g["id"])
-        if st.button(f"{g['nombre']}  ({len(secs)} secciones)", width='stretch',
-                     key="carn_g_" + str(g['id'])):
-            st.session_state["carn_grado_sel"] = g["id"]
-            st.rerun()
-
+    st.markdown(f"**Secciones de {grado_sel}:**")
+    st.caption("Selecciona una sección para entrar.")
+    
+    # Mostramos las secciones en un desplegable también para ahorrar RAM
+    ops_secs = {f"{s['nombre']} ({len(alumnos_de_seccion(s['id']))} alumnos)": s["id"] for s in secs}
+    sec_sel = st.selectbox("Selecciona la sección", list(ops_secs.keys()), key="carn_sec_selbox")
+    
+    if st.button("Entrar a la sección", type="primary", width='stretch'):
+        st.session_state["carn_ver_seccion"] = ops_secs[sec_sel]
+        st.rerun()
 
 def _carnets_ver_seccion(idsec):
     with cursor() as (con, cur):
