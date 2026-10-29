@@ -21,8 +21,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         overflow: hidden;
         border: 3px solid #E65100;
         background: #000;
-        height: 260px; /* 🆕 Altura reducida para que los mensajes suban */
-        min-height: 260px;
+        height: 300px; /* 🆕 Altura perfecta: ni muy grande ni muy chica */
+        min-height: 300px;
         display: flex;
         align-items: center;
         justify-content: center;
