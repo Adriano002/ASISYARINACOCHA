@@ -33,8 +33,9 @@ def obtener_conexion():
         cur = con.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
-        cur.execute("PRAGMA busy_timeout=5000")
+        cur.execute("PRAGMA busy_timeout=10000") # 10 segundos de espera
         cur.execute("PRAGMA foreign_keys=ON")
+        cur.execute("PRAGMA cache_size=-2000") # Limita caché a 2MB para no llenar la RAM
         _local.con = con
     return con
 
