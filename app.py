@@ -2378,9 +2378,17 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     return img
     
 def _render_carnets(filas, titulo=None):
+    # 🆕 IMPORTS LOCALES (Lazy Loading)
     import tempfile
     import os
     import gc
+    from io import BytesIO
+    from pathlib import Path
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, 
+                                     PageBreak, Table, TableStyle, 
+                                     Image as RLImage)
 
     # Guardamos el PDF en un archivo temporal, NO en la RAM
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -2515,6 +2523,7 @@ def pdf_carnets_todos():
 
 
 def pdf_carnet_alumno(dni):
+    from reportlab.platypus import SimpleDocTemplate # 🆕 FIX
     with cursor() as (con, cur):
         cur.execute("""
             SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
