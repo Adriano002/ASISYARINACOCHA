@@ -6304,86 +6304,71 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS LOCAL (Igual al primero, pero sin emojis)
+    # 1. CSS Y FONDO (Limpio, sin divs sueltos)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* Fondo crema suave que cubre toda la pantalla */
-    .login-bg {
-        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%);
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+    /* Fondo de pantalla completa forzado */
+    .stApp {
+        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%) !important;
     }
     /* Tarjeta central */
     .login-card {
         background: #FFFFFF;
-        border-radius: 24px 24px 0 0;
-        padding: 40px 30px 20px 30px;
-        box-shadow: 0 -10px 40px rgba(232,123,74,0.05);
+        border-radius: 24px;
+        padding: 50px 30px 40px 30px;
+        box-shadow: 0 20px 40px rgba(232,123,74,0.15);
         border: 1px solid #FFE4D6;
-        border-bottom: none;
         text-align: center;
-        margin-bottom: -20px; /* Pega la tarjeta con el formulario */
+        margin-top: 60px;
+        margin-bottom: 20px;
     }
     .login-title {
-        font-size: 36px; font-weight: 900; color: #E87B4A !important;
-        margin-bottom: 5px; letter-spacing: -1px;
+        font-size: 38px; font-weight: 900; color: #E87B4A !important;
+        margin-bottom: 8px; letter-spacing: -1px;
     }
     .login-sub { 
-        font-size: 15px; color: #666 !important; 
-        margin-bottom: 10px; font-weight: 600; 
+        font-size: 16px; color: #666 !important; 
+        margin-bottom: 20px; font-weight: 600; 
     }
-    /* Contenedor del formulario para que se vea como parte de la tarjeta */
-    div[data-testid="stForm"] {
-        background: white !important;
-        border-radius: 0 0 24px 24px !important;
-        padding: 0px 30px 30px 30px !important;
-        box-shadow: 0 20px 40px rgba(232,123,74,0.15) !important;
-        border: 1px solid #FFE4D6 !important;
-        border-top: none !important;
-    }
-    /* Inputs */
+    /* Forzamos que los inputs se vean hermosos */
     .stTextInput > div > div > input {
         border-radius: 10px !important;
         border: 2px solid #FFE4D6 !important;
-        padding: 10px 15px !important;
+        padding: 12px 15px !important;
     }
-    /* Botón */
+    /* Forzamos que el botón se vea hermoso */
     .stFormSubmitButton > button {
         background: #E87B4A !important;
         color: white !important;
         border-radius: 10px !important;
         font-weight: 800 !important;
         border: none !important;
-        padding: 12px !important;
+        padding: 14px !important;
         width: 100% !important;
+        margin-top: 15px !important;
+        font-size: 16px !important;
+        transition: all 0.2s;
     }
     .stFormSubmitButton > button:hover {
         background: #D66535 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(232,123,74,0.3) !important;
     }
-    </style>
-    <div class="login-bg"></div>""", unsafe_allow_html=True)
+    </style>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Sin Emojis)
+    # 2. ESTRUCTURA VISUAL (Puro texto y formulario, cero imágenes)
     # ══════════════════════════════════════════════════════════════════
     _, centro, _ = st.columns([1, 1.2, 1])
     
     with centro:
         # Abrimos la tarjeta
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
-        # El escudo usando st.image (centrado con columnas)
-        c_img1, c_img2, c_img3 = st.columns([1, 1, 1])
-        with c_img2:
-            st.image("escudo.png", use_container_width=True) 
-            
-        # Título y subtítulo
-        st.markdown("""
+        st.markdown("""<div class="login-card">
             <div class="login-title">asisyarina</div>
             <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
         
-        # Formulario (Ocultamos los labels para que se vea más limpio)
+        # Formulario
         with st.form("login"):
             usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario", label_visibility="collapsed")
             password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed")
