@@ -5188,8 +5188,7 @@ def vista_alumnos():
 #GRADOS Y SECCIONES
 def vista_grados_secciones():
     st.title("Grados y Secciones")
-    st.caption("Vista de referencia. Las secciones se crean automaticamente "
-               "al importar el Excel de alumnos.")
+    st.caption("Vista de referencia. Las secciones se crean automáticamente al importar el Excel de alumnos.")
 
     df = leer_df("""
         SELECT g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
@@ -5201,24 +5200,64 @@ def vista_grados_secciones():
     """)
 
     if df.empty:
-        st.info("No hay secciones creadas todavia.")
+        st.info("No hay secciones creadas todavía.")
         return
 
-    st.subheader("Resumen por grado")
-    resumen = df.groupby("Grado", as_index=False)["Alumnos"].sum()
-    resumen.columns = ["Grado", "Total alumnos"]
-    st.dataframe(resumen, width='stretch', hide_index=True)
+    # 🆕 1. TARJETAS DE RESUMEN (Slides)
+    st.subheader("Resumen General")
+    
+    # Calculamos los totales
+    total_alumnos = int(df["Alumnos"].sum())
+    total_secciones = len(df)
+    
+    # Buscamos cuántos grados y turnos únicos hay
+    total_grados = df["Grado"].nunique()
+    total_turnos = df["Turno"].nunique()
 
-    st.subheader("Resumen por turno")
-    resumen_t = df.groupby("Turno", as_index=False)["Alumnos"].sum()
-    resumen_t.columns = ["Turno", "Total alumnos"]
-    st.dataframe(resumen_t, width='stretch', hide_index=True)
+    # Mostramos 4 tarjetas bonitas
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Alumnos", f"{total_alumnos:,}")
+    c2.metric("Total Secciones", total_secciones)
+    c3.metric("Grados", total_grados)
+    c4.metric("Turnos", total_turnos)
 
-    st.subheader("Detalle por seccion")
-    st.dataframe(df, width='stretch', hide_index=True)
+    st.markdown("---")
 
-    st.metric("Total de secciones", len(df))
-    st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
+    # 🆕 2. TABS POR GRADO (Para que no esté todo amontonado)
+    st.subheader("Detalle por Grado")
+    
+    grados_disponibles = df["Grado"].unique().tolist()
+    tabs = st.tabs(grados_disponibles)
+
+    for i, grado in enumerate(grados_disponibles):
+        with tabs[i]:
+            df_grado = df[df["Grado"] == grado].copy()
+            
+            # Separamos por turno
+            for turno in ["Mañana", "Tarde"]:
+                df_turno = df_grado[df_grado["Turno"] == turno]
+                if df_turno.empty:
+                    continue
+                    
+                st.markdown(f"**Turno {turno}**")
+                
+                # Seleccionamos solo las columnas necesarias
+                df_mostrar = df_turno[["Seccion", "Alumnos"]].copy()
+                df_mostrar.columns = ["Sección", "Cantidad de Alumnos"]
+                
+                # Ordenamos alfabéticamente por sección
+                df_mostrar = df_mostrar.sort_values("Sección")
+                
+                # Mostramos la tabla con un ancho controlado para que no se desparrame
+                st.dataframe(
+                    df_mostrar, 
+                    width='stretch', # En Streamlit nuevo, esto ajusta al contenedor
+                    hide_index=True,
+                    use_container_width=True
+                )
+                
+                # Un pequeño espacio entre turnos
+                st.markdown("<br>", unsafe_allow_html=True)
 
 
 #CARNETS
