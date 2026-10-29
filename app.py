@@ -199,6 +199,10 @@ def cerrar_sesion():
     usuario = st.session_state.get("user")
     if usuario:
         auditar(usuario["usuario"], "Logout")
+        
+    # 🆕 BORRAMOS EL TOKEN Y LA HORA
+    st.query_params.clear()
+    
     for k in list(st.session_state.keys()):
         del st.session_state[k]
 
@@ -6697,6 +6701,11 @@ def vista_login():
                 if datos:
                     st.session_state["user"] = datos
                     auditar(datos["usuario"], "Login")
+                    
+                    # 🆕 GUARDAMOS EL TOKEN Y LA HORA DE ENTRADA
+                    st.query_params["sesion"] = datos["usuario"]
+                    st.query_params["ts"] = str(int(time.time()))
+                    
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
@@ -6907,9 +6916,41 @@ def main():
         inicializar_bd()
         aplicar_estilos()
 
+        # 🆕 RECUPERAR SESIÓN Y VALIDAR TIEMPO
+        if not st.session_state.get("user"):
+            token = st.query_params.get("sesion")
+            ts_str = st.query_params.get("ts")
+            
+            if token and ts_str:
+                try:
+                    # Calculamos cuántos segundos pasaron
+                    tiempo_ingreso = int(ts_str)
+                    ahora_ts = int(time.time())
+                    diferencia = ahora_ts - tiempo_ingreso
+                    
+                    # Si pasaron más de 300 segundos (5 minutos), lo pateamos al login
+                    if diferencia > 300:
+                        st.query_params.clear()
+                        st.warning("Sesión expirada por inactividad. Vuelve a ingresar.")
+                    else:
+                        # Si está dentro de los 5 min, recuperamos al usuario
+                        with cursor() as (con, cur):
+                            cur.execute("SELECT * FROM usuarios WHERE usuario=? AND activo=1", (token,))
+                            f = cur.fetchone()
+                            if f:
+                                u = dict(f)
+                                u["bloqueado_hasta"] = fmt_ts(u.get("bloqueado_hasta"))
+                                st.session_state["user"] = u
+                                # 🆕 RENOVAMOS EL TIEMPO en cada recarga para que los 5 min se cuenten desde la última interacción
+                                st.query_params["ts"] = str(ahora_ts)
+                except Exception:
+                    st.query_params.clear()
+
         if not st.session_state.get("user"):
             vista_login()
             return
+            
+        # ... (el resto de tu código: _verificar_admin_activo, menú, etc.) ...
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
             st.info("Contacta al desarrollador para restaurar el acceso.")
