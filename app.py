@@ -2467,16 +2467,20 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from reportlab.lib.units import cm
     from io import BytesIO
     from pathlib import Path
+    import os
 
     buf = BytesIO()
+    # Márgenes de 1.5cm a cada lado. Total ancho útil = 21 cm
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
                             rightMargin=1.5*cm, leftMargin=1.5*cm,
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
     est = getSampleStyleSheet()
     
-    estilo_titulo = ParagraphStyle('TituloReporte', parent=est['Heading1'], fontSize=16, textColor=colors.HexColor('#B85C38'), spaceAfter=6, fontName='Helvetica-Bold')
-    estilo_subtitulo = ParagraphStyle('SubtituloReporte', parent=est['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=4, fontName='Helvetica-Bold')
-    estilo_texto = ParagraphStyle('TextoReporte', parent=est['Normal'], fontSize=9, textColor=colors.HexColor('#666666'), fontName='Helvetica')
+    # Estilos
+    estilo_titulo = ParagraphStyle('TituloReporte', parent=est['Heading1'], fontSize=18, textColor=colors.HexColor('#C4562A'), spaceAfter=2, fontName='Helvetica-Bold')
+    estilo_subtitulo = ParagraphStyle('SubtituloReporte', parent=est['Heading2'], fontSize=12, textColor=colors.HexColor('#4A4A4A'), spaceAfter=2, fontName='Helvetica-Bold')
+    estilo_texto = ParagraphStyle('TextoReporte', parent=est['Normal'], fontSize=8, textColor=colors.HexColor('#888888'), fontName='Helvetica-Oblique')
+    estilo_bloque = ParagraphStyle('BloqueReporte', parent=est['Heading3'], fontSize=10, textColor=colors.HexColor('#333333'), spaceBefore=10, spaceAfter=6, fontName='Helvetica-Bold')
 
     el = []
     primera = True
@@ -2487,12 +2491,13 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(PageBreak())
         primera = False
 
+        # ─── CABECERA ELEGANTE CON ESCUDO ───
         cabecera_data = []
         if escudo_path.exists():
             try:
-                img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
+                img_escudo = Image(str(escudo_path), width=2.8*cm, height=2.8*cm)
                 cabecera_data = [[
-                    Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')}</font>", estilo_titulo),
+                    Paragraph(f"<b>{titulo_base}</b><br/><font size=11 color='#4A4A4A'>{nombre_hoja}</font><br/><font size=8 color='#888888'>Generado: {ahora().strftime('%Y-%m-%d %H:%M:%S')}</font>", estilo_titulo),
                     img_escudo
                 ]]
             except Exception:
@@ -2500,7 +2505,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
         
         if not cabecera_data:
             cabecera_data = [[
-                Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')}</font>", estilo_titulo),
+                Paragraph(f"<b>{titulo_base}</b><br/><font size=11 color='#4A4A4A'>{nombre_hoja}</font>", estilo_titulo),
                 ""
             ]]
 
@@ -2509,54 +2514,56 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
+            ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#C4562A')),
         ]))
         el.append(tabla_cabecera)
-        el.append(Spacer(1, 12))
+        el.append(Spacer(1, 15))
 
         es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
 
         for titulo_bloque, df in bloques:
-            el.append(Paragraph(f"<b>{titulo_bloque}</b>", estilo_subtitulo))
-            el.append(Spacer(1, 6))
+            el.append(Paragraph(f"{titulo_bloque}", estilo_bloque))
             
             if df is None or df.empty:
-                el.append(Paragraph("Sin registros.", estilo_texto))
+                el.append(Paragraph("Sin registros para mostrar.", estilo_texto))
                 el.append(Spacer(1, 10))
                 continue
 
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
             
             if es_hoja_faltas:
+                # Hoja de faltas: 4 columnas
                 col_widths = [2.0*cm, 8.5*cm, 2.0*cm, 8.5*cm]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 t.setStyle(TableStyle([
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
-                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#E8F5E9')),
-                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#FFEBEE')),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#43A047')),
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#E53935')),
                     ("ALIGN", (0, 0), (0, -1), "CENTER"),
                     ("ALIGN", (2, 0), (2, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ]))
             else:
-                # 🆕 MATEMÁTICA FORZADA: Si la columna se llama "N", mide 1.2cm exactos.
-                # Si se llama "Estado", mide 1.8cm exactos.
-                # Si se llama "Apellidos" o "Nombres", mide 8.5cm exactos.
+                # 🆕 ANCHOS MATEMÁTICOS EXACTOS (Suma = 21 cm)
                 col_widths = []
                 for col in df.columns:
                     cl = str(col).strip().lower()
                     if cl == "n":
-                        col_widths.append(1.2 * cm)
+                        col_widths.append(1.5 * cm)    # N: bien chiquita
                     elif cl == "estado":
-                        col_widths.append(1.8 * cm)
-                    elif cl == "hora":
-                        col_widths.append(2.0 * cm)
-                    elif "apellido" in cl or "nombre" in cl:
-                        col_widths.append(8.5 * cm)
+                        col_widths.append(2.5 * cm)    # Estado: chiquita
+                    elif "hora" in cl:
+                        col_widths.append(2.5 * cm)    # Hora: chiquita
+                    elif "apellido" in cl:
+                        col_widths.append(7.0 * cm)    # Apellidos: ancha
+                    elif "nombre" in cl:
+                        col_widths.append(7.5 * cm)    # Nombres: ancha
                     else:
                         col_widths.append(3.0 * cm)
                 
@@ -2564,15 +2571,15 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#C4562A')), # Naranja oscuro elegante
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor('#CCCCCC')),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#EEEEEE')),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor('#C4562A')),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor('#E0E0E0')),
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9F9F9")]),
                 ]
                 
                 col_estado = None
@@ -2580,8 +2587,15 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                     if str(c).strip().lower() == "estado":
                         col_estado = j
                         break
+                
                 if col_estado is not None:
-                    mapa = {"P": colors.HexColor("#22C55E"), "T": colors.HexColor("#F59E0B"), "J": colors.HexColor("#EAB308"), "F": colors.HexColor("#EF4444")}
+                    mapa = {
+                        "P": colors.HexColor("#2E7D32"), # Verde oscuro
+                        "T": colors.HexColor("#F57F17"), # Naranja oscuro
+                        "J": colors.HexColor("#F9A825"), # Amarillo oscuro
+                        "F": colors.HexColor("#C62828"), # Rojo oscuro
+                        "PERMISO": colors.HexColor("#1565C0") # Azul
+                    }
                     for i in range(1, len(datos)):
                         val = str(datos[i][col_estado]).strip().upper()
                         if val in mapa:
@@ -2591,7 +2605,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 t.setStyle(TableStyle(estilos))
 
             el.append(t)
-            el.append(Spacer(1, 12))
+            el.append(Spacer(1, 15))
     
     doc.build(el)
     buf.seek(0)
