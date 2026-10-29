@@ -244,8 +244,10 @@ INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_vent_t ON ventanas(turno_id, tipo)",
     "CREATE INDEX IF NOT EXISTS idx_bloq_a ON bloqueos(alumno_id, activo)",
     "CREATE INDEX IF NOT EXISTS idx_aud_f ON auditoria(fecha)",
+    "CREATE INDEX IF NOT EXISTS idx_perm_a ON permisos(alumno_id, activo)",
+    "CREATE INDEX IF NOT EXISTS idx_jp_a ON justificaciones_previas(alumno_id, aplicada)",
+    "CREATE INDEX IF NOT EXISTS idx_dias_f ON dias_especiales(fecha, activo)",
 ]
-
 
 def aplicar_schema():
     """Ejecuta todo el schema (idempotente)."""
