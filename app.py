@@ -144,14 +144,13 @@ def grado_a_ui(g):
     return mapa.get(str(g).strip(), g)
   
 def generar_qr(dni, size=220):
-    import qrcode  # 🆕 Carga diferida
+    import qrcode 
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
                         box_size=10, border=2)
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
     return img
-
 
 def generar_qr_bytes(dni, size=220):
     img = generar_qr(dni, size)
@@ -160,14 +159,12 @@ def generar_qr_bytes(dni, size=220):
     buf.seek(0)
     return buf.getvalue()
 
-
 def calcular_limite(es_reincidente):
     return LIMITE_REINCIDENTE if es_reincidente else LIMITE_NUEVO
 
 
 def texto_ultima_oportunidad():
-    return "⚠️ ÚLTIMA OPORTUNIDAD — si llega tarde otra vez, mañana no podrá escanear."
-
+    return "si llega tarde otra vez, mañana no podrá escanear."
 
 def _columnas_responsive(n_items, max_cols=3):
     """
@@ -176,7 +173,6 @@ def _columnas_responsive(n_items, max_cols=3):
     pantalla cambia de ancho, por eso no se puede confiar en N columnas.
     """
     return st.columns(1)
-
 
 def _botones_lista(items, etiqueta_fn, key_fn, max_cols=3):
     """
@@ -194,7 +190,6 @@ def hashear_password(password):
     d = hashlib.pbkdf2_hmac(PBK_ALG, password.encode("utf-8"), salt, PBK_ITER)
     return f"pbkdf2_{PBK_ALG}${PBK_ITER}${salt.hex()}${d.hex()}"
 
-
 def verificar_password(password, hash_guardado):
     if hash_guardado.startswith("pbkdf2_"):
         try:
@@ -207,13 +202,11 @@ def verificar_password(password, hash_guardado):
     return secrets.compare_digest(
         hashlib.sha256(password.encode()).hexdigest(), hash_guardado)
 
-
 def _ip():
     try:
         return st.context.headers.get("X-Forwarded-For", "local")
     except Exception:
         return "local"
-
 
 def auditar(usuario, accion, va=None, vn=None, tb=None, rid=None):
     try:
@@ -224,18 +217,16 @@ def auditar(usuario, accion, va=None, vn=None, tb=None, rid=None):
     except Exception as e:
         log.warning("audit: %s", e)
 
-
 def cerrar_sesion():
     usuario = st.session_state.get("user")
     if usuario:
         auditar(usuario["usuario"], "Logout")
         
-    # 🆕 BORRAMOS EL TOKEN Y LA HORA
+    #BORRAMOS EL TOKEN Y LA HORA
     st.query_params.clear()
     
     for k in list(st.session_state.keys()):
         del st.session_state[k]
-
 
 def _bloqueado(u):
     if not u.get("bloqueado_hasta"):
@@ -247,7 +238,6 @@ def _bloqueado(u):
         return ahora() < bh
     except (ValueError, TypeError):
         return False
-
 
 def autenticar(nombre_usuario, password):
     nombre_usuario = (nombre_usuario or "").strip().lower()
@@ -286,12 +276,10 @@ def autenticar(nombre_usuario, password):
         u["ultimo_login"] = timestamp_str()
         return u, ""
 
-
 def _verificar_admin_activo():
     with cursor() as (con, cur):
         cur.execute("SELECT id FROM usuarios WHERE rol='Admin' AND activo=1")
         return cur.fetchone() is not None
-
 
 @st.cache_resource
 def inicializar_bd():
@@ -299,7 +287,6 @@ def inicializar_bd():
     _seed()
     log.info("base de datos respondiendo correctamente")
     return True
-
 
 def _seed():
     with cursor() as (con, cur):
@@ -355,13 +342,11 @@ def _seed():
                 ("admin", hashear_password(pwd)))
             log.warning("admin creado, pass temporal: %s", pwd)
 
-
 def modo_mantenimiento():
     with cursor() as (con, cur):
         cur.execute("SELECT valor FROM config WHERE clave=?", ("mantenimiento",))
         f = cur.fetchone()
         return bool(f and f["valor"] == "1")
-
 
 def activar_mantenimiento(usuario, mensaje=""):
     escribir("INSERT INTO config(clave,valor) VALUES(?,?) "
@@ -371,7 +356,6 @@ def activar_mantenimiento(usuario, mensaje=""):
              "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor",
              ("mantenimiento_msg", mensaje or ""))
     auditar(usuario["usuario"], "Activo modo mantenimiento")
-
 
 def desactivar_mantenimiento(usuario):
     escribir("INSERT INTO config(clave,valor) VALUES(?,?) "
@@ -386,7 +370,6 @@ def mensaje_mantenimiento():
                     ("mantenimiento_msg",))
         f = cur.fetchone()
         return f["valor"] if f else ""
-
 
 def vista_mantenimiento():
     st.title("Sistema en mantenimiento")
@@ -407,28 +390,23 @@ def obtener_periodo_activo():
         d["fecha_cierre"] = fmt_ts(d.get("fecha_cierre"))
         return d
 
-
 def periodo_tiene_alumnos(pid):
     with cursor() as (con, cur):
         cur.execute("SELECT COUNT(*) AS n FROM alumnos "
                     "WHERE periodo_id=? AND activo=1", (pid,))
         return (cur.fetchone()["n"] or 0) > 0
 
-
 def sistema_bloqueado():
     p = obtener_periodo_activo()
     return not p or not periodo_tiene_alumnos(p["id"])
-
 
 def listar_periodos():
     return leer_df("SELECT id,nombre,fecha_inicio,fecha_fin,activo,cerrado "
                    "FROM periodos ORDER BY id DESC")
 
-
 def listar_periodos_cerrados():
     return leer_df("SELECT id,nombre,fecha_inicio,fecha_fin,fecha_cierre "
                    "FROM periodos WHERE cerrado=1 ORDER BY id DESC")
-
 
 def activar_periodo(idp, usuario):
     with cursor() as (con, cur):
@@ -443,7 +421,7 @@ def activar_periodo(idp, usuario):
     auditar(usuario["usuario"], f"Activo periodo id={idp}",
             tb="periodos", rid=idp)
 
-    # 🆕 SUBIR INMEDIATAMENTE A R2
+    #SUBIR INMEDIATAMENTE A R2
     try:
         from sync import subir_bd
         from db import DB_PATH
@@ -463,7 +441,6 @@ def info_periodo_con_alumnos():
         FROM periodos p ORDER BY p.id DESC
     """)
 
-
 @st.cache_data(ttl=60)
 def listar_turnos():
     with cursor() as (con, cur):
@@ -476,7 +453,6 @@ def listar_turnos():
         d["hora_salida"] = fmt_time(d.get("hora_salida"))
         out.append(d)
     return out
-
 
 def listar_ventanas(id_turno=None):
     with cursor() as (con, cur):
@@ -498,14 +474,11 @@ def listar_ventanas(id_turno=None):
         out.append(d)
     return out
 
-
-
 def _dia_dict(f):
     d = dict(f)
     d["fecha"] = fmt_date(d.get("fecha"))
     d["hora_entrada"] = fmt_time(d.get("hora_entrada"))
     return d
-
 
 def dia_especial_hoy(id_turno, fecha, id_seccion=None):
     f_str = fmt_date(fecha)
@@ -548,7 +521,6 @@ def dia_especial_hoy(id_turno, fecha, id_seccion=None):
         r = cur.fetchone()
         return _dia_dict(r) if r else None
 
-
 def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
     dia = dia_especial_hoy(id_turno, fecha, id_seccion)
     if dia and dia["tipo"] == "feriado":
@@ -577,7 +549,6 @@ def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
                 "contar_como_clases": (bool(dia.get("contar_como_clases")) if es_ev else False),
             }
     return None
-
 
 @st.cache_data(ttl=60)
 def listar_grados():
@@ -942,7 +913,6 @@ def insertar_alumnos_validos(val):
     log.info("Import: %d nuevos, %d actualizados, %d errs", ins, reac, len(errs))
     return ins, reac, errs
 
-
 #  BLOQUEOS
 def _fecha_ultimo_desbloqueo(idal):
     with cursor() as (con, cur):
@@ -954,10 +924,8 @@ def _fecha_ultimo_desbloqueo(idal):
         f = cur.fetchone()
         return f["fecha_fin"] if f else None
 
-
 def _es_reincidente(idal):
     return _fecha_ultimo_desbloqueo(idal) is not None
-
 
 def contar_tardanzas_desde_ultimo_desbloqueo(idal):
     desde = _fecha_ultimo_desbloqueo(idal)
@@ -976,7 +944,6 @@ def contar_tardanzas_desde_ultimo_desbloqueo(idal):
             """, (idal, desde_d))
         return cur.fetchone()["n"] or 0
 
-
 def contar_tardanzas_injustificadas(idal, pid=None):
     with cursor() as (con, cur):
         if pid is not None:
@@ -987,7 +954,6 @@ def contar_tardanzas_injustificadas(idal, pid=None):
             cur.execute("SELECT COUNT(*) AS n FROM tardanzas "
                         "WHERE alumno_id=? AND justificada=0", (idal,))
         return cur.fetchone()["n"] or 0
-
 
 def alumno_bloqueado(idal):
     with cursor() as (con, cur):
@@ -1001,14 +967,12 @@ def alumno_bloqueado(idal):
         d["fecha_fin"] = fmt_ts(d.get("fecha_fin"))
         return d
 
-
 def crear_bloqueo(idal, motivo, usuario, origen="automatico"):
     escribir("INSERT INTO bloqueos(alumno_id,motivo,activo,fecha_inicio,"
              "creado_por,origen) VALUES(?,?,1,?,?,?)",
              (idal, motivo, hoy_str(), usuario["usuario"], origen))
     auditar(usuario["usuario"], f"Bloqueo {origen} alumno_id={idal}",
             tb="bloqueos", rid=idal)
-
 
 def liberar_bloqueo(idal, usuario, obs=""):
     escribir("UPDATE bloqueos SET activo=0,fecha_fin=?,liberado_por=? "
@@ -1018,12 +982,10 @@ def liberar_bloqueo(idal, usuario, obs=""):
             f"Libero bloqueo alumno_id={idal}. Obs: {obs}",
             tb="bloqueos", rid=idal)
 
-
 def historial_bloqueos_alumno(alumno_id):
     return leer_df("SELECT id,motivo,activo,fecha_inicio,fecha_fin,"
                    "creado_por,origen,liberado_por FROM bloqueos "
                    "WHERE alumno_id=? ORDER BY id DESC", (alumno_id,))
-
 
 def listar_bloqueados():
     return leer_df("""
@@ -1073,16 +1035,11 @@ def limpiar_asistencias_antiguas(meses_a_mantener):
     log.info(f"Limpieza: {total_asist} asistencias y {total_tard} tardanzas eliminadas antes de {fecha_limite}.")
     return total_asist, total_tard, fecha_limite
 
-
 def vista_mantenimiento_datos():
     st.title("Mantenimiento y Contingencia")
     usuario = st.session_state["user"]
     
     tabs = st.tabs(["Registro Manual (Pasado)", "Limpiar Base de Datos (R2)"])
-    
-    # ══════════════════════════════════════════════════════════════════
-    # TAB 1: REGISTRO MANUAL PASADO
-    # ══════════════════════════════════════════════════════════════════
     with tabs[0]:
         st.subheader("Registrar Asistencia de Días Anteriores")
         st.info("Usa esta opción si hubo caída de internet o luz y se tomó asistencia en papel.")
@@ -1096,7 +1053,7 @@ def vista_mantenimiento_datos():
         clave = "mant_sel"
         idsec = _selector_grado_seccion(clave, "Elige el grado")
         
-        # 🆕 CAMBIO CLAVE: En lugar de "return", usamos un "if idsec:"
+        #CAMBIO CLAVE: En lugar de "return", usamos un "if idsec:"
         if idsec:
             with cursor() as (con, cur):
                 cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
@@ -1154,9 +1111,6 @@ def vista_mantenimiento_datos():
                                     else:
                                         st.error(msg)
 
-    # ══════════════════════════════════════════════════════════════════
-    # TAB 2: LIMPIEZA Y COMPACTACIÓN (AHORA SÍ SE VE)
-    # ══════════════════════════════════════════════════════════════════
     with tabs[1]:
         st.subheader("Limpieza de Asistencias Antiguas")
         st.warning("Esta acción eliminará PERMANENTEMENTE las asistencias antiguas de la base de datos para reducir el peso del archivo que se sube a R2.")
@@ -1234,7 +1188,6 @@ def _puede_justificar(fecha_objetivo_str, tipo_asistencia=None, ventana_id=None)
                     return False, "La ventana ya esta cerrada."
     return True, ""
 
-
 def crear_justificacion_previa(idal, fecha_obj, tipo, motivo, usuario):
     if tipo != FALTA:
         return False, "Solo se pueden registrar justificaciones para FALTAS."
@@ -1258,7 +1211,6 @@ def crear_justificacion_previa(idal, fecha_obj, tipo, motivo, usuario):
     auditar(usuario["usuario"], f"Creo justificacion previa {fecha_obj} id={idal}",
             tb="justificaciones_previas", rid=idal)
     return True, "Justificacion registrada."
-
 
 def crear_permiso(idal, fi, ff, motivo, usuario):
     try:
@@ -1552,9 +1504,9 @@ def registrar_entrada(dni, usuario, origen="qr"):
         msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] +
                f" | Tardanza {n}a ({acc}){sufijo} {ha}")
         if alcanzo_limite:
-            msg += " | ⚠️ MANANA NO PODRA ESCANEAR"
+            msg += " MAÑANA NO PODRA ESCANEAR"
         elif ultima_oport:
-            msg += " | ⚠️ Ultima oportunidad"
+            msg += " Ultima oportunidad"
 
         return True, "TARDANZA", msg, {
             "alumno": al, "numero": n, "accion": acc,
@@ -1663,7 +1615,7 @@ def marcar_faltas_al_cierre():
                           1 if jp else 0, "auto", pid))
 
 
-# ─── JUSTIFICAR ASISTENCIA ─────────────────────────────────────────────────
+#JUSTIFICAR ASISTENCIA
 def justificar_asistencia(ida, obs, usuario):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM asistencias WHERE id=?", (ida,))
@@ -1702,7 +1654,7 @@ def quitar_justificacion(ida, usuario):
     return True, "Justificacion eliminada."
 
 
-# ─── ESCÁNER QR ────────────────────────────────────────────────────────────
+#ESCÁNER QR 
 def _procesar_escaneo(dni):
     u = st.session_state.get("user")
     if not u:
@@ -1736,7 +1688,7 @@ def _procesar_escaneo(dni):
 
 
 def escaner_qr_continuo(key="qr_scanner"):
-    # 🆕 ELIMINADO EL HEADER (Más espacio y menos RAM)
+    #ELIMINADO EL HEADER (Más espacio y menos RAM)
     if st.session_state.get("_qr_desbloqueo_exitoso"):
         result = None
     else:
@@ -1773,7 +1725,7 @@ def escaner_qr_continuo(key="qr_scanner"):
 
     desbloq = st.session_state.get("_qr_desbloqueo_exitoso")
     if desbloq:
-        st.success(f"✅ **{desbloq['nombre']}** desbloqueado con éxito. **Vuelve a escanear su QR**.")
+        st.success(f"**{desbloq['nombre']}** desbloqueado con éxito. **Vuelve a escanear su QR**.")
         if st.button("OK, entendido", key="ok_desbloq_msg", type="secondary", width='stretch'):
             st.session_state.pop("_qr_desbloqueo_exitoso", None)
             st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
@@ -1793,7 +1745,6 @@ def escaner_qr_continuo(key="qr_scanner"):
                         unsafe_allow_html=True)
             for msg in mensajes[1:3]:
                 _render_mensaje_qr(msg)
-
 
 def _render_mensaje_qr(msg):
     tipo = msg["tipo"]
@@ -1854,7 +1805,7 @@ def _render_mensaje_qr(msg):
                     st.session_state["_qr_mensajes"] = \
                         st.session_state["_qr_mensajes"][1:]
                 st.rerun()
-# ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
+#PERFIL ALUMNO
 def perfil_alumno_datos(idal):
     try:
         with cursor() as (con, cur):
@@ -1965,7 +1916,7 @@ def _perfil_alumno(idal):
     nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
     inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
 
-    # 🆕 DISEÑO NATIVO STREAMLIT (Sin HTML)
+    #DISEÑO NATIVO STREAMLIT (Sin HTML)
     with st.container(border=True):
         c1, c2 = st.columns([1, 4])
         with c1:
@@ -2038,7 +1989,7 @@ def _perfil_alumno(idal):
                     if st.button("❌ Desactivar Alumno", width='stretch', key="acc_desac"):
                         st.session_state["_desac_al"] = True
                 else:
-                    if st.button("✅ Reactivar Alumno", width='stretch', key="acc_reac"):
+                    if st.button("Reactivar Alumno", width='stretch', key="acc_reac"):
                         st.session_state["_reac_al"] = True
 
     # Confirmaciones de desactivación/reactivación
@@ -2161,11 +2112,11 @@ def _perfil_alumno(idal):
                     """, (al["id"], to_date(perm['fecha_inicio']), to_date(perm['fecha_fin'])))
                     aplicado = (cur.fetchone()["n"] or 0) > 0
                 if not activo:
-                    estado_txt = "🔴 Anulado"
+                    estado_txt = "Anulado"
                 elif aplicado:
-                    estado_txt = "🔒 Aplicado"
+                    estado_txt = "Aplicado"
                 else:
-                    estado_txt = "🟢 Pendiente"
+                    estado_txt = "Pendiente"
                 c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
                 c2.write(estado_txt)
                 if activo and not aplicado:
@@ -2202,10 +2153,10 @@ def _perfil_alumno(idal):
                 except (ValueError, TypeError):
                     v = 0
                 if v == 1:
-                    return "🔒 Aplicada"
+                    return "Aplicada"
                 if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
+                    return "Anulada"
+                return "Pendiente"
 
             dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
             st.caption(f"{len(dj)} justificacion(es) previa(s). Solo se anulan las PENDIENTES.")
@@ -2262,8 +2213,7 @@ def _perfil_alumno(idal):
                     st.session_state.pop("_reactivar_jp_id", None)
                     st.rerun()
 
-
-# ─── MÉTRICAS ──────────────────────────────────────────────────────────────
+#MÉTRICAS
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -2331,7 +2281,6 @@ def metricas_dia_turno(fecha, id_turno):
             "bloqueados": bloqueados, "justificadas": just_hoy,
             "permisos": permisos}
 
-
 def ultimos_registros_turno(fecha, id_turno, limite=30):
     return leer_df("""
         SELECT a.dni,
@@ -2346,7 +2295,6 @@ def ultimos_registros_turno(fecha, id_turno, limite=30):
         WHERE ast.fecha=? AND ast.hora IS NOT NULL AND s.turno_id=?
         ORDER BY ast.hora DESC LIMIT ?
     """, (to_date(fecha), id_turno, limite))
-
 
 def _turnos_para_panel():
     ha = hora_corta()
@@ -2363,8 +2311,7 @@ def _turnos_para_panel():
                 resultado.append({"turno": t, "ventana": v, "estado": "cerrado"})
     return resultado
 
-
-# ─── CIERRE ANUAL ──────────────────────────────────────────────────────────
+#CIERRE ANUAL
 def reporte_cierre_anual(pid):
     return leer_df("""
         SELECT g.nombre AS grado,s.nombre AS seccion,t.nombre AS turno,
@@ -2430,8 +2377,7 @@ def reporte_detallado_por_mes(pid):
                  else date(cur_d.year, cur_d.month + 1, 1))
     return res
 
-
-def cerrar_ano_escolar(usuario, pid, nuevo_nombre, fi, ff):
+def cerrar_año_escolar(usuario, pid, nuevo_nombre, fi, ff):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM periodos WHERE id=?", (pid,))
         p = cur.fetchone()
@@ -2462,7 +2408,7 @@ def cerrar_ano_escolar(usuario, pid, nuevo_nombre, fi, ff):
     auditar(usuario["usuario"], f"Cerro periodo {p['nombre']}",
             tb="periodos", rid=pid)
 
-    # 🆕 SUBIR INMEDIATAMENTE A R2
+    #SUBIR INMEDIATAMENTE A R2
     try:
         from sync import subir_bd
         from db import DB_PATH
@@ -2472,7 +2418,6 @@ def cerrar_ano_escolar(usuario, pid, nuevo_nombre, fi, ff):
 
     return True, f"Periodo '{p['nombre']}' cerrado. Nuevo: '{nuevo_nombre}'."
 
-
 def listar_cierres_anuales():
     return leer_df("""
         SELECT c.id,p.nombre AS periodo,c.fecha_cierre,c.generado_por
@@ -2480,7 +2425,7 @@ def listar_cierres_anuales():
         ORDER BY c.id DESC
     """)
 
-# ─── GENERACIÓN DE PDF ─────────────────────────────────────────────────────
+#GENERACIÓN DE PDF
 def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     from reportlab.lib import colors  # 🆕
     from reportlab.lib.pagesizes import A4
@@ -2653,17 +2598,13 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     buf.seek(0)
     return buf.getvalue()
 
-
-
-# ─── CARNETS ───────────────────────────────────────────────────────────────
+#CARNETS 
 def _generar_fotocheck_pil(alumno, escudo_path=None):
     from PIL import Image, ImageDraw, ImageFont
     from pathlib import Path as _P
     import qrcode
     import datetime
-
     BASE_DIR = _P(__file__).resolve().parent
-
     ANCHO_PX = 817
     ALTO_PX = 550
     NARANJA_OSCURO = (184, 92, 56)
@@ -2738,13 +2679,8 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
 
     f_colegio = _font(18, bold=True)
     f_foto = _font(24, bold=True)
-    
-    # TÍTULO DE ARRIBA (TAMAÑO 32)
     f_titulo = _font(32, bold=True)
-    
-    # 👇 FRASE TAMAÑO 32 EXACTO (Igual que el título) SIN CURSIVA 👇
     f_frase = _font(32, bold=True, italic=False) 
-    
     f_label = _font(26, bold=True)
 
     esc_size = int(FRANJA_W * 0.75)
@@ -2876,10 +2812,6 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
         (QR_SIZE, QR_SIZE), Image.LANCZOS)
     
     img.paste(qr_img_pil, (qr_x, 65))
-
-    # =====================================================================
-    # 👇 FRASE TAMAÑO 32 (Igual que el título) SIN COMILLAS Y RECTA 👇
-    # =====================================================================
     frase = 'Ser del CNY, es ser mejor'
     
     frase_centro_x = DER_X + espacio_d // 2
@@ -2896,7 +2828,7 @@ def _generar_fotocheck_pil(alumno, escudo_path=None):
     return img
     
 def _render_carnets(filas, titulo=None):
-    # 🆕 IMPORTS LOCALES (Lazy Loading)
+    #IMPORTS LOCALES (Lazy Loading)
     import tempfile
     import os
     import gc
@@ -3073,7 +3005,7 @@ def pdf_carnet_individual(dni):
     ALTO_CARNET = 53 * mm
     
     buf = BytesIO()
-    # 🆕 Usamos Canvas directo (Cero margenes ocultos)
+    #Usamos Canvas directo (Cero margenes ocultos)
     c = pdfcanvas.Canvas(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET))
     c.drawImage(ImageReader(ib), 0, 0, width=ANCHO_CARNET, height=ALTO_CARNET)
     c.save()
@@ -3323,7 +3255,7 @@ def pdf_resumen_alumno(idal):
     return buf.getvalue()
 
 
-# ─── EXCEL ─────────────────────────────────────────────────────────────────
+# EXCEL
 def df_a_xlsx(df, hoja="Datos"):
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
@@ -3341,7 +3273,7 @@ def df_a_xlsx_multilhoja(hojas):
     return buf.getvalue()
 
 
-# ─── HOJAS DE REPORTE ──────────────────────────────────────────────────────
+#HOJAS DE REPORTE 
 def _hoja_faltaron_dia(fecha, ids_secs):
     todos_just = []
     todos_injust = []
@@ -3472,11 +3404,11 @@ def _generar_hojas_diario(fecha, ids_secs):
     return hojas
 
 
-def _generar_hojas_mensual(mes, ano, ids_secs):
+def _generar_hojas_mensual(mes, año, ids_secs):
     hojas = {}
-    ult = monthrange(ano, mes)[1]
-    ini = date(ano, mes, 1)
-    fin = date(ano, mes, ult)
+    ult = monthrange(año, mes)[1]
+    ini = date(año, mes, 1)
+    fin = date(año, mes, ult)
 
     dias_especiales_mes = set()
     with cursor() as (con, cur):
@@ -3503,7 +3435,7 @@ def _generar_hojas_mensual(mes, ano, ids_secs):
 
         dias = []
         for d in range(1, ult + 1):
-            f = date(ano, mes, d)
+            f = date(año, mes, d)
             if f.weekday() >= 5 and f not in dias_especiales_mes:
                 continue
             dias.append(f)
@@ -3592,7 +3524,7 @@ def _generar_hojas_mensual(mes, ano, ids_secs):
         ]
     return hojas
 
-# ─── SELECTORES REUTILIZABLES ──────────────────────────────────────────────
+#SELECTORES REUTILIZABLES
 def _selector_grado_seccion(clave, titulo="Elige el grado"):
     idsec = st.session_state.get(clave + "_idsec")
     if idsec:
@@ -3756,7 +3688,7 @@ def _reset_selector(clave, on_click_key=None):
         st.session_state.pop(on_click_key, None)
 
 
-# ─── PUERTA ────────────────────────────────────────────────────────────────
+#PUERTA
 def _puerta_puede_operar(fecha):
     f_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -3965,7 +3897,7 @@ def vista_puerta():
         st.session_state["_ultimo_modo"] = "Manual"
         _puerta_manual(usuario, fecha)
 
-# ─── BLOQUEADOS ────────────────────────────────────────────────────────────
+#BLOQUEADOS
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
     st.caption(
@@ -4038,7 +3970,7 @@ def vista_bloqueados():
     if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
         _reset_selector(clave, "bloq_al_sel_id")
         st.rerun()
-# ─── PANEL DIRECCION ───────────────────────────────────────────────────────
+#PANEL DIRECCION
 def vista_panel_direccion():
     # 🆕 CONTROL DE FALTAS (Solo cuando entran al panel)
     try:
@@ -4092,8 +4024,6 @@ def vista_panel_direccion():
     c2.metric("Bloqueados", m["bloqueados"])
     c3.metric("Justificadas hoy", m["justificadas"])
     c4.metric("Permisos hoy", m["permisos"])
-
-
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
@@ -4267,7 +4197,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
     if tipo == "diario":
         st.subheader(f"Reporte Diario - {sec['grado']} {sec['seccion']}")
         
-        # 🆕 SELECTOR DE FECHA
+        # SELECTOR DE FECHA
         fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
         fecha_str = fecha_sel.strftime("%Y-%m-%d")
         
@@ -4300,25 +4230,25 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         hoy = ahora().date()
         st.subheader(f"Cierre Mensual - {sec['grado']} {sec['seccion']}")
         
-        # 🆕 SELECTOR DE MES Y AÑO
+        #SELECTOR DE MES Y AÑO
         c1, c2 = st.columns(2)
         with c1:
             mes_sel = st.selectbox("Mes", range(1, 13), index=hoy.month - 1, format_func=lambda x: MESES_ES[x], key="rep_mes_sel")
         with c2:
-            ano_sel = st.number_input("Año", min_value=2020, max_value=2030, value=hoy.year, key="rep_ano_sel")
+            año_sel = st.number_input("Año", min_value=2020, max_value=2030, value=hoy.year, key="rep_año_sel")
             
-        hojas = _generar_hojas_mensual(mes_sel, ano_sel, [idsec])
+        hojas = _generar_hojas_mensual(mes_sel, año_sel, [idsec])
         if not hojas:
             st.info("Sin datos para este mes.")
             return
             
         pdf = generar_pdf_multilhoja(
-            hojas, f"Cierre Mensual {MESES_ES[mes_sel]} {ano_sel}")
+            hojas, f"Cierre Mensual {MESES_ES[mes_sel]} {año_sel}")
         c1, c2 = st.columns(2)
         with c1:
             st.download_button(
                 "Descargar PDF", pdf,
-                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.pdf",
+                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{año_sel}.pdf",
                 "application/pdf", key="rep_dl_mensual_pdf", type="primary")
         with c2:
             hojas_xlsx = {}
@@ -4329,7 +4259,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
                 st.download_button(
                     "Descargar Excel",
                     df_a_xlsx_multilhoja(hojas_xlsx),
-                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.xlsx",
+                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{año_sel}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="rep_dl_mensual_xlsx")
                     
@@ -4519,7 +4449,7 @@ def vista_reportes():
     _rep_seleccionar_seccion(usuario)
 
 
-# ─── ALUMNOS UI ────────────────────────────────────────────────────────────
+#ALUMNOS UI 
 def _frag_crear_alumno():
     st.subheader("Crear alumno manualmente")
     grados = listar_grados()
@@ -4567,7 +4497,6 @@ def _frag_crear_alumno():
                 st.rerun()
             else:
                 st.error(msg)
-
 
 def _frag_editar_alumno():
     st.subheader("Editar alumno")
@@ -4920,11 +4849,11 @@ def _perfil_alumno(idal):
                           to_date(perm['fecha_fin'])))
                     aplicado = (cur.fetchone()["n"] or 0) > 0
                 if not activo:
-                    estado_txt = "🔴 Anulado"
+                    estado_txt = "Anulado"
                 elif aplicado:
-                    estado_txt = "🔒 Aplicado"
+                    estado_txt = "Aplicado"
                 else:
-                    estado_txt = "🟢 Pendiente"
+                    estado_txt = "Pendiente"
                 c1.write(f"**{perm['fecha_inicio']} → {perm['fecha_fin']}** — {perm['motivo']}")
                 c2.write(estado_txt)
                 if activo and not aplicado:
@@ -4963,10 +4892,10 @@ def _perfil_alumno(idal):
                 except (ValueError, TypeError):
                     v = 0
                 if v == 1:
-                    return "🔒 Aplicada"
+                    return "Aplicada"
                 if v == -1:
-                    return "🔴 Anulada"
-                return "🟡 Pendiente"
+                    return "Anulada"
+                return "Pendiente"
 
             dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
             st.caption(f"{len(dj)} justificacion(es) previa(s). "
@@ -5044,7 +4973,7 @@ def vista_alumnos():
         _frag_editar_alumno()
 
 
-# ─── GRADOS Y SECCIONES ────────────────────────────────────────────────────
+#GRADOS Y SECCIONES
 def vista_grados_secciones():
     st.title("Grados y Secciones")
     st.caption("Vista de referencia. Las secciones se crean automaticamente "
@@ -5080,7 +5009,7 @@ def vista_grados_secciones():
     st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
 
 
-# ─── CARNETS ───────────────────────────────────────────────────────────────
+#CARNETS
 def vista_carnets():
     st.title("Carnets QR")
 
@@ -5097,7 +5026,7 @@ def vista_carnets():
         st.warning("No hay grados registrados.")
         return
 
-    # 🆕 SELECTBOX NATIVO (Cero RAM extra)
+    #SELECTBOX NATIVO (Cero RAM extra)
     ops_grados = {g["nombre"]: g["id"] for g in grados}
     grado_sel = st.selectbox("Selecciona el grado", list(ops_grados.keys()), key="carn_grado_selbox")
     idg = ops_grados[grado_sel]
@@ -5148,9 +5077,6 @@ def _carnets_ver_seccion(idsec):
 
     st.markdown("---")
     
-    # ==========================================
-    # OPCIÓN 1: CARNET INDIVIDUAL (De este salón)
-    # ==========================================
     st.markdown("### 1. Generar Carnet Individual (de este salón)")
     c1, c2 = st.columns([3, 1])
     with c1:
@@ -5162,35 +5088,27 @@ def _carnets_ver_seccion(idsec):
         pdf_ind = pdf_carnet_individual(dni_sel)
         if pdf_ind:
             st.download_button(
-                "⬇️ Descargar Carnet", pdf_ind,
+                "Descargar Carnet", pdf_ind,
                 f"carnet_{dni_sel}.pdf",
                 "application/pdf", width='stretch')
 
     st.markdown("---")
-
-    # ==========================================
-    # OPCIÓN 2: SALÓN COMPLETO
-    # ==========================================
     st.markdown("### 2. Generar PDF de Todo el Salón")
     st.caption("Genera un PDF con todos los alumnos de esta sección.")
-    if st.button("📄 Generar PDF del Salón Completo", type="primary", width='stretch'):
+    if st.button("Generar PDF del Salón Completo", type="primary", width='stretch'):
         with st.spinner("Generando PDF..."):
             pdf = pdf_carnets_por_seccion(idsec)
             if pdf:
                 st.download_button(
-                    "⬇️ Guardar PDF del Salón", pdf,
+                    "Guardar PDF del Salón", pdf,
                     f"carnets_{sec['grado']}{sec['seccion']}.pdf",
                     "application/pdf", width='stretch', key="dl_salon")
 
     st.markdown("---")
-
-    # ==========================================
-    # OPCIÓN 3: CANASTA (BUSCADOR GLOBAL)
-    # ==========================================
     st.markdown("### 3. Generar PDF de Seleccionados (Cualquier Salón)")
     st.caption("Busca a cualquier alumno del colegio (por nombre o DNI) para agregarlo a la lista.")
     
-    # 🆕 BUSCADOR GLOBAL
+    #BUSCADOR GLOBAL
     busqueda = st.text_input("Buscar alumno por nombre o DNI", key="buscar_al_global", placeholder="Ej: Juan o 74105299")
     
     if busqueda:
@@ -5204,7 +5122,7 @@ def _carnets_ver_seccion(idsec):
             ops_global = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df_global.iterrows()}
             al_global_sel = st.selectbox("Selecciona el alumno encontrado", list(ops_global.keys()), key="global_al_sel")
             
-            if st.button("➕ Agregar a la Lista", width='stretch'):
+            if st.button("Agregar a la Lista", width='stretch'):
                 id_agregar = ops_global[al_global_sel]
                 if id_agregar not in st.session_state["canasta_carnets"]:
                     st.session_state["canasta_carnets"].append(id_agregar)
@@ -5239,20 +5157,20 @@ def _carnets_ver_seccion(idsec):
                 
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("🗑️ Vaciar Lista", width='stretch'):
+            if st.button("Vaciar Lista", width='stretch'):
                 st.session_state["canasta_carnets"] = []
                 st.rerun()
         with c2:
-            if st.button("📄 Generar PDF de la Lista", type="primary", width='stretch'):
+            if st.button("Generar PDF de la Lista", type="primary", width='stretch'):
                 with st.spinner("Generando PDF..."):
                     pdf = pdf_carnets_seleccionados(canasta, titulo="Carnets Seleccionados")
                     if pdf:
                         st.download_button(
-                            "⬇️ Guardar PDF Seleccionados", pdf,
+                            "Guardar PDF Seleccionados", pdf,
                             "carnets_seleccionados.pdf",
                             "application/pdf", width='stretch', key="dl_canasta")
 
-# ─── VENTANAS ──────────────────────────────────────────────────────────────
+#VENTANAS
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Configura apertura, limite puntual y cierre por turno y tipo.")
@@ -5287,7 +5205,7 @@ def vista_ventanas():
                     st.toast("Ventana actualizada")
                     st.rerun()
 
-# ─── USUARIOS ──────────────────────────────────────────────────────────────
+#USUARIOS
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
         cur.execute("SELECT id,rol,es_principal,usuario FROM usuarios WHERE id=?",
@@ -5363,7 +5281,7 @@ def _frag_usuarios_botones():
     st.markdown("### Buscar Usuarios")
     st.caption("Selecciona un filtro para cargar la lista (ahorra memoria al no mostrar todo de golpe).")
 
-    # 🆕 FILTROS
+    #FILTROS
     c1, c2 = st.columns(2)
     with c1:
         roles_disponibles = ["Todos", "Admin", "Direccion", "Auxiliar"]
@@ -5405,9 +5323,9 @@ def _frag_usuarios_botones():
 
         st.write(f"**{len(df)} usuarios encontrados**")
         
-        # 🆕 MOSTRAMOS SOLO UN DATAFRAME
+        #MOSTRAMOS SOLO UN DATAFRAME
         df_mostrar = df.copy()
-        df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "🟢 Activo" if x else "🔴 Inactivo")
+        df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "Activo" if x else "Inactivo")
         df_mostrar["rol_ui"] = df_mostrar.apply(
             lambda r: "Admin (principal)" if (r["rol"] == "Admin" and r["es_principal"]) 
             else ("Sub Admin" if r["rol"] == "Admin" else r["rol"]), axis=1
@@ -5424,12 +5342,12 @@ def _frag_usuarios_botones():
         ops = {f"{r['nombres']} ({r['usuario']})": r["id"] for _, r in df.iterrows()}
         sel = st.selectbox("Selecciona el usuario a editar", list(ops.keys()))
         
-        # 🆕 GUARDAMOS EL ID DEL USUARIO QUE SE ESTÁ EDITANDO ACTUALMENTE
+        #GUARDAMOS EL ID DEL USUARIO QUE SE ESTÁ EDITANDO ACTUALMENTE
         if st.button("Ver / Editar usuario seleccionado", width='stretch'):
             st.session_state["_usuario_editando_activo"] = ops[sel]
             st.rerun()
 
-    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
+    #AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
     usuario_editando = st.session_state.get("_usuario_editando_activo")
     if usuario_editando:
         st.markdown("---")
@@ -5498,12 +5416,12 @@ def _frag_usuarios_crear():
                                     (u_norm, hashear_password(p), r, n, idt))
                         auditar(usuario["usuario"], "Creo usuario " + u_norm)
 
-                        # 🆕 SUBIR A R2 AL INSTANTE (CRÍTICO)
+                        #SUBIR A R2 AL INSTANTE (CRÍTICO)
                         try:
                             from sync import subir_bd
                             from db import DB_PATH
                             subir_bd(DB_PATH)
-                            log.info(f"✅ Usuario {u_norm} creado y respaldado en R2")
+                            log.info(f"Usuario {u_norm} creado y respaldado en R2")
                         except Exception as e:
                             log.error(f"Fallo backup tras crear usuario: {e}")
 
@@ -5519,7 +5437,6 @@ def _frag_usuarios_crear():
                             st.error("Ese usuario ya existe.")
                         else:
                             st.error(f"Error: {e}")
-
 
 def _frag_usuarios_asignar():
     usuario = st.session_state["user"]
@@ -5553,8 +5470,6 @@ def _frag_usuarios_asignar():
         cur.execute("SELECT seccion_id FROM auxiliar_secciones "
                     "WHERE usuario_id=?", (ida,))
         asig = {r["seccion_id"] for r in cur.fetchall()}
-
-    # 🛡️ TODO DENTRO DE UN st.form (los checkboxes NO disparan rerun)
     with st.form(f"form_asig_{ida}"):
         st.write("Secciones disponibles:")
         sel_s = []
@@ -5587,7 +5502,7 @@ def _frag_usuarios_asignar():
             from sync import subir_bd
             from db import DB_PATH
             subir_bd(DB_PATH)
-            log.info(f"✅ {len(sel_s)} secciones asignadas a usuario_id={ida} y respaldadas en R2")
+            log.info(f"{len(sel_s)} secciones asignadas a usuario_id={ida} y respaldadas en R2")
         except Exception as e:
             log.error(f"Fallo backup tras asignar secciones: {e}")
 
@@ -5630,7 +5545,7 @@ def vista_usuarios():
         _frag_usuarios_mantenimiento()
 
 
-# ─── AUDITORÍA ─────────────────────────────────────────────────────────────
+#AUDITORÍA
 def _frag_importar_excel():
     st.subheader("Cargar alumnos al periodo")
     st.info("Columnas: DNI, Nombres, Apellido Paterno, Apellido Materno, Grado, "
@@ -5736,7 +5651,7 @@ def vista_auditoria():
                         cur.execute("UPDATE periodos SET activo=0 WHERE id!=?", (nuevo_id,))
                     auditar(usuario["usuario"], f"Creo periodo {nom}", tb="periodos", rid=nuevo_id)
 
-                    # 🆕 SUBIR INMEDIATAMENTE A R2
+                    #SUBIR INMEDIATAMENTE A R2
                     try:
                         from sync import subir_bd
                         from db import DB_PATH
@@ -5838,14 +5753,14 @@ def vista_auditoria():
             ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
         conf = st.text_input("Escribe CERRAR para confirmar")
 
-        if confirmar_accion("cerrar_ano", "Cerrar año escolar",
+        if confirmar_accion("cerrar_año", "Cerrar año escolar",
                              "¿Estas seguro de cerrar el año escolar?"):
             if not desc:
                 st.error("Primero debes descargar el reporte anual.")
             elif conf.strip() != "CERRAR":
                 st.error("Debes escribir exactamente CERRAR.")
             else:
-                ok, msg = cerrar_ano_escolar(
+                ok, msg = cerrar_año_escolar(
                     usuario, p["id"], nn,
                     fi.strftime("%Y-%m-%d"),
                     ff.strftime("%Y-%m-%d"))
@@ -5867,7 +5782,7 @@ def vista_auditoria():
             st.dataframe(dfp, width='stretch')
 
 
-# ─── DÍAS ESPECIALES ───────────────────────────────────────────────────────
+#DÍAS ESPECIALES
 def vista_dias_especiales():
     st.title("Dias especiales")
     usuario = st.session_state["user"]
@@ -6017,7 +5932,7 @@ def vista_dias_especiales():
                 st.rerun()
 
 
-# ─── JUSTIFICACIONES PREVIAS ───────────────────────────────────────────────
+#JUSTIFICACIONES PREVIAS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
     st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
@@ -6161,7 +6076,7 @@ def _render_historial_global_jp(usuario):
     st.markdown("---")
     st.markdown("**Buscar en todos los tiempos**")
     
-    # 🆕 FILTROS Y BÚSQUEDA
+    #FILTROS Y BÚSQUEDA
     c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
@@ -6217,11 +6132,10 @@ def _render_historial_global_jp(usuario):
             st.info("Sin justificaciones previas con esos filtros.")
         else:
             st.write(f"{len(df_all)} justificaciones encontradas")
-            # 🆕 SOLO DATAFRAME (Cero RAM en CSS)
+            # SOLO DATAFRAME (Cero RAM en CSS)
             st.dataframe(df_all, width='stretch', hide_index=True)
 
-
-# ─── PERMISOS ──────────────────────────────────────────────────────────────
+#PERMISOS
 def _frag_permisos(usuario):
     st.subheader("Permisos de inasistencia")
     st.caption(f"Permisos para dias FUTUROS (desde mañana, maximo "
@@ -6236,7 +6150,7 @@ def _frag_permisos(usuario):
 def _render_registrar_perm(usuario):
     clave = "perm_sel"
     
-    # 🆕 Lógica mejorada: Si ya hay alumno seleccionado, mostramos el formulario directo
+    # Lógica mejorada: Si ya hay alumno seleccionado, mostramos el formulario directo
     al_sel_id = st.session_state.get("perm_al_sel_id")
     
     if not al_sel_id:
@@ -6359,7 +6273,7 @@ def _render_historial_global_perm(usuario):
     st.markdown("---")
     st.markdown("**Buscar en todos los tiempos**")
     
-    # 🆕 FILTROS Y BÚSQUEDA
+    #FILTROS Y BÚSQUEDA
     c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
@@ -6370,7 +6284,7 @@ def _render_historial_global_perm(usuario):
                                       key="perm_filtro_texto",
                                       placeholder="Ej: 12345678")
                                       
-    if st.button("🔍 Buscar Permisos", type="primary", width='stretch'):
+    if st.button("Buscar Permisos", type="primary", width='stretch'):
         st.session_state["_buscar_perm_hist"] = True
 
     if st.session_state.get("_buscar_perm_hist"):
@@ -6424,17 +6338,13 @@ def vista_justificaciones_permisos():
         _frag_permisos(usuario)
 
 
-# ─── BACKUP ────────────────────────────────────────────────────────────────
+#BACKUP
 def vista_backup():
     st.title("Backup y Respaldo")
     usuario = st.session_state["user"]
     
     import os
     archivo_log = "historial_backups.txt"
-    
-    # ══════════════════════════════════════════════════════════════════
-    # 1. HISTORIAL DE RESPALDOS
-    # ══════════════════════════════════════════════════════════════════
     st.subheader("Historial de Resguardos Automáticos")
     st.caption("El sistema respalda automáticamente a las 09:00 AM y 03:00 PM (Hora de Perú).")
     
@@ -6444,7 +6354,7 @@ def vista_backup():
         ultimos = lineas[-10:]
         ultimos.reverse()
         for linea in ultimos:
-            texto_limpio = linea.strip().replace("✅", "EXITOSO:").replace("❌", "ERROR:")
+            texto_limpio = linea.strip().replace("EXITOSO:").replace("ERROR:")
             if "EXITOSO" in texto_limpio:
                 st.success(texto_limpio)
             elif "ERROR" in texto_limpio:
@@ -6456,13 +6366,10 @@ def vista_backup():
     
     st.markdown("---")
 
-    # ══════════════════════════════════════════════════════════════════
-    # 2. ZONA PROTEGIDA (Clave de seguridad)
-    # ══════════════════════════════════════════════════════════════════
     st.subheader("Acciones de Administrador")
     st.warning("Por seguridad, estas acciones están bloqueadas. Ingresa la clave para continuar.")
     
-    CLAVE_MAESTRA = "Yarinacocha2026" # <-- Tu clave secreta
+    CLAVE_MAESTRA = "Yarinacocha2026" #
     
     clave_ingresada = st.text_input("Ingresa la clave de administrador:", 
                                     type="password",
@@ -6475,9 +6382,6 @@ def vista_backup():
     st.success("Clave correcta. Acceso concedido.")
     st.markdown("---")
     
-    # ══════════════════════════════════════════════════════════════════
-    # 3. ACCIONES (Subir a R2 y Descargar Local)
-    # ══════════════════════════════════════════════════════════════════
     c1, c2 = st.columns(2)
     
     with c1:
@@ -6517,9 +6421,6 @@ def vista_backup():
 
     st.markdown("---")
     
-    # ══════════════════════════════════════════════════════════════════
-    # 4. RESTAURAR BACKUP ANTERIOR
-    # ══════════════════════════════════════════════════════════════════
     st.subheader("Restaurar Base de Datos desde R2")
     st.warning("⚠️ Esta acción reemplazará la base de datos actual con la versión que elijas. La app se reiniciará.")
     
@@ -6553,9 +6454,6 @@ def vista_backup():
                         
     st.markdown("---")
     
-    # ══════════════════════════════════════════════════════════════════
-    # 5. LIMPIAR BACKUPS ANTIGUOS EN R2
-    # ══════════════════════════════════════════════════════════════════
     st.subheader("Limpiar Backups Antiguos en R2")
     st.caption("Elimina de la nube los respaldos que ya no necesitas para no llenar el almacenamiento.")
     
@@ -6582,19 +6480,12 @@ def vista_backup():
                     st.success(f"¡Limpieza exitosa! Se eliminaron {borrados} backups antiguos de R2.")
                     time.sleep(1)
                     st.rerun()
-
-# ─── ESTILOS CSS ───────────────────────────────────────────────────────────
+#ESTILOS CSS 
 def aplicar_estilos():
     st.markdown("""
     <style>
-    /* ══════════════════════════════════════════════════════════════════
-       IMPORTAR FUENTE NUNITO DESDE GOOGLE FONTS
-       ══════════════════════════════════════════════════════════════════ */
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&display=swap');
 
-    /* ══════════════════════════════════════════════════════════════════
-       VARIABLES GLOBALES
-       ══════════════════════════════════════════════════════════════════ */
     :root{
         --primario:       #E87B4A;
         --primario-dark:  #D66535;
@@ -6631,9 +6522,6 @@ def aplicar_estilos():
         }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       TIPOGRAFÍA (Nunito)
-       ══════════════════════════════════════════════════════════════════ */
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
     .stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
@@ -6643,10 +6531,6 @@ def aplicar_estilos():
     h1, h2, h3, h4, h5, h6, p, span, a, label, div{
         font-family: var(--fuente);
     }
-
-    /* ══════════════════════════════════════════════════════════════════
-       FIX: ICONOS MATERIAL SYMBOLS (NO tocar)
-       ══════════════════════════════════════════════════════════════════ */
     span[data-testid="stIconMaterial"],
     span[data-testid="stIconMaterial"] *,
     .material-symbols-rounded,
@@ -6700,9 +6584,6 @@ def aplicar_estilos():
         opacity: 0.75;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       SIDEBAR (ESCRITORIO Y MÓVIL)
-       ══════════════════════════════════════════════════════════════════ */
     section[data-testid="stSidebar"] {
         border-right: 1px solid var(--primario-borde);
     }
@@ -6736,7 +6617,7 @@ def aplicar_estilos():
         color: var(--primario) !important;
     }
 
-    /* 🆕 TARJETA DE USUARIO (Más angosta y con el escudo) */
+    /*TARJETA DE USUARIO (Más angosta y con el escudo) */
     .encabezado-sidebar {
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 15px 10px !important;
@@ -6789,9 +6670,6 @@ def aplicar_estilos():
         color: #FFF !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       INPUTS
-       ══════════════════════════════════════════════════════════════════ */
     .stTextInput input, .stNumberInput input, .stDateInput input,
     .stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
         border-radius: var(--radius-sm) !important;
@@ -6804,9 +6682,6 @@ def aplicar_estilos():
         box-shadow: 0 0 0 3px var(--primario-soft) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       BOTONES
-       ══════════════════════════════════════════════════════════════════ */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
         background: var(--primario) !important;
         color: #FFFFFF !important;
@@ -6830,9 +6705,6 @@ def aplicar_estilos():
         transform: translateY(-1px);
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       MÉTRICAS
-       ══════════════════════════════════════════════════════════════════ */
     div[data-testid="stMetric"]{
         background: var(--primario-soft);
         border: 1px solid var(--primario-borde);
@@ -6848,9 +6720,6 @@ def aplicar_estilos():
         color: var(--texto-titulo) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       TABS
-       ══════════════════════════════════════════════════════════════════ */
     .stTabs [data-baseweb="tab-list"]{
         gap: 4px;
         border-bottom: 2px solid var(--primario-borde);
@@ -6868,9 +6737,6 @@ def aplicar_estilos():
         opacity: 1;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       EXPANDERS
-       ══════════════════════════════════════════════════════════════════ */
     .streamlit-expanderHeader, details summary{
         border: 1px solid var(--primario-borde) !important;
         border-radius: var(--radius-sm) !important;
@@ -6882,9 +6748,6 @@ def aplicar_estilos():
         border-color: var(--primario) !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       HEADERS DE PÁGINA
-       ══════════════════════════════════════════════════════════════════ */
     .scan-header, .puerta-header{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 24px 28px;
@@ -6898,9 +6761,6 @@ def aplicar_estilos():
     .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
     .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
 
-    /* ══════════════════════════════════════════════════════════════════
-       PERFIL HERO
-       ══════════════════════════════════════════════════════════════════ */
     .perfil-hero{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         border-radius: 14px;
@@ -6939,10 +6799,6 @@ def aplicar_estilos():
         border: 1px solid rgba(255,255,255,.45);
         color: #FFF !important;
     }
-
-    /* ══════════════════════════════════════════════════════════════════
-       BLOQUES / CARDS
-       ══════════════════════════════════════════════════════════════════ */
     .perfil-bloque{
         background: var(--secondary-background-color);
         border: 1px solid var(--primario-borde);
@@ -6971,9 +6827,6 @@ def aplicar_estilos():
     }
     .info-valor{ font-weight: 600; }
 
-    /* ══════════════════════════════════════════════════════════════════
-       KPI CARDS
-       ══════════════════════════════════════════════════════════════════ */
     .kpi-grid{
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -7005,9 +6858,6 @@ def aplicar_estilos():
         .kpi-card .kpi-lbl-alerta{ color: #FC8181; }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       MENSAJES QR
-       ══════════════════════════════════════════════════════════════════ */
     .scan-ultimos{
         font-size: 11px; font-weight: 800; text-transform: uppercase;
         letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
@@ -7048,9 +6898,6 @@ def aplicar_estilos():
         .qr-bloqueado { background: rgba(239,68,68,.15); }
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       BOTÓN SELECCIONADO
-       ══════════════════════════════════════════════════════════════════ */
     .btn-sel .stButton > button{
         background: #43A047 !important;
         color: #FFF !important;
@@ -7059,9 +6906,6 @@ def aplicar_estilos():
         color: #FFF !important;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       SEPARADORES
-       ══════════════════════════════════════════════════════════════════ */
     hr{
         border: none;
         height: 1px;
@@ -7069,9 +6913,6 @@ def aplicar_estilos():
         margin: 20px 0;
     }
 
-    /* ══════════════════════════════════════════════════════════════════
-       RESPONSIVE (CELULAR) Y SIDEBAR ESTILO APP MÓVIL
-       ══════════════════════════════════════════════════════════════════ */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
         h2{ font-size: 1.2rem !important; }
@@ -7128,7 +6969,7 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
             t.strip())
 
 
-# ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
+#LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
     st.markdown("""
     <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
@@ -7150,7 +6991,7 @@ def vista_login():
                     st.session_state["user"] = datos
                     auditar(datos["usuario"], "Login")
                     
-                    # 🆕 GUARDAMOS EL TOKEN Y LA HORA DE ENTRADA
+                    #GUARDAMOS EL TOKEN Y LA HORA DE ENTRADA
                     st.query_params["sesion"] = datos["usuario"]
                     st.query_params["ts"] = str(int(time.time()))
                     
@@ -7253,7 +7094,7 @@ def vista_mi_cuenta():
         st.rerun()
 
 
-# ─── MENÚ Y RUTAS ──────────────────────────────────────────────────────────
+#MENÚ Y RUTAS 
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     
@@ -7269,7 +7110,7 @@ def obtener_opciones_por_rol(usuario):
             "Dias especiales", 
             "Ventanas",
             "Justificaciones y Permisos", 
-            "Mantenimiento Datos",  # 🆕 Exclusivo del Admin
+            "Mantenimiento Datos",  #Exclusivo del Admin
             "Usuarios", 
             "Backup", 
             "Auditoria",
@@ -7324,7 +7165,7 @@ def menu_lateral():
     opciones = obtener_opciones_por_rol(usuario)
     
     with st.sidebar:
-        # 🆕 TARJETA DE USUARIO (Con la letra inicial, sin imágenes)
+        # TARJETA DE USUARIO (Con la letra inicial, sin imágenes)
         inicial = (usuario["nombres"] or "?")[0].upper()
         st.markdown(
             f'<div class="encabezado-sidebar">'
@@ -7361,11 +7202,11 @@ def _enrutar(op, usuario):
     if op != "Reportes":
         st.session_state.pop("_rep_iniciado", None)
         
-    # 🆕 DESTRUIR CÁMARA AL SALIR DE PUERTA
+    # DESTRUIR CÁMARA AL SALIR DE PUERTA
     if op != "Puerta":
         st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
 
-    # 🆕 LIMPIAR MEMORIA AL CAMBIAR DE PESTAÑA (Soluciona bug de Carnets y Perfil)
+    # LIMPIAR MEMORIA AL CAMBIAR DE PESTAÑA (Soluciona bug de Carnets y Perfil)
     op_anterior = st.session_state.get("_menu_anterior")
     if op_anterior and op_anterior != op:
         st.session_state.pop("perfil_alumno_id", None)
@@ -7388,16 +7229,44 @@ def _control_faltas():
         marcar_faltas_al_cierre()
     except Exception as e:
         log.warning(f"No se pudieron procesar faltas al cierre: {e}")
-# ─── MAIN ──────────────────────────────────────────────────────────────────
+#MAIN 
+import os  # Asegúrate de que 'os' esté importado arriba
 
-
-@st.cache_resource
-def _iniciar_hilo_backup_una_vez():
-    """Arranca el hilo de backup UNA SOLA VEZ por proceso de Python."""
-    hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
-    hilo.start()
-    log.info("✅ Hilo de backup encendido (9:00 AM y 3:00 PM) - UNA VEZ por proceso.")
-    return True
+def _verificar_backup_por_tiempo():
+    """Revisa si pasaron 4 horas desde el último backup. Si es así, lo sube."""
+    try:
+        archivo_marca = "data/.ultimo_backup.txt"
+        ahora_ts = time.time()
+        
+        # Si no existe el archivo, lo creamos con la hora actual
+        if not os.path.exists(archivo_marca):
+            os.makedirs("data", exist_ok=True)
+            with open(archivo_marca, "w") as f:
+                f.write(str(ahora_ts))
+            return
+            
+        with open(archivo_marca, "r") as f:
+            ultimo_backup = float(f.read().strip())
+            
+        # Si pasaron más de 4 horas (14400 segundos)
+        if ahora_ts - ultimo_backup > (4 * 3600):
+            log.info("⏰ Pasaron más de 4 horas. Iniciando backup automático en segundo plano...")
+            
+            def tarea_backup():
+                try:
+                    from sync import subir_bd
+                    from db import DB_PATH
+                    subir_bd(DB_PATH)
+                    with open(archivo_marca, "w") as f:
+                        f.write(str(time.time()))
+                    log.info("✅ Backup automático por tiempo completado.")
+                except Exception as e:
+                    log.error(f"❌ Fallo backup automático: {e}")
+                    
+            threading.Thread(target=tarea_backup, daemon=True).start()
+            
+    except Exception as e:
+        log.warning(f"Error verificando backup automático: {e}")
 
 
 def main():
@@ -7416,8 +7285,8 @@ def main():
         inicializar_bd()
         aplicar_estilos()
 
-        # 🛡️ ARRANCAR HILO CON CACHÉ (1 sola vez por proceso)
-        _iniciar_hilo_backup_una_vez()
+        # 🛡️ BACKUP POR TIEMPO (Reemplaza al hilo viejo)
+        _verificar_backup_por_tiempo()
 
         # RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
         if not st.session_state.get("user"):
