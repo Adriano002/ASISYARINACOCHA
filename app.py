@@ -1002,7 +1002,120 @@ def obtener_auditoria(limite=500):
     return leer_df("SELECT id,usuario,accion,fecha,ip FROM auditoria "
                    "ORDER BY id DESC LIMIT ?", (int(limite),))
 
+def limpiar_asistencias_antiguas(meses_a_mantener):
+    from datetime import datetime, timedelta
+    from db import cursor, log
+    
+    # Calculamos la fecha límite (hoy menos X meses)
+    fecha_limite = (datetime.now() - timedelta(days=meses_a_mantener * 30)).strftime("%Y-%m-%d")
+    
+    with cursor() as (con, cur):
+        # 1. Contamos cuántos registros se van a borrar
+        cur.execute("SELECT COUNT(*) as n FROM asistencias WHERE fecha < ?", (fecha_limite,))
+        total_asist = cur.fetchone()["n"]
+        
+        cur.execute("SELECT COUNT(*) as n FROM tardanzas WHERE fecha < ?", (fecha_limite,))
+        total_tard = cur.fetchone()["n"]
+        
+        if total_asist == 0 and total_tard == 0:
+            return 0, 0, fecha_limite
+            
+        # 2. Borramos los registros viejos
+        cur.execute("DELETE FROM asistencias WHERE fecha < ?", (fecha_limite,))
+        cur.execute("DELETE FROM tardanzas WHERE fecha < ?", (fecha_limite,))
+        
+        # 3. 🆕 EL TRUCO MÁGICO: COMPACTAR LA BASE DE DATOS
+        # Esto reduce el tamaño del archivo en el disco.
+        cur.execute("VACUUM")
+        
+    log.info(f"Limpieza: {total_asist} asistencias y {total_tard} tardanzas eliminadas antes de {fecha_limite}.")
+    return total_asist, total_tard, fecha_limite
 
+
+def vista_mantenimiento_datos():
+    st.title("Mantenimiento y Contingencia")
+    usuario = st.session_state["user"]
+    
+    tabs = st.tabs(["Registro Manual (Pasado)", "Limpiar Base de Datos (R2)"])
+    
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 1: REGISTRO MANUAL PASADO
+    # ══════════════════════════════════════════════════════════════════
+    with tabs[0]:
+        st.subheader("Registrar Asistencia de Días Anteriores")
+        st.info("Usa esta opción si hubo caída de internet o luz y se tomó asistencia en papel.")
+        
+        with st.container(border=True):
+            st.markdown("**Paso 1: Buscar al Alumno**")
+            busqueda = st.text_input("DNI o Nombre del alumno", placeholder="Ej: 74105299", key="busq_pasado")
+            
+            al_sel = None
+            if busqueda:
+                df_res = buscar_alumnos(busqueda, limite=5)
+                if df_res.empty:
+                    st.warning("No se encontraron alumnos.")
+                else:
+                    ops = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df_res.iterrows()}
+                    sel = st.selectbox("Selecciona al alumno", list(ops.keys()), key="sel_pasado")
+                    idal = ops[sel]
+                    
+                    with cursor() as (con, cur):
+                        cur.execute("SELECT dni FROM alumnos WHERE id=?", (idal,))
+                        al_sel = cur.fetchone()["dni"]
+        
+        if al_sel:
+            with st.container(border=True):
+                st.markdown("**Paso 2: Registrar la fecha y estado**")
+                c1, c2 = st.columns(2)
+                with c1:
+                    fecha_reg = st.date_input("Fecha del registro", max_value=hoy_date(), key="fecha_pasado")
+                with c2:
+                    estado_reg = st.selectbox("Estado", [PUNTUAL, TARDANZA, FALTA], key="estado_pasado")
+                    
+                motivo = st.text_input("¿Por qué se registra tarde? (Obligatorio)", placeholder="Ej: Caída de internet", key="motivo_pasado")
+                
+                if st.button("Guardar Registro", type="primary", use_container_width=True, key="btn_guardar_pasado"):
+                    if not motivo.strip():
+                        st.error("El motivo es obligatorio para auditoría.")
+                    else:
+                        fecha_str = fecha_reg.strftime("%Y-%m-%d")
+                        ok, msg = registrar_asistencia_manual_pasada(
+                            al_sel, fecha_str, estado_reg, usuario, motivo.strip()
+                        )
+                        if ok:
+                            st.success(msg)
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 2: LIMPIEZA Y COMPACTACIÓN DE LA BASE DE DATOS
+    # ══════════════════════════════════════════════════════════════════
+    with tabs[1]:
+        st.subheader("Limpieza de Asistencias Antiguas")
+        st.warning("Esta acción eliminará PERMANENTEMENTE las asistencias antiguas de la base de datos para reducir el peso del archivo que se sube a R2.")
+        
+        with st.container(border=True):
+            meses = st.slider("Mantener asistencias de los últimos (meses):", min_value=3, max_value=12, value=6, key="slider_meses")
+            
+            st.write(f"Se borrarán todos los registros anteriores a **{meses} meses**. (Ejemplo: si hoy es diciembre, se borrará marzo hacia atrás).")
+            
+            check = st.checkbox("Entiendo que esta acción borra datos y no se puede deshacer.")
+            
+            if st.button("Eliminar y Compactar Base de Datos", type="primary", use_container_width=True, disabled=not check, key="btn_limpiar_bd"):
+                with st.spinner("Compactando base de datos... Esto puede tardar unos segundos."):
+                    try:
+                        borrados_as, borrados_tar, fecha_limite = limpiar_asistencias_antiguas(meses_a_mantener=meses)
+                        if borrados_as == 0 and borrados_tar == 0:
+                            st.info("No hay registros tan antiguos para borrar.")
+                        else:
+                            st.success(f"¡Limpieza exitosa! Se eliminaron {borrados_as} asistencias y {borrados_tar} tardanzas anteriores al {fecha_limite}.")
+                            
+                            # Sugerimos hacer un backup inmediatamente después
+                            st.info("El archivo local ahora pesa menos. Ve a la vista de 'Backup' y presiona 'Subir a R2' para actualizar la nube.")
+                    except Exception as e:
+                        st.error(f"Error al limpiar: {e}")
 # JUSTIFICACIONES Y PERMISOS 
 def _aplicar_just_prev(cur, idal, fecha, tipo):
     cur.execute("SELECT id FROM justificaciones_previas "
@@ -6871,19 +6984,48 @@ def vista_mi_cuenta():
 # ─── MENÚ Y RUTAS ──────────────────────────────────────────────────────────
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
+    
     if rol == "Admin":
-        return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
-                "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
-                "Justificaciones y Permisos", "Usuarios", "Backup", "Auditoria",
-                "Mi cuenta"]
+        return [
+            "Puerta", 
+            "Bloqueados", 
+            "Panel Direccion", 
+            "Reportes", 
+            "Alumnos",
+            "Grados y Secciones", 
+            "Carnets", 
+            "Dias especiales", 
+            "Ventanas",
+            "Justificaciones y Permisos", 
+            "Mantenimiento Datos",  # 🆕 Exclusivo del Admin
+            "Usuarios", 
+            "Backup", 
+            "Auditoria",
+            "Mi cuenta"
+        ]
+        
     if rol == "Direccion":
-        return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
-                "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
+        return [
+            "Panel Direccion", 
+            "Bloqueados", 
+            "Reportes", 
+            "Alumnos", 
+            "Carnets",
+            "Dias especiales", 
+            "Justificaciones y Permisos", 
+            "Mi cuenta"
+        ]
+        
     if rol == "Auxiliar":
-        return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes",
-                "Mi cuenta"]
+        return [
+            "Puerta", 
+            "Bloqueados", 
+            "Justificaciones y Permisos", 
+            "Reportes",
+            "Mi cuenta"
+        ]
+        
     return []
-
 
 RUTAS = {
     "Puerta": vista_puerta,
@@ -6900,6 +7042,7 @@ RUTAS = {
     "Auditoria": vista_auditoria,
     "Mi cuenta": vista_mi_cuenta,
     "Justificaciones y Permisos": vista_justificaciones_permisos,
+    "Mantenimiento Datos": vista_mantenimiento_datos, 
 }
 
 
