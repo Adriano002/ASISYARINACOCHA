@@ -3780,14 +3780,9 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    # 🆕 CSS EXCLUSIVO PARA EL DASHBOARD (Solo se carga al entrar aquí)
+    # 🆕 CSS EXCLUSIVO PARA EL DASHBOARD
     st.markdown("""
     <style>
-    /* Contenedor principal */
-    .dash-container {
-        font-family: 'Nunito', sans-serif;
-    }
-    /* Cabecera del Dashboard */
     .dash-header {
         background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
         border-radius: 16px;
@@ -3811,7 +3806,6 @@ def vista_panel_direccion():
         opacity: 0.9;
         font-size: 15px;
     }
-    /* Tarjetas KPI */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -3825,31 +3819,13 @@ def vista_panel_direccion():
         text-align: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         border-bottom: 5px solid #E87B4A;
-        transition: transform 0.2s ease;
     }
-    .kpi-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    }
-    .kpi-icon {
-        font-size: 28px;
-        margin-bottom: 10px;
-        display: block;
-    }
-    .kpi-value {
-        font-size: 36px;
-        font-weight: 800;
-        line-height: 1.1;
-        margin-bottom: 5px;
-    }
+    .kpi-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+    .kpi-value { font-size: 36px; font-weight: 800; line-height: 1.1; margin-bottom: 5px; }
     .kpi-label {
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: #666;
+        font-size: 12px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 1px; color: #666;
     }
-    /* Variantes de color */
     .kpi-exito { border-bottom-color: #22C55E; }
     .kpi-exito .kpi-value { color: #22C55E; }
     .kpi-peligro { border-bottom-color: #EF4444; }
@@ -3858,23 +3834,7 @@ def vista_panel_direccion():
     .kpi-alerta .kpi-value { color: #F59E0B; }
     .kpi-info { border-bottom-color: #3B82F6; }
     .kpi-info .kpi-value { color: #3B82F6; }
-
-    /* Botón de actualizar */
-    .btn-refresh .stButton > button {
-        background: white !important;
-        color: #E87B4A !important;
-        border: 2px solid white !important;
-        border-radius: 30px !important;
-        font-weight: 800 !important;
-        padding: 10px 24px !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    .btn-refresh .stButton > button:hover {
-        background: #FFF0E8 !important;
-        border-color: #E87B4A !important;
-    }
-
-    /* Panel de progreso */
+    
     .progress-container {
         background: white;
         border-radius: 16px;
@@ -3909,7 +3869,6 @@ def vista_panel_direccion():
         st.info("No hay turnos configurados.")
         return
 
-    # Selector de turno (ocultamos la etiqueta para que se vea limpio)
     etiquetas = [f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})" for info in turnos_info]
     sel = st.radio("Turno", etiquetas, horizontal=True, key="panel_dir_turno", label_visibility="collapsed")
     
@@ -3924,98 +3883,96 @@ def vista_panel_direccion():
     # CABECERA (HTML)
     # ==========================================
     color_estado = "#4CAF50" if estado == "activo" else "#F44336"
-    st.markdown(f"""
-    <div class="dash-header">
-        <div>
-            <h1>Panel de Control</h1>
-            <p>Monitoreo en tiempo real del turno <b>{turno['nombre']}</b> — {fecha}</p>
-        </div>
-        <div style="text-align: right;">
-            <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,0.4);">
-                <span style="color: {color_estado}; font-size: 18px;">●</span> {estado.upper()}
-            </span>
-            <p style="margin-top: 8px; font-size: 13px;">Ventana: {ventana['nombre']}</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    # Quitamos la indentación para que Streamlit no lo trate como código
+    html_header = f"""
+<div class="dash-header">
+<div>
+<h1>Panel de Control</h1>
+<p>Monitoreo en tiempo real del turno <b>{turno['nombre']}</b> — {fecha}</p>
+</div>
+<div style="text-align: right;">
+<span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,0.4);">
+<span style="color: {color_estado}; font-size: 18px;">●</span> {estado.upper()}
+</span>
+<p style="margin-top: 8px; font-size: 13px;">Ventana: {ventana['nombre']}</p>
+</div>
+</div>
+"""
+    st.markdown(html_header, unsafe_allow_html=True)
 
     # ==========================================
-    # BOTÓN DE ACTUALIZAR (Nativo pero estilizado)
+    # BOTÓN DE ACTUALIZAR
     # ==========================================
-    st.markdown('<div class="btn-refresh">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([3, 1, 3])
     with c2:
         if st.button("🔄 ACTUALIZAR", width='stretch', key="btn_actualizar_dash"):
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # ==========================================
     # KPIs (HTML)
     # ==========================================
-    # Definimos la lógica de colores para los KPIs
     kpi_puntuales_cls = "kpi-exito"
     kpi_tardanzas_cls = "kpi-alerta" if m["tardanzas"] > 0 else "kpi-exito"
     kpi_faltas_cls = "kpi-peligro" if m["faltas"] > 0 else "kpi-exito"
     kpi_bloqueados_cls = "kpi-peligro" if m["bloqueados"] > 0 else "kpi-exito"
 
-    st.markdown(f"""
-    <div class="dash-container">
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <span class="kpi-icon">👥</span>
-                <div class="kpi-value" style="color: #E87B4A;">{m['total']}</div>
-                <div class="kpi-label">Total Alumnos</div>
-            </div>
-            <div class="kpi-card {kpi_puntuales_cls}">
-                <span class="kpi-icon">✅</span>
-                <div class="kpi-value">{m['puntuales']}</div>
-                <div class="kpi-label">Puntuales</div>
-            </div>
-            <div class="kpi-card {kpi_tardanzas_cls}">
-                <span class="kpi-icon">⏳</span>
-                <div class="kpi-value">{m['tardanzas']}</div>
-                <div class="kpi-label">Tardanzas</div>
-            </div>
-            <div class="kpi-card {kpi_faltas_cls}">
-                <span class="kpi-icon">❌</span>
-                <div class="kpi-value">{m['faltas']}</div>
-                <div class="kpi-label">Faltas</div>
-            </div>
-        </div>
+    html_kpis = f"""
+<div class="kpi-grid">
+<div class="kpi-card">
+<span class="kpi-icon">👥</span>
+<div class="kpi-value" style="color: #E87B4A;">{m['total']}</div>
+<div class="kpi-label">Total Alumnos</div>
+</div>
+<div class="kpi-card {kpi_puntuales_cls}">
+<span class="kpi-icon">✅</span>
+<div class="kpi-value">{m['puntuales']}</div>
+<div class="kpi-label">Puntuales</div>
+</div>
+<div class="kpi-card {kpi_tardanzas_cls}">
+<span class="kpi-icon">⏳</span>
+<div class="kpi-value">{m['tardanzas']}</div>
+<div class="kpi-label">Tardanzas</div>
+</div>
+<div class="kpi-card {kpi_faltas_cls}">
+<span class="kpi-icon">❌</span>
+<div class="kpi-value">{m['faltas']}</div>
+<div class="kpi-label">Faltas</div>
+</div>
+</div>
 
-        <div class="kpi-grid">
-            <div class="kpi-card kpi-info">
-                <span class="kpi-icon">📚</span>
-                <div class="kpi-value">{m['ref_asistio']}</div>
-                <div class="kpi-label">Reforzamiento</div>
-            </div>
-            <div class="kpi-card {kpi_bloqueados_cls}">
-                <span class="kpi-icon">🚫</span>
-                <div class="kpi-value">{m['bloqueados']}</div>
-                <div class="kpi-label">Bloqueados</div>
-            </div>
-            <div class="kpi-card kpi-info">
-                <span class="kpi-icon">📝</span>
-                <div class="kpi-value">{m['justificadas']}</div>
-                <div class="kpi-label">Justificadas</div>
-            </div>
-            <div class="kpi-card kpi-info">
-                <span class="kpi-icon">📄</span>
-                <div class="kpi-value">{m['permisos']}</div>
-                <div class="kpi-label">Permisos</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+<div class="kpi-grid">
+<div class="kpi-card kpi-info">
+<span class="kpi-icon">📚</span>
+<div class="kpi-value">{m['ref_asistio']}</div>
+<div class="kpi-label">Reforzamiento</div>
+</div>
+<div class="kpi-card {kpi_bloqueados_cls}">
+<span class="kpi-icon">🚫</span>
+<div class="kpi-value">{m['bloqueados']}</div>
+<div class="kpi-label">Bloqueados</div>
+</div>
+<div class="kpi-card kpi-info">
+<span class="kpi-icon">📝</span>
+<div class="kpi-value">{m['justificadas']}</div>
+<div class="kpi-label">Justificadas</div>
+</div>
+<div class="kpi-card kpi-info">
+<span class="kpi-icon">📄</span>
+<div class="kpi-value">{m['permisos']}</div>
+<div class="kpi-label">Permisos</div>
+</div>
+</div>
+"""
+    st.markdown(html_kpis, unsafe_allow_html=True)
 
     # ==========================================
-    # BARRAS DE PROGRESO (Nativo estilizado por CSS)
+    # BARRAS DE PROGRESO
     # ==========================================
-    st.markdown('<div class="progress-container">', unsafe_allow_html=True)
-    st.markdown('<div class="progress-title">Progreso de Asistencia del Turno</div>', unsafe_allow_html=True)
+    html_progress_start = '<div class="progress-container"><div class="progress-title">Progreso de Asistencia del Turno</div>'
+    st.markdown(html_progress_start, unsafe_allow_html=True)
     
     total = m["total"] if m["total"] > 0 else 1
-    
     c1, c2, c3 = st.columns(3)
     with c1:
         st.write(f"**Puntuales:** {m['puntuales']} / {m['total']}")
