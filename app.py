@@ -7373,9 +7373,10 @@ def main():
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
-        # 🆕 SIEMPRE descarga la BD más reciente de R2 al arrancar
+        # 🆕 SIEMPRE descarga la BD más reciente de R2 al arrancar (ruta correcta)
         from sync import descargar_bd_si_no_existe
-        descargar_bd_si_no_existe()
+        from db import DB_PATH
+        descargar_bd_si_no_existe(str(DB_PATH))
 
         inicializar_bd()
         aplicar_estilos()
