@@ -2551,20 +2551,21 @@ def pdf_carnet_individual(dni):
     img.save(ib, format="PNG")
     ib.seek(0)
     
-    # Tamaño exacto de un carnet (85mm x 53mm)
+    # 🆕 Tamaño exacto del carnet (85mm x 53mm)
     ANCHO_CARNET = 85 * mm
     ALTO_CARNET = 53 * mm
     
     buf = BytesIO()
+    # 🆕 Le damos un margen de 0 (pero el lienzo es 0.1mm más grande para que no chille)
     doc = SimpleDocTemplate(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET),
                             rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0)
     
-    img_rl = RLImage(ib, width=ANCHO_CARNET, height=ALTO_CARNET)
+    # 🆕 Al ponerlo en 84.9mm y 52.9mm, aseguramos que quepa sin dar error
+    img_rl = RLImage(ib, width=ANCHO_CARNET - 0.2*mm, height=ALTO_CARNET - 0.2*mm)
     doc.build([img_rl])
     
     buf.seek(0)
     return buf.getvalue()
-
 
 def pdf_carnet_alumno(dni):
     from reportlab.platypus import SimpleDocTemplate # 🆕 FIX
