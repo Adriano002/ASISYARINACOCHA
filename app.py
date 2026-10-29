@@ -2523,10 +2523,9 @@ def pdf_carnets_todos():
 
 
 def pdf_carnet_individual(dni):
-    from reportlab.platypus import SimpleDocTemplate
+    from reportlab.platypus import SimpleDocTemplate, Image as RLImage
     from reportlab.lib.pagesizes import mm
     from io import BytesIO
-    from reportlab.platypus import Image as RLImage
     from pathlib import Path
 
     with cursor() as (con, cur):
@@ -2551,17 +2550,16 @@ def pdf_carnet_individual(dni):
     img.save(ib, format="PNG")
     ib.seek(0)
     
-    # 🆕 Tamaño exacto del carnet (85mm x 53mm)
+    # 🆕 Calculamos el tamaño exacto en puntos (ReportLab usa puntos)
     ANCHO_CARNET = 85 * mm
     ALTO_CARNET = 53 * mm
     
     buf = BytesIO()
-    # 🆕 Le damos un margen de 0 (pero el lienzo es 0.1mm más grande para que no chille)
     doc = SimpleDocTemplate(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET),
                             rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0)
     
-    # 🆕 Al ponerlo en 84.9mm y 52.9mm, aseguramos que quepa sin dar error
-    img_rl = RLImage(ib, width=ANCHO_CARNET - 0.2*mm, height=ALTO_CARNET - 0.2*mm)
+    # 🆕 Le quitamos 1 punto (1/72 de pulgada) para que quepa perfecto sin dar error
+    img_rl = RLImage(ib, width=ANCHO_CARNET - 1, height=ALTO_CARNET - 1)
     doc.build([img_rl])
     
     buf.seek(0)
