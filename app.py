@@ -1522,97 +1522,65 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
 
 # MARCAR FALTAS AL CIERRE 
-def marcar_faltas_al_cierre():
+def procesar_faltas_parciales():
+    """
+    Marca faltas a los alumnos cuya ventana de escaneo YA CERRÓ (por ejemplo, la ventana de clases cerró a las 7:10 AM),
+    pero sin esperar a que cierre todo el día. Esto permite generar reportes exactos a cualquier hora.
+    """
+    from db import cursor
+    from datetime import datetime
+    
     fecha_d = hoy_date()
     fecha_str = hoy_str()
-    ha = hora_corta()
-    h_str = hora_corta()
+    h = hora_corta()
     per = obtener_periodo_activo()
     pid = per["id"] if per else None
 
     with cursor() as (con, cur):
-        cur.execute("SELECT id FROM dias_especiales WHERE fecha=? AND activo=1 "
-                    "AND tipo='feriado' LIMIT 1", (fecha_d,))
+        # 1. Si es feriado, no hacer nada
+        cur.execute("SELECT id FROM dias_especiales WHERE fecha=? AND activo=1 AND tipo='feriado' LIMIT 1", (fecha_d,))
         if cur.fetchone():
             return
 
-        cur.execute("SELECT id,turno_id,hora_entrada FROM dias_especiales "
-                    "WHERE fecha=? AND activo=1 AND tipo='evento' LIMIT 1",
-                    (fecha_d,))
-        evento = cur.fetchone()
-        if evento:
-            for t in listar_turnos():
-                if evento["turno_id"] and t["id"] != evento["turno_id"]:
-                    continue
-                for v in listar_ventanas(t["id"]):
-                    if v["tipo"] != VENT_CLASES:
-                        continue
-                    if ha < v["hora_cierre"]:
-                        continue
-                    cur.execute("""
-                        SELECT a.id FROM alumnos a
-                        JOIN secciones s ON a.seccion_id=s.id
-                        WHERE s.turno_id=? AND a.activo=1
-                    """, (t["id"],))
-                    for al in cur.fetchall():
-                        cur.execute("SELECT id FROM asistencias "
-                                    "WHERE alumno_id=? AND fecha=? AND tipo='evento'",
-                                    (al["id"], fecha_d))
-                        if cur.fetchone():
-                            continue
-                        if hay_permiso_activo(al["id"], fecha_str):
-                            cur.execute("""
-                                INSERT INTO asistencias(alumno_id,fecha,ventana_id,
-                                    tipo,hora,estado,justificada,observacion,origen,
-                                    periodo_id,dia_especial_id)
-                                VALUES(?,?,?,'evento',?,?,1,?,?,?,?)
-                            """, (al["id"], fecha_d, v["id"], h_str,
-                                  PERMISO, "Permiso", "manual", pid, evento["id"]))
-                            continue
-                        cur.execute("""
-                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,
-                                tipo,hora,estado,origen,periodo_id,dia_especial_id)
-                            VALUES(?,?,?,'evento',?,?,?,?,?)
-                        """, (al["id"], fecha_d, v["id"], h_str, "Falta",
-                              "auto", pid, evento["id"]))
-            return
-
-        if es_fin_de_semana():
-            return
+        # 2. Recorrer todas las ventanas
         for t in listar_turnos():
             for v in listar_ventanas(t["id"]):
-                if ha < v["hora_cierre"]:
-                    continue
+                # 🛑 CLAVE: Solo procesar si la ventana YA CERRÓ
+                if h < v["hora_cierre"]:
+                    continue 
+
                 tipo = "clases" if v["tipo"] == VENT_CLASES else "reforzamiento"
                 est = "Falta" if v["tipo"] == VENT_CLASES else "No asistio"
+
+                # Buscar alumnos de ese turno
                 cur.execute("""
                     SELECT a.id FROM alumnos a
                     JOIN secciones s ON a.seccion_id=s.id
                     WHERE s.turno_id=? AND a.activo=1
                 """, (t["id"],))
+
                 for al in cur.fetchall():
-                    cur.execute("SELECT id FROM asistencias "
-                                "WHERE alumno_id=? AND fecha=? AND tipo=?",
-                                (al["id"], fecha_d, tipo))
+                    # ¿Ya tiene registro de asistencia?
+                    cur.execute("SELECT id FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo=?", (al["id"], fecha_d, tipo))
                     if cur.fetchone():
-                        continue
+                        continue # Ya escaneó, no hacer nada
+
+                    # Si no tiene registro, verificar si tiene permiso o justificación previa
                     if hay_permiso_activo(al["id"], fecha_str):
                         cur.execute("""
-                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,
-                                tipo,hora,estado,justificada,observacion,origen,
-                                periodo_id)
+                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
                             VALUES(?,?,?,?,?,?,1,?,?,?)
-                        """, (al["id"], fecha_d, v["id"], tipo, h_str,
-                              PERMISO, "Permiso otorgado", "manual", pid))
+                        """, (al["id"], fecha_d, v["id"], tipo, h, PERMISO, "Permiso otorgado", "auto", pid))
                         continue
-                    jp = (_aplicar_just_prev(cur, al["id"], fecha_str, "Falta")
-                          if v["tipo"] == VENT_CLASES else False)
+                        
+                    # Aplicar justificación previa si existe
+                    jp = (_aplicar_just_prev(cur, al["id"], fecha_str, "Falta") if v["tipo"] == VENT_CLASES else False)
+                    
+                    # Marcar Falta
                     cur.execute("""
-                        INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,
-                            hora,estado,justificada,origen,periodo_id)
+                        INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id)
                         VALUES(?,?,?,?,?,?,?,?,?)
-                    """, (al["id"], fecha_d, v["id"], tipo, h_str, est,
-                          1 if jp else 0, "auto", pid))
+                    """, (al["id"], fecha_d, v["id"], tipo, h, est, 1 if jp else 0, "auto", pid))
 
 
 #JUSTIFICAR ASISTENCIA
@@ -2492,82 +2460,143 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
 
 
 def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
-    from reportlab.lib import colors  # 🆕
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, PageBreak, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, PageBreak, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.units import cm
     from io import BytesIO
+    from pathlib import Path
 
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
-                            rightMargin=15, leftMargin=15,
-                            topMargin=20, bottomMargin=20)
+                            rightMargin=1.5*cm, leftMargin=1.5*cm,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm)
     est = getSampleStyleSheet()
+    
+    # Estilos personalizados
+    estilo_titulo = ParagraphStyle(
+        'TituloReporte', parent=est['Heading1'],
+        fontSize=16, textColor=colors.HexColor('#B85C38'), spaceAfter=6, fontName='Helvetica-Bold'
+    )
+    estilo_subtitulo = ParagraphStyle(
+        'SubtituloReporte', parent=est['Heading2'],
+        fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=4, fontName='Helvetica-Bold'
+    )
+    estilo_texto = ParagraphStyle(
+        'TextoReporte', parent=est['Normal'],
+        fontSize=9, textColor=colors.HexColor('#666666'), fontName='Helvetica'
+    )
+
     el = []
     primera = True
+    escudo_path = Path("escudo.png")
+
     for nombre_hoja, bloques in hojas.items():
         if not primera:
             el.append(PageBreak())
         primera = False
-        el.append(Paragraph(f"<b>{titulo_base}</b>", est["Heading2"]))
-        el.append(Paragraph(f"<b>{nombre_hoja}</b>", est["Heading3"]))
-        el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
-                            est["Normal"]))
-        el.append(Spacer(1, 10))
+
+        # ─── CABECERA ELEGANTE CON ESCUDO A LA DERECHA ───
+        cabecera_data = []
+        if escudo_path.exists():
+            try:
+                img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
+                cabecera_data = [[
+                    Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')} - Los alumnos que lleguen después no figuran.</font>", estilo_titulo),
+                    img_escudo
+                ]]
+            except Exception:
+                pass
+        
+        if not cabecera_data:
+            cabecera_data = [[
+                Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')}</font>", estilo_titulo),
+                ""
+            ]]
+
+        tabla_cabecera = Table(cabecera_data, colWidths=[18*cm, 3*cm])
+        tabla_cabecera.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('LINEBELOW', (0, 0), (-1, -1), 1.5, colors.HexColor('#B85C38')),
+        ]))
+        el.append(tabla_cabecera)
+        el.append(Spacer(1, 12))
 
         es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
 
         for titulo_bloque, df in bloques:
-            el.append(Paragraph(f"<b>{titulo_bloque}</b>", est["Heading4"]))
-            el.append(Spacer(1, 4))
+            el.append(Paragraph(f"<b>{titulo_bloque}</b>", estilo_subtitulo))
+            el.append(Spacer(1, 6))
+            
             if df is None or df.empty:
-                el.append(Paragraph("Sin faltas registradas.", est["Normal"]))
+                el.append(Paragraph("Sin registros para mostrar.", estilo_texto))
                 el.append(Spacer(1, 10))
                 continue
 
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
-            at = A4[1] - 30
+            at = 21 * cm # Ancho total disponible (A4 ancho - margenes)
 
             if es_hoja_faltas:
-                ancho_grado = 1.6 * 28.35
+                # Hoja de faltas: 4 columnas (Grado, Alumno, Grado, Alumno)
+                ancho_grado = 2.0 * cm
                 ancho_alumno = (at - 2 * ancho_grado) / 2
-                col_widths = [ancho_grado, ancho_alumno,
-                              ancho_grado, ancho_alumno]
+                col_widths = [ancho_grado, ancho_alumno, ancho_grado, ancho_alumno]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                    ("LINEAFTER", (1, 0), (1, -1), 1.5, colors.black),
-                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor("#E8F5E9")),
-                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor("#FFEBEE")),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#4CAF50')), # Verde para justificados
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#F44336')), # Rojo para injustificados
+                    ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                    ("ALIGN", (2, 0), (2, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ]
                 for i in range(1, len(datos)):
                     if i % 2 == 0:
-                        estilos.append(("BACKGROUND", (0, i), (1, i),
-                                        colors.HexColor("#F1F8E9")))
-                        estilos.append(("BACKGROUND", (2, i), (3, i),
-                                        colors.HexColor("#FFF3E0")))
+                        estilos.append(("BACKGROUND", (0, i), (1, i), colors.HexColor("#F1F8E9")))
+                        estilos.append(("BACKGROUND", (2, i), (3, i), colors.HexColor("#FFF3E0")))
                 t.setStyle(TableStyle(estilos))
             else:
+                # Reportes normales: Ajuste inteligente de columnas
                 n_cols = len(df.columns)
-                ac = at / n_cols
-                t = Table(datos, colWidths=[ac] * n_cols, repeatRows=1)
+                col_widths = []
+                for col in df.columns:
+                    cl = str(col).lower()
+                    if "apellido" in cl or "nombre" in cl or "alumno" in cl:
+                        col_widths.append(at * 0.35) # 35% para nombres
+                    elif "observacion" in cl:
+                        col_widths.append(at * 0.25) # 25% para observaciones
+                    elif "grado" in cl or "seccion" in cl or "turno" in cl or "estado" in cl:
+                        col_widths.append(at * 0.10) # 10% para grado/seccion/estado
+                    else:
+                        col_widths.append(at * 0.20) # 20% para el resto
+                
+                # Normalizar para que sumen exactamente el ancho total
+                total_w = sum(col_widths)
+                col_widths = [(w / total_w) * at for w in col_widths]
+                
+                t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')), # Naranja institucional
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]
+                
+                # Colorear celdas de estado (P, T, F)
                 col_estado = None
                 for j, c in enumerate(df.columns):
                     if str(c).lower() == "estado":
@@ -2584,16 +2613,14 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                     for i in range(1, len(datos)):
                         val = str(datos[i][col_estado]).strip().upper()
                         if val in mapa:
-                            estilos.append(
-                                ("TEXTCOLOR", (col_estado, i),
-                                 (col_estado, i), mapa[val]))
-                            estilos.append(
-                                ("FONTNAME", (col_estado, i),
-                                 (col_estado, i), "Helvetica-Bold"))
+                            estilos.append(("TEXTCOLOR", (col_estado, i), (col_estado, i), mapa[val]))
+                            estilos.append(("FONTNAME", (col_estado, i), (col_estado, i), "Helvetica-Bold"))
+                
                 t.setStyle(TableStyle(estilos))
 
             el.append(t)
             el.append(Spacer(1, 12))
+    
     doc.build(el)
     buf.seek(0)
     return buf.getvalue()
@@ -3039,72 +3066,108 @@ def generar_qr(dni, size=220):
 
 
 def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
-    from reportlab.lib import colors  # 🆕
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.units import cm
     from io import BytesIO
+    from pathlib import Path
 
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
-                            rightMargin=15, leftMargin=15,
-                            topMargin=20, bottomMargin=20)
+                            rightMargin=1.5*cm, leftMargin=1.5*cm,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm)
     est = getSampleStyleSheet()
-    el = [Paragraph(f"<b>{titulo}</b>", est["Heading1"])]
+    
+    estilo_titulo = ParagraphStyle('Titulo', parent=est['Heading1'], fontSize=16, textColor=colors.HexColor('#B85C38'), fontName='Helvetica-Bold')
+    estilo_sub = ParagraphStyle('Sub', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#666666'))
+
+    el = []
+    escudo_path = Path("escudo.png")
+
+    # Cabecera elegante
+    cab_data = []
+    if escudo_path.exists():
+        try:
+            img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
+            cab_data = [[Paragraph(f"<b>{titulo}</b>", estilo_titulo), img_escudo]]
+        except Exception:
+            pass
+    
+    if not cab_data:
+        cab_data = [[Paragraph(f"<b>{titulo}</b>", estilo_titulo), ""]]
+
+    t_cab = Table(cab_data, colWidths=[18*cm, 3*cm])
+    t_cab.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 1.5, colors.HexColor('#B85C38')),
+    ]))
+    el.append(t_cab)
+    
     if subtitulo:
-        el.append(Paragraph(subtitulo, est["Normal"]))
-    el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
-                        est["Normal"]))
+        el.append(Paragraph(subtitulo, estilo_sub))
+    el.append(Paragraph(f"Generado hasta: {ahora().strftime('%Y-%m-%d %H:%M:%S')}", estilo_sub))
     el.append(Spacer(1, 12))
+
     if not df.empty:
         datos = [df.columns.tolist()] + df.astype(str).values.tolist()
+        at = 21 * cm
+        
+        # Ajuste de anchos inteligente
         anchos = []
         for col in df.columns:
             cl = str(col).lower()
-            if any(k in cl for k in ["auxiliar", "apellido", "nombres",
-                                      "alumno", "observacion"]):
+            if any(k in cl for k in ["auxiliar", "apellido", "nombres", "alumno", "observacion"]):
                 anchos.append(3.5)
-            elif any(k in cl for k in ["grado", "seccion", "turno",
-                                        "tipo", "estado"]):
+            elif any(k in cl for k in ["grado", "seccion", "turno", "tipo", "estado"]):
                 anchos.append(1.5)
             elif any(k in cl for k in ["fecha", "hora"]):
                 anchos.append(1.8)
             else:
                 anchos.append(1.0)
-        at = A4[1] - 30
+        
         sm = sum(anchos)
         anchos = [a * at / sm for a in anchos]
-        GRIS = colors.HexColor("#FAFAFA")
+        
         if fuente_chica:
             fc = ff = 6
             pad = 3
         else:
-            fc = 11
-            ff = 10
-            pad = 5
+            fc = 9
+            ff = 8
+            pad = 4
+            
         t = Table(datos, colWidths=anchos, repeatRows=1)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), fc),
             ("FONTSIZE", (0, 1), (-1, -1), ff),
-            ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.black),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')),
+            ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.HexColor('#B85C38')),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("LEFTPADDING", (0, 0), (-1, -1), pad),
             ("RIGHTPADDING", (0, 0), (-1, -1), pad),
             ("TOPPADDING", (0, 0), (-1, -1), pad),
             ("BOTTOMPADDING", (0, 0), (-1, -1), pad),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRIS]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
         ]))
         el.append(t)
+    else:
+        el.append(Paragraph("Sin datos para mostrar.", estilo_sub))
+
     doc.build(el)
     buf.seek(0)
     return buf.getvalue()
 
 
 def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
-    from reportlab.lib import colors  # 🆕
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import SimpleDocTemplate, PageBreak, Paragraph, Spacer, Table, TableStyle
@@ -3123,8 +3186,10 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
         primera = False
         el.append(Paragraph(f"<b>{titulo_base}</b>", est["Heading2"]))
         el.append(Paragraph(f"<b>{nombre_hoja}</b>", est["Heading3"]))
-        el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
-                            est["Normal"]))
+        
+        # 🆕 AQUI SE MUESTRA LA HORA EXACTA CON SEGUNDOS
+        el.append(Paragraph(f"<b>Reporte generado hasta las:</b> {ahora().strftime('%H:%M:%S')} - <i>Los alumnos que lleguen después de esta hora no figuran en este documento.</i>", est["Normal"]))
+        
         el.append(Spacer(1, 10))
 
         es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
@@ -3143,8 +3208,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             if es_hoja_faltas:
                 ancho_grado = 1.6 * 28.35
                 ancho_alumno = (at - 2 * ancho_grado) / 2
-                col_widths = [ancho_grado, ancho_alumno,
-                              ancho_grado, ancho_alumno]
+                col_widths = [ancho_grado, ancho_alumno, ancho_grado, ancho_alumno]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -3161,10 +3225,8 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 ]
                 for i in range(1, len(datos)):
                     if i % 2 == 0:
-                        estilos.append(("BACKGROUND", (0, i), (1, i),
-                                        colors.HexColor("#F1F8E9")))
-                        estilos.append(("BACKGROUND", (2, i), (3, i),
-                                        colors.HexColor("#FFF3E0")))
+                        estilos.append(("BACKGROUND", (0, i), (1, i), colors.HexColor("#F1F8E9")))
+                        estilos.append(("BACKGROUND", (2, i), (3, i), colors.HexColor("#FFF3E0")))
                 t.setStyle(TableStyle(estilos))
             else:
                 n_cols = len(df.columns)
@@ -3196,12 +3258,8 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                     for i in range(1, len(datos)):
                         val = str(datos[i][col_estado]).strip().upper()
                         if val in mapa:
-                            estilos.append(
-                                ("TEXTCOLOR", (col_estado, i),
-                                 (col_estado, i), mapa[val]))
-                            estilos.append(
-                                ("FONTNAME", (col_estado, i),
-                                 (col_estado, i), "Helvetica-Bold"))
+                            estilos.append(("TEXTCOLOR", (col_estado, i), (col_estado, i), mapa[val]))
+                            estilos.append(("FONTNAME", (col_estado, i), (col_estado, i), "Helvetica-Bold"))
                 t.setStyle(TableStyle(estilos))
 
             el.append(t)
@@ -4177,6 +4235,9 @@ def _rep_pantalla_tipos(idsec):
 
 
 def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
+    # 🆕 FORZAR ACTUALIZACIÓN DE FALTAS ANTES DE GENERAR REPORTE
+    procesar_faltas_parciales()
+
     with cursor() as (con, cur):
         cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
                        t.nombre AS turno FROM secciones s
@@ -4197,10 +4258,12 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
     if tipo == "diario":
         st.subheader(f"Reporte Diario - {sec['grado']} {sec['seccion']}")
         
-        # SELECTOR DE FECHA
+        # 🆕 SELECTOR DE FECHA
         fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
         fecha_str = fecha_sel.strftime("%Y-%m-%d")
         
+        st.error(f"⚠️ **ATENCIÓN AUXILIAR:** Este reporte es una 'foto' de la asistencia hasta las **{ahora().strftime('%H:%M:%S')}**. Si descarga el reporte antes de que cierren las ventanas, los alumnos que lleguen después aparecerán como FALTA. Para un reporte EXACTO, descárguelo al final del turno.")
+
         hojas = _generar_hojas_diario(fecha_str, [idsec])
         if not hojas:
             st.info(f"Sin datos para el día {fecha_str}.")
@@ -4230,25 +4293,25 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         hoy = ahora().date()
         st.subheader(f"Cierre Mensual - {sec['grado']} {sec['seccion']}")
         
-        #SELECTOR DE MES Y AÑO
+        # 🆕 SELECTOR DE MES Y AÑO
         c1, c2 = st.columns(2)
         with c1:
             mes_sel = st.selectbox("Mes", range(1, 13), index=hoy.month - 1, format_func=lambda x: MESES_ES[x], key="rep_mes_sel")
         with c2:
-            año_sel = st.number_input("Año", min_value=2020, max_value=2030, value=hoy.year, key="rep_año_sel")
+            ano_sel = st.number_input("Año", min_value=2020, max_value=2030, value=hoy.year, key="rep_ano_sel")
             
-        hojas = _generar_hojas_mensual(mes_sel, año_sel, [idsec])
+        hojas = _generar_hojas_mensual(mes_sel, ano_sel, [idsec])
         if not hojas:
             st.info("Sin datos para este mes.")
             return
             
         pdf = generar_pdf_multilhoja(
-            hojas, f"Cierre Mensual {MESES_ES[mes_sel]} {año_sel}")
+            hojas, f"Cierre Mensual {MESES_ES[mes_sel]} {ano_sel}")
         c1, c2 = st.columns(2)
         with c1:
             st.download_button(
                 "Descargar PDF", pdf,
-                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{año_sel}.pdf",
+                f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.pdf",
                 "application/pdf", key="rep_dl_mensual_pdf", type="primary")
         with c2:
             hojas_xlsx = {}
@@ -4259,7 +4322,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
                 st.download_button(
                     "Descargar Excel",
                     df_a_xlsx_multilhoja(hojas_xlsx),
-                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{año_sel}.xlsx",
+                    f"Cierre_mensual_{sec['grado']}_{sec['seccion']}_{MESES_ES[mes_sel]}_{ano_sel}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="rep_dl_mensual_xlsx")
                     
