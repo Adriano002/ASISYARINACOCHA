@@ -13,20 +13,25 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     css="""
     #qr-wrapper {
         width: 100%;
-        max-width: 500px;
+        max-width: 340px; /* 🆕 Achicamos el ancho para que no ocupe toda la pantalla */
         margin: 0 auto;
     }
     #qr-reader {
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: hidden;
-        border: 2px solid #E65100;
+        border: 3px solid #E65100;
         background: #000;
-        min-height: 260px;
+        height: 320px; /* 🆕 Altura fija para evitar que se estire hacia abajo */
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     #qr-reader video {
-        border-radius: 6px;
+        border-radius: 8px;
         width: 100% !important;
-        height: auto !important;
+        height: 100% !important;
+        object-fit: cover; /* 🆕 Llena la caja sin distorsionar */
     }
     #qr-status {
         text-align: center;
@@ -180,7 +185,6 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
             setTimeout(() => {
                 if (!iniciado) return;
 
-                // 🆕 Usamos Html5Qrcode crudo (como en Incidencias) para evitar NotReadableError
                 try {
                     scanner = new Html5Qrcode("qr-reader", { verbose: false });
                     scanner.start(
