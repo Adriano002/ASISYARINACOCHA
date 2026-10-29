@@ -3201,48 +3201,144 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     return buf.getvalue()
 
 def pdf_resumen_alumno(idal):
-    from reportlab.lib import colors  # 🆕
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.units import cm
     from io import BytesIO
+    from pathlib import Path
 
     d = perfil_alumno_datos(idal)
     if not d:
         return None
     al = d["alumno"]
+    
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=30, leftMargin=30,
-                            topMargin=30, bottomMargin=30)
+    
+    # 🆕 DISEÑO PREMIUM CON ESCUDO Y MARCA DE AGUA
+    def _pie_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#C4562A'))
+        canvas.setLineWidth(1)
+        canvas.line(2*cm, 2*cm, 19*cm, 2*cm)
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#888888'))
+        canvas.drawString(2*cm, 1.5*cm, "Documento oficial generado por el Sistema de Asistencia I.E. Yarinacocha.")
+        canvas.drawRightString(19*cm, 1.5*cm, f"Página {doc.page}")
+        
+        escudo_path = Path("escudo.png")
+        if escudo_path.exists():
+            try:
+                canvas.saveState()
+                canvas.setFillAlpha(0.05)
+                canvas.drawImage(str(escudo_path), 5.5*cm, 10*cm, width=10*cm, height=10*cm, mask='auto')
+                canvas.restoreState()
+            except Exception:
+                pass
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2.5*cm)
     est = getSampleStyleSheet()
+    
+    estilo_titulo = ParagraphStyle('Titulo', parent=est['Heading1'], fontSize=18, textColor=colors.HexColor('#C4562A'), fontName='Helvetica-Bold')
+    estilo_sub = ParagraphStyle('Sub', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#666666'))
+    estilo_label = ParagraphStyle('Label', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#444444'), fontName='Helvetica-Bold')
+
     el = []
-    el.append(Paragraph("<b>Reporte de Asistencia</b>", est["Heading1"]))
-    el.append(Paragraph("I.E. Yarinacocha", est["Normal"]))
-    el.append(Spacer(1, 20))
-    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") +
-              ", " + al['nombres'])
-    el.append(Paragraph(f"<b>Alumno:</b> {nombre}", est["Normal"]))
-    el.append(Paragraph(f"<b>DNI:</b> {al['dni']}", est["Normal"]))
-    el.append(Paragraph(
-        f"<b>Grado:</b> {al['grado']} {al['seccion']} - {al['turno']}",
-        est["Normal"]))
-    el.append(Spacer(1, 15))
-    el.append(Paragraph("<b>Resumen</b>", est["Heading2"]))
-    resumen = [["Puntuales", "Tardanzas", "Faltas", "Reforzamiento", "Tard. injust."],
-               [d["total_puntuales"], d["total_tardanzas"], d["total_faltas"],
-                d["total_ref_asistio"], d["tard_injust"]]]
-    t = Table(resumen)
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(C_PRIMARIO)),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+    escudo_path = Path("escudo.png")
+
+    # CABECERA
+    cab_data = []
+    if escudo_path.exists():
+        try:
+            img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
+            cab_data = [[Paragraph("<b>RESUMEN DE ASISTENCIA</b>", estilo_titulo), img_escudo]]
+        except Exception:
+            pass
+    
+    if not cab_data:
+        cab_data = [[Paragraph("<b>RESUMEN DE ASISTENCIA</b>", estilo_titulo), ""]]
+
+    t_cab = Table(cab_data, colWidths=[14.5*cm, 2.5*cm])
+    t_cab.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#C4562A')),
     ]))
+    el.append(t_cab)
+    
+    nombre_aux = st.session_state.get("user", {}).get("nombres", "Sistema")
+    el.append(Paragraph(f"Generado por: <b>{nombre_aux}</b> | {ahora().strftime('%Y-%m-%d %H:%M:%S')}", estilo_sub))
+    el.append(Spacer(1, 15))
+
+    # DATOS DEL ALUMNO
+    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres'])
+    
+    datos_alumno = [
+        [Paragraph("Alumno:", estilo_label), Paragraph(nombre, estilo_sub)],
+        [Paragraph("DNI:", estilo_label), Paragraph(str(al['dni']), estilo_sub)],
+        [Paragraph("Grado:", estilo_label), Paragraph(f"{al['grado']} {al['seccion']} - Turno {al['turno']}", estilo_sub)],
+    ]
+    
+    t_alumno = Table(datos_alumno, colWidths=[3*cm, 14*cm])
+    t_alumno.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    el.append(t_alumno)
+    el.append(Spacer(1, 20))
+
+    # TABLA DE RESUMEN ESTADÍSTICO
+    el.append(Paragraph("<b>Resumen Estadístico</b>", estilo_titulo))
+    el.append(Spacer(1, 10))
+    
+    resumen = [
+        ["Puntuales", "Tardanzas", "Faltas", "Reforzamiento", "Tard. Injust."],
+        [
+            d["total_puntuales"], 
+            d["total_tardanzas"], 
+            d["total_faltas"],
+            d["total_ref_asistio"], 
+            d["tard_injust"]
+        ]
+    ]
+    
+    t = Table(resumen, colWidths=[3.4*cm]*5)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#C4562A')),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("FONTSIZE", (0, 1), (-1, -1), 16),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 1), (-1, 1), 15),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 15),
+    ]))
+    
+    # Pintar los números de colores
+    t.setStyle(TableStyle([
+        ("TEXTCOLOR", (0, 1), (0, 1), colors.HexColor("#2E7D32")), # Verde
+        ("TEXTCOLOR", (1, 1), (1, 1), colors.HexColor("#F57F17")), # Naranja
+        ("TEXTCOLOR", (2, 1), (2, 1), colors.HexColor("#C62828")), # Rojo
+        ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#1565C0")), # Azul
+        ("TEXTCOLOR", (4, 1), (4, 1), colors.HexColor("#C62828")), # Rojo
+    ]))
+    
     el.append(t)
-    doc.build(el)
+
+    doc.build(el, onFirstPage=_pie_pagina, onLaterPages=_pie_pagina)
     buf.seek(0)
     return buf.getvalue()
-
 
 # EXCEL
 def df_a_xlsx(df, hoja="Datos"):
