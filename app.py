@@ -3246,18 +3246,84 @@ def pdf_resumen_alumno(idal):
 
 # EXCEL
 def df_a_xlsx(df, hoja="Datos"):
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from io import BytesIO
+
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
         df.to_excel(w, index=False, sheet_name=hoja)
+        
+        # 🆕 MAGIA DE OPENPYXL (Filtros y Diseño)
+        workbook = w.book
+        worksheet = workbook[hoja]
+        
+        # 1. Filtros automáticos (Las flechitas)
+        worksheet.auto_filter.ref = worksheet.dimensions
+        
+        # 2. Estilo de la cabecera
+        header_fill = PatternFill(start_color="C4562A", end_color="C4562A", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        for cell in worksheet[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+        # 3. Auto-ajustar el ancho de las columnas
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter # Obtener la letra de la columna
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            worksheet.column_dimensions[column].width = adjusted_width
+
     buf.seek(0)
     return buf.getvalue()
 
 
 def df_a_xlsx_multilhoja(hojas):
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from io import BytesIO
+
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
         for n, df in hojas.items():
             df.to_excel(w, index=False, sheet_name=n[:31])
+            
+            # 🆕 APLICAR FORMATO A CADA HOJA
+            worksheet = w.book[n[:31]]
+            
+            # 1. Filtros automáticos
+            worksheet.auto_filter.ref = worksheet.dimensions
+            
+            # 2. Cabecera bonita
+            header_fill = PatternFill(start_color="C4562A", end_color="C4562A", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True)
+            
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+            # 3. Auto-ajustar columnas
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                worksheet.column_dimensions[column].width = adjusted_width
+
     buf.seek(0)
     return buf.getvalue()
 
