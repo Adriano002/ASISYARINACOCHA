@@ -3216,7 +3216,7 @@ def pdf_resumen_alumno(idal):
     
     buf = BytesIO()
     
-    # 🆕 DISEÑO PREMIUM CON ESCUDO Y MARCA DE AGUA
+    # PIE DE PÁGINA Y MARCA DE AGUA
     def _pie_pagina(canvas, doc):
         canvas.saveState()
         canvas.setStrokeColor(colors.HexColor('#C4562A'))
@@ -3246,6 +3246,7 @@ def pdf_resumen_alumno(idal):
     estilo_titulo = ParagraphStyle('Titulo', parent=est['Heading1'], fontSize=18, textColor=colors.HexColor('#C4562A'), fontName='Helvetica-Bold')
     estilo_sub = ParagraphStyle('Sub', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#666666'))
     estilo_label = ParagraphStyle('Label', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#444444'), fontName='Helvetica-Bold')
+    estilo_bloque = ParagraphStyle('Bloque', parent=est['Heading3'], fontSize=12, textColor=colors.HexColor('#C4562A'), spaceBefore=15, spaceAfter=8, fontName='Helvetica-Bold')
 
     el = []
     escudo_path = Path("escudo.png")
@@ -3255,12 +3256,12 @@ def pdf_resumen_alumno(idal):
     if escudo_path.exists():
         try:
             img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
-            cab_data = [[Paragraph("<b>RESUMEN DE ASISTENCIA</b>", estilo_titulo), img_escudo]]
+            cab_data = [[Paragraph("<b>REPORTE INDIVIDUAL DE ASISTENCIA</b>", estilo_titulo), img_escudo]]
         except Exception:
             pass
     
     if not cab_data:
-        cab_data = [[Paragraph("<b>RESUMEN DE ASISTENCIA</b>", estilo_titulo), ""]]
+        cab_data = [[Paragraph("<b>REPORTE INDIVIDUAL DE ASISTENCIA</b>", estilo_titulo), ""]]
 
     t_cab = Table(cab_data, colWidths=[14.5*cm, 2.5*cm])
     t_cab.setStyle(TableStyle([
@@ -3282,6 +3283,7 @@ def pdf_resumen_alumno(idal):
         [Paragraph("Alumno:", estilo_label), Paragraph(nombre, estilo_sub)],
         [Paragraph("DNI:", estilo_label), Paragraph(str(al['dni']), estilo_sub)],
         [Paragraph("Grado:", estilo_label), Paragraph(f"{al['grado']} {al['seccion']} - Turno {al['turno']}", estilo_sub)],
+        [Paragraph("Apoderado:", estilo_label), Paragraph(f"{al.get('nombre_apoderado') or '-'} (Tel: {al.get('telefono_apoderado') or '-'})", estilo_sub)],
     ]
     
     t_alumno = Table(datos_alumno, colWidths=[3*cm, 14*cm])
@@ -3293,19 +3295,13 @@ def pdf_resumen_alumno(idal):
     el.append(t_alumno)
     el.append(Spacer(1, 20))
 
-    # TABLA DE RESUMEN ESTADÍSTICO
+    # CUADRO DE NÚMEROS
     el.append(Paragraph("<b>Resumen Estadístico</b>", estilo_titulo))
     el.append(Spacer(1, 10))
     
     resumen = [
         ["Puntuales", "Tardanzas", "Faltas", "Reforzamiento", "Tard. Injust."],
-        [
-            d["total_puntuales"], 
-            d["total_tardanzas"], 
-            d["total_faltas"],
-            d["total_ref_asistio"], 
-            d["tard_injust"]
-        ]
+        [d["total_puntuales"], d["total_tardanzas"], d["total_faltas"], d["total_ref_asistio"], d["tard_injust"]]
     ]
     
     t = Table(resumen, colWidths=[3.4*cm]*5)
@@ -3323,18 +3319,74 @@ def pdf_resumen_alumno(idal):
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 1), (-1, 1), 15),
         ("BOTTOMPADDING", (0, 1), (-1, 1), 15),
+        # Colores de números
+        ("TEXTCOLOR", (0, 1), (0, 1), colors.HexColor("#2E7D32")),
+        ("TEXTCOLOR", (1, 1), (1, 1), colors.HexColor("#F57F17")),
+        ("TEXTCOLOR", (2, 1), (2, 1), colors.HexColor("#C62828")),
+        ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#1565C0")),
+        ("TEXTCOLOR", (4, 1), (4, 1), colors.HexColor("#C62828")),
     ]))
-    
-    # Pintar los números de colores
-    t.setStyle(TableStyle([
-        ("TEXTCOLOR", (0, 1), (0, 1), colors.HexColor("#2E7D32")), # Verde
-        ("TEXTCOLOR", (1, 1), (1, 1), colors.HexColor("#F57F17")), # Naranja
-        ("TEXTCOLOR", (2, 1), (2, 1), colors.HexColor("#C62828")), # Rojo
-        ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#1565C0")), # Azul
-        ("TEXTCOLOR", (4, 1), (4, 1), colors.HexColor("#C62828")), # Rojo
-    ]))
-    
     el.append(t)
+
+    # 🆕 TABLA DE HISTORIAL DETALLADO
+    df_ast = d.get("asistencias")
+    if df_ast is not None and not df_ast.empty:
+        el.append(Paragraph("<b>Historial Detallado de Asistencias</b>", estilo_bloque))
+        
+        # Preparamos los datos para la tabla
+        filas_tabla = [["Fecha", "Tipo", "Estado", "Observación"]]
+        
+        # Mostramos solo los últimos 100 para no hacer un PDF de 50 páginas de golpe
+        # (Si quieres todos, puedes quitar el .head(100))
+        for _, row in df_ast.head(100).iterrows():
+            f_str = fmt_date(row['fecha'])
+            tipo_str = str(row['tipo']).capitalize()
+            
+            # Si fue un evento, le agregamos el nombre
+            if str(row['tipo']).lower() == "evento" and row.get("evento_nombre"):
+                tipo_str = f"Evento ({row['evento_nombre']})"
+                
+            estado_str = str(row['estado'])
+            obs = "Justificada" if row['justificada'] == 1 else "Sin justificar"
+            if estado_str == "Puntual":
+                obs = "-"
+                
+            filas_tabla.append([f_str, tipo_str, estado_str, obs])
+            
+        t_hist = Table(filas_tabla, colWidths=[3*cm, 5*cm, 4*cm, 5*cm], repeatRows=1)
+        
+        estilos_hist = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor('#333333')),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor('#E0E0E0')),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
+        ]
+        
+        # Pintar los estados de colores
+        for i in range(1, len(filas_tabla)):
+            estado = filas_tabla[i][2]
+            if estado == "Puntual":
+                estilos_hist.append(("TEXTCOLOR", (2, i), (2, i), colors.HexColor("#2E7D32")))
+            elif estado == "Tardanza":
+                estilos_hist.append(("TEXTCOLOR", (2, i), (2, i), colors.HexColor("#F57F17")))
+            elif estado == "Falta":
+                estilos_hist.append(("TEXTCOLOR", (2, i), (2, i), colors.HexColor("#C62828")))
+            elif estado == "Permiso":
+                estilos_hist.append(("TEXTCOLOR", (2, i), (2, i), colors.HexColor("#1565C0")))
+                
+        t_hist.setStyle(TableStyle(estilos_hist))
+        el.append(t_hist)
+        
+        # Aviso si hay más de 100
+        if len(df_ast) > 100:
+            el.append(Spacer(1, 5))
+            el.append(Paragraph(f"<i>Mostrando los últimos 100 registros de {len(df_ast)} en total. Para ver el historial completo, descargue el Excel.</i>", estilo_sub))
 
     doc.build(el, onFirstPage=_pie_pagina, onLaterPages=_pie_pagina)
     buf.seek(0)
