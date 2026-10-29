@@ -3407,6 +3407,8 @@ def _generar_hojas_diario(fecha, ids_secs):
             sec = cur.fetchone()
         if not sec:
             continue
+        
+        # Preparamos los datos (MANTENIENDO LA COLUMNA "N")
         df_clases = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
             a.nombres AS Nombres,
@@ -3424,6 +3426,7 @@ def _generar_hojas_diario(fecha, ids_secs):
             WHERE a.seccion_id=? AND a.activo=1
             ORDER BY a.apellido_paterno,a.apellido_materno
         """, (to_date(fecha), idsec))
+        
         if not df_clases.empty:
             df_clases.insert(0, "N", range(1, len(df_clases) + 1))
 
@@ -3435,6 +3438,7 @@ def _generar_hojas_diario(fecha, ids_secs):
               AND ast.tipo='reforzamiento' AND ast.estado='Asistio'
             ORDER BY a.apellido_paterno
         """, (idsec, to_date(fecha)))
+        
         if not df_ref.empty:
             df_ref.insert(0, "N", range(1, len(df_ref) + 1))
 
