@@ -4101,26 +4101,44 @@ def _frag_editar_alumno():
 
 
 def _frag_listar_alumnos():
+    # 1. Mostramos los filtros
     idg, ids, texto = filtros_grado_seccion_nombre("list_al")
-    df = buscar_alumnos(texto, idg, ids, limite=5000)
-    st.write(f"{len(df)} alumnos")
-    if df.empty:
-        st.info("Sin resultados.")
-        return
-    mostrar = st.checkbox("Mostrar todos", value=False)
-    lim = len(df) if mostrar else 50
-    for _, al in df.head(lim).iterrows():
-        c1, c2 = st.columns([5, 1])
-        c1.markdown(
-            f"**{al['nombre_completo']}** &nbsp; "
-            f"<span style='color:#B85C38; font-weight:700;'>{al['grado']} "
-            f"{al['seccion']}</span> "
-            f"<span style='color:#757575;'>({al['turno']})</span>",
-            unsafe_allow_html=True)
-        if c2.button("Ver perfil", key="perfil_" + str(al['id'])):
-            st.session_state["perfil_alumno_id"] = al["id"]
-            st.rerun()
+    
+    # 2. Botón para ejecutar la búsqueda
+    st.markdown("---")
+    if st.button("🔍 Buscar Alumnos", type="primary", width='stretch'):
+        st.session_state["_realizar_busqueda_alumnos"] = True
 
+    # 3. Solo mostramos la tabla si se presionó el botón
+    if st.session_state.get("_realizar_busqueda_alumnos"):
+        # Si no hay filtros aplicados, pedimos que seleccione algo
+        if not idg and not ids and not texto:
+            st.info("Selecciona un grado, una sección o escribe un nombre para buscar.")
+            return
+
+        df = buscar_alumnos(texto, idg, ids, limite=500)
+        
+        st.write(f"**{len(df)} alumnos encontrados**")
+        if df.empty:
+            st.info("Sin resultados para esta búsqueda.")
+            return
+
+        # Mostramos la tabla ligera
+        df_mostrar = df[['nombre_completo', 'grado', 'seccion', 'turno', 'dni']].copy()
+        df_mostrar.columns = ["Apellidos y Nombres", "Grado", "Sección", "Turno", "DNI"]
+        st.dataframe(df_mostrar, width='stretch', hide_index=True)
+
+        st.markdown("---")
+        st.subheader("Ver perfil de un alumno")
+        
+        # Selector para elegir al alumno de la lista filtrada
+        ops = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df.iterrows()}
+        sel = st.selectbox("Selecciona el alumno", list(ops.keys()), key="perfil_sel_lista")
+        
+        if st.button("Ver perfil completo", width='stretch'):
+            st.session_state["perfil_alumno_id"] = ops[sel]
+            st.session_state["_realizar_busqueda_alumnos"] = False # Limpiamos la memoria
+            st.rerun()
 
 def _perfil_alumno(idal):
     d = perfil_alumno_datos(idal)
