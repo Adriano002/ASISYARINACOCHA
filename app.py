@@ -1084,73 +1084,67 @@ def vista_mantenimiento_datos():
         
         clave = "mant_sel"
         idsec = _selector_grado_seccion(clave, "Elige el grado")
-        if not idsec:
-            return
         
-        with cursor() as (con, cur):
-            cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
-                           t.nombre AS turno FROM secciones s
-                           JOIN grados g ON s.grado_id=g.id
-                           JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
-                        (idsec,))
-            sec = cur.fetchone()
-            
-        if not sec:
-            st.warning("Seccion no encontrada.")
-            return
-
-        if st.button("← Regresar a grados", key="mant_volver_grados"):
-            st.session_state.pop(clave + "_idsec", None)
-            st.rerun()
-            
-        st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
-        
-        df = alumnos_de_seccion(idsec)
-        if df.empty:
-            st.info("Sin alumnos activos.")
-            return
-
-        st.caption(f"{len(df)} alumnos. Marca el estado para la fecha **{fecha_str}**.")
-        
-        for _, al in df.iterrows():
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([4, 1, 1, 1])
-                with c1:
-                    st.write(f"**{al['nombre_completo']}**")
+        # 🆕 CAMBIO CLAVE: En lugar de "return", usamos un "if idsec:"
+        if idsec:
+            with cursor() as (con, cur):
+                cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
+                               t.nombre AS turno FROM secciones s
+                               JOIN grados g ON s.grado_id=g.id
+                               JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
+                            (idsec,))
+                sec = cur.fetchone()
                 
-                with c2:
-                    if st.button("Puntual", key=f"punt_{al['id']}", type="primary", width='stretch'):
-                        ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, PUNTUAL, usuario, "Registro tardío (Puntual)"
-                        )
-                        if ok:
-                            st.toast(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-                with c3:
-                    if st.button("Tardanza", key=f"tard_{al['id']}", width='stretch'):
-                        ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, TARDANZA, usuario, "Registro tardío (Tardanza)"
-                        )
-                        if ok:
-                            st.toast(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-                with c4:
-                    if st.button("Falta", key=f"falt_{al['id']}", width='stretch'):
-                        ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, FALTA, usuario, "Registro tardío (Falta)"
-                        )
-                        if ok:
-                            st.toast(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
+            if sec:
+                if st.button("← Regresar a grados", key="mant_volver_grados"):
+                    st.session_state.pop(clave + "_idsec", None)
+                    st.rerun()
+                    
+                st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+                
+                df = alumnos_de_seccion(idsec)
+                if not df.empty:
+                    st.caption(f"{len(df)} alumnos. Marca el estado para la fecha **{fecha_str}**.")
+                    
+                    for _, al in df.iterrows():
+                        with st.container(border=True):
+                            c1, c2, c3, c4 = st.columns([4, 1, 1, 1])
+                            with c1:
+                                st.write(f"**{al['nombre_completo']}**")
+                            
+                            with c2:
+                                if st.button("Puntual", key=f"punt_{al['id']}", type="primary", width='stretch'):
+                                    ok, msg = registrar_asistencia_manual_pasada(
+                                        al["dni"], fecha_str, PUNTUAL, usuario, "Registro tardío (Puntual)"
+                                    )
+                                    if ok:
+                                        st.toast(msg)
+                                        st.rerun()
+                                    else:
+                                        st.error(msg)
+                            with c3:
+                                if st.button("Tardanza", key=f"tard_{al['id']}", width='stretch'):
+                                    ok, msg = registrar_asistencia_manual_pasada(
+                                        al["dni"], fecha_str, TARDANZA, usuario, "Registro tardío (Tardanza)"
+                                    )
+                                    if ok:
+                                        st.toast(msg)
+                                        st.rerun()
+                                    else:
+                                        st.error(msg)
+                            with c4:
+                                if st.button("Falta", key=f"falt_{al['id']}", width='stretch'):
+                                    ok, msg = registrar_asistencia_manual_pasada(
+                                        al["dni"], fecha_str, FALTA, usuario, "Registro tardío (Falta)"
+                                    )
+                                    if ok:
+                                        st.toast(msg)
+                                        st.rerun()
+                                    else:
+                                        st.error(msg)
 
     # ══════════════════════════════════════════════════════════════════
-    # TAB 2: LIMPIEZA Y COMPACTACIÓN (CORREGIDO)
+    # TAB 2: LIMPIEZA Y COMPACTACIÓN (AHORA SÍ SE VE)
     # ══════════════════════════════════════════════════════════════════
     with tabs[1]:
         st.subheader("Limpieza de Asistencias Antiguas")
@@ -1173,7 +1167,6 @@ def vista_mantenimiento_datos():
                          key="btn_limpiar_bd"):
                 with st.spinner("Compactando base de datos... Esto puede tardar unos segundos."):
                     try:
-                        # 🆕 LLAMAMOS A LA FUNCIÓN CORRECTA
                         borrados_as, borrados_tar, fecha_limite = limpiar_asistencias_antiguas(meses_a_mantener=meses)
                         
                         if borrados_as == 0 and borrados_tar == 0:
