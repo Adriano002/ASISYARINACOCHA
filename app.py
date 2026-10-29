@@ -10,14 +10,7 @@ from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
-import qrcode
 import streamlit as st
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import (Image as RLImage, PageBreak, Paragraph,
-                                 SimpleDocTemplate, Spacer, Table, TableStyle)
-
 from db import (escribir, leer_df, cursor, to_time, to_date, to_ts,
                 fmt_time, fmt_date, fmt_ts)
 from schema import aplicar_schema
@@ -121,11 +114,11 @@ def grado_a_ui(g):
     return mapa.get(str(g).strip(), g)
   
 def generar_qr(dni, size=220):
+    import qrcode  # 🆕 Carga diferida
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
                         box_size=10, border=2)
     qr.add_data(str(dni).strip())
     qr.make(fit=True)
-    # Genera el QR directo, SIN escudo en el medio
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
     return img
 
@@ -1312,8 +1305,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
                         _nombre_completo(al) + " ya registro reforzamiento hoy"
                     ), {}
                 raise
-            auditar(usuario["usuario"], f"Reforzamiento {origen} DNI {dni}",
-                    tb="asistencias")
+            
             msg = (_nombre_completo(al) + " | " + al["grado"] + " " +
                    al["seccion"] + " | Reforzamiento + Clases Puntual " + ha
                    if al["turno"] == "Tarde" else
@@ -1365,9 +1357,6 @@ def registrar_entrada(dni, usuario, origen="qr"):
                     log.warning("tardanza: %s", e)
 
     if est == TARDANZA:
-        auditar(usuario["usuario"],
-                f"Tardanza {n}a DNI {dni} -> {acc}", tb="tardanzas")
-
         alcanzo_limite = (n >= limite)
         ultima_oport = (n == limite - 1) and not alcanzo_limite
 
@@ -1386,8 +1375,6 @@ def registrar_entrada(dni, usuario, origen="qr"):
             "ultima_oportunidad": ultima_oport,
         }
 
-    auditar(usuario["usuario"], f"Entrada Puntual {origen} DNI {dni}",
-            tb="asistencias")
     return True, "PUNTUAL", (
         _nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] +
         " | " + tipo_real.upper() + " Puntual " + ha
@@ -1553,7 +1540,7 @@ def _procesar_escaneo(dni):
     st.session_state.setdefault("_qr_mensajes", [])
     st.session_state["_qr_mensajes"].insert(0, {
         "dni": dni, "tipo": tipo, "mensaje": msg, "extra": extra, "ts": time.time()})
-    st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][:10]
+    st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][:3] # 🆕 SOLO 3
     contador = st.session_state.get("_qr_sonido_contador", 0) + 1
     st.session_state["_qr_sonido_contador"] = contador
     st.session_state["_qr_sonido_pendiente"] = {
@@ -1561,10 +1548,7 @@ def _procesar_escaneo(dni):
 
 
 def escaner_qr_continuo(key="qr_scanner"):
-    st.markdown('<div class="scan-header"><div class="scan-titulo">Escaneo QR</div>'
-                '<div class="scan-sub">Apunta al código del alumno</div></div>',
-                unsafe_allow_html=True)
-
+    # 🆕 ELIMINADO EL HEADER (Más espacio y menos RAM)
     if st.session_state.get("_qr_desbloqueo_exitoso"):
         result = None
     else:
@@ -1579,8 +1563,6 @@ def escaner_qr_continuo(key="qr_scanner"):
             st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
             _procesar_escaneo(dni)
             
-            # 🆕 SOLO recargamos si el alumno está bloqueado (para ver los botones).
-            # Si es puntual, tardanza o error, NO recargamos para que la cámara fluya.
             m = st.session_state.get("_qr_mensajes", [{}])[0]
             if m.get("tipo") == "BLOQUEADO":
                 st.rerun()
@@ -1610,11 +1592,9 @@ def escaner_qr_continuo(key="qr_scanner"):
             st.rerun()
 
     mensajes = st.session_state.get("_qr_mensajes", [])
-    
-    # 🆕 OPTIMIZACIÓN RAM: Limitamos a 5 mensajes para no acumular texto
-    if len(mensajes) > 5:
-        st.session_state["_qr_mensajes"] = mensajes[:5]
-        mensajes = mensajes[:5]
+    if len(mensajes) > 3:
+        st.session_state["_qr_mensajes"] = mensajes[:3]
+        mensajes = mensajes[:3]
 
     if mensajes:
         m = mensajes[0]
@@ -1623,7 +1603,7 @@ def escaner_qr_continuo(key="qr_scanner"):
         if len(mensajes) > 1:
             st.markdown('<div class="scan-ultimos">Últimos escaneos</div>',
                         unsafe_allow_html=True)
-            for msg in mensajes[1:5]:
+            for msg in mensajes[1:3]:
                 _render_mensaje_qr(msg)
 
 
@@ -1984,6 +1964,12 @@ def listar_cierres_anuales():
 
 # ─── GENERACIÓN DE PDF ─────────────────────────────────────────────────────
 def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
+    from reportlab.lib import colors  # 🆕
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from io import BytesIO
+
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
                             rightMargin=15, leftMargin=15,
@@ -2043,6 +2029,12 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
 
 
 def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
+    from reportlab.lib import colors  # 🆕
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, PageBreak, Paragraph, Spacer, Table, TableStyle
+    from io import BytesIO
+
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
                             rightMargin=15, leftMargin=15,
@@ -2142,6 +2134,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     doc.build(el)
     buf.seek(0)
     return buf.getvalue()
+
 
 
 # ─── CARNETS ───────────────────────────────────────────────────────────────
@@ -2535,7 +2528,196 @@ def pdf_carnet_alumno(dni):
     return _render_carnets(filas) if filas else None
 
 
+def generar_qr(dni, size=220):
+    import qrcode  # 🆕 Carga diferida
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
+                        box_size=10, border=2)
+    qr.add_data(str(dni).strip())
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    return img
+
+
+def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
+    from reportlab.lib import colors  # 🆕
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from io import BytesIO
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
+                            rightMargin=15, leftMargin=15,
+                            topMargin=20, bottomMargin=20)
+    est = getSampleStyleSheet()
+    el = [Paragraph(f"<b>{titulo}</b>", est["Heading1"])]
+    if subtitulo:
+        el.append(Paragraph(subtitulo, est["Normal"]))
+    el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
+                        est["Normal"]))
+    el.append(Spacer(1, 12))
+    if not df.empty:
+        datos = [df.columns.tolist()] + df.astype(str).values.tolist()
+        anchos = []
+        for col in df.columns:
+            cl = str(col).lower()
+            if any(k in cl for k in ["auxiliar", "apellido", "nombres",
+                                      "alumno", "observacion"]):
+                anchos.append(3.5)
+            elif any(k in cl for k in ["grado", "seccion", "turno",
+                                        "tipo", "estado"]):
+                anchos.append(1.5)
+            elif any(k in cl for k in ["fecha", "hora"]):
+                anchos.append(1.8)
+            else:
+                anchos.append(1.0)
+        at = A4[1] - 30
+        sm = sum(anchos)
+        anchos = [a * at / sm for a in anchos]
+        GRIS = colors.HexColor("#FAFAFA")
+        if fuente_chica:
+            fc = ff = 6
+            pad = 3
+        else:
+            fc = 11
+            ff = 10
+            pad = 5
+        t = Table(datos, colWidths=anchos, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), fc),
+            ("FONTSIZE", (0, 1), (-1, -1), ff),
+            ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.black),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), pad),
+            ("RIGHTPADDING", (0, 0), (-1, -1), pad),
+            ("TOPPADDING", (0, 0), (-1, -1), pad),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), pad),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRIS]),
+        ]))
+        el.append(t)
+    doc.build(el)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
+    from reportlab.lib import colors  # 🆕
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, PageBreak, Paragraph, Spacer, Table, TableStyle
+    from io import BytesIO
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
+                            rightMargin=15, leftMargin=15,
+                            topMargin=20, bottomMargin=20)
+    est = getSampleStyleSheet()
+    el = []
+    primera = True
+    for nombre_hoja, bloques in hojas.items():
+        if not primera:
+            el.append(PageBreak())
+        primera = False
+        el.append(Paragraph(f"<b>{titulo_base}</b>", est["Heading2"]))
+        el.append(Paragraph(f"<b>{nombre_hoja}</b>", est["Heading3"]))
+        el.append(Paragraph("Generado: " + ahora().strftime("%Y-%m-%d %H:%M"),
+                            est["Normal"]))
+        el.append(Spacer(1, 10))
+
+        es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
+
+        for titulo_bloque, df in bloques:
+            el.append(Paragraph(f"<b>{titulo_bloque}</b>", est["Heading4"]))
+            el.append(Spacer(1, 4))
+            if df is None or df.empty:
+                el.append(Paragraph("Sin faltas registradas.", est["Normal"]))
+                el.append(Spacer(1, 10))
+                continue
+
+            datos = [df.columns.tolist()] + df.astype(str).values.tolist()
+            at = A4[1] - 30
+
+            if es_hoja_faltas:
+                ancho_grado = 1.6 * 28.35
+                ancho_alumno = (at - 2 * ancho_grado) / 2
+                col_widths = [ancho_grado, ancho_alumno,
+                              ancho_grado, ancho_alumno]
+                t = Table(datos, colWidths=col_widths, repeatRows=1)
+                estilos = [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ("LINEAFTER", (1, 0), (1, -1), 1.5, colors.black),
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor("#E8F5E9")),
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor("#FFEBEE")),
+                ]
+                for i in range(1, len(datos)):
+                    if i % 2 == 0:
+                        estilos.append(("BACKGROUND", (0, i), (1, i),
+                                        colors.HexColor("#F1F8E9")))
+                        estilos.append(("BACKGROUND", (2, i), (3, i),
+                                        colors.HexColor("#FFF3E0")))
+                t.setStyle(TableStyle(estilos))
+            else:
+                n_cols = len(df.columns)
+                ac = at / n_cols
+                t = Table(datos, colWidths=[ac] * n_cols, repeatRows=1)
+                estilos = [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+                col_estado = None
+                for j, c in enumerate(df.columns):
+                    if str(c).lower() == "estado":
+                        col_estado = j
+                        break
+                if col_estado is not None:
+                    mapa = {
+                        "P": colors.HexColor("#22C55E"),
+                        "T": colors.HexColor("#F59E0B"),
+                        "J": colors.HexColor("#EAB308"),
+                        "F": colors.HexColor("#EF4444"),
+                        "PERMISO": colors.HexColor("#3B82F6"),
+                    }
+                    for i in range(1, len(datos)):
+                        val = str(datos[i][col_estado]).strip().upper()
+                        if val in mapa:
+                            estilos.append(
+                                ("TEXTCOLOR", (col_estado, i),
+                                 (col_estado, i), mapa[val]))
+                            estilos.append(
+                                ("FONTNAME", (col_estado, i),
+                                 (col_estado, i), "Helvetica-Bold"))
+                t.setStyle(TableStyle(estilos))
+
+            el.append(t)
+            el.append(Spacer(1, 12))
+    doc.build(el)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 def pdf_resumen_alumno(idal):
+    from reportlab.lib import colors  # 🆕
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from io import BytesIO
+
     d = perfil_alumno_datos(idal)
     if not d:
         return None
@@ -3308,14 +3490,8 @@ def vista_bloqueados():
             st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    try:
-        st_autorefresh(interval=15000, key="panel_dir_refresh")
-    except Exception:
-        pass
-
     st.title("Panel Direccion")
     fecha = hoy_str()
-
     turnos_info = _turnos_para_panel()
     if not turnos_info:
         st.info("No hay turnos configurados.")
@@ -3344,7 +3520,7 @@ def vista_panel_direccion():
                 f"ventana: {ventana['nombre']} "
                 f"(cerro a las {ventana['hora_cierre']})")
 
-    if st.button("Actualizar", key="refresh_panel"):
+    if st.button("Actualizar Datos", key="refresh_panel"):
         marcar_faltas_al_cierre()
         st.rerun()
 
@@ -3361,15 +3537,8 @@ def vista_panel_direccion():
     c3.metric("Justificadas hoy", m["justificadas"])
     c4.metric("Permisos hoy", m["permisos"])
 
-    st.markdown("---")
-    st.subheader(f"Ultimos escaneos ({turno['nombre']})")
-    df = ultimos_registros_turno(fecha, turno["id"], 30)
-    if df.empty:
-        st.info("Sin escaneos hoy en este turno.")
-    else:
-        st.dataframe(df, width='stretch')
 
-# ─── REPORTES ──────────────────────────────────────────────────────────────
+#REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
     permitidas = None
@@ -6323,10 +6492,20 @@ def _enrutar(op, usuario):
         st.session_state.pop("_rep_iniciado", None)
         
     # 🆕 DESTRUIR CÁMARA AL SALIR DE PUERTA
-    # Si el usuario cambia de pestaña, forzamos la destrucción del componente de la cámara
     if op != "Puerta":
         st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
-        
+
+    # 🆕 LIMPIAR MEMORIA AL CAMBIAR DE PESTAÑA (Soluciona bug de Carnets y Perfil)
+    op_anterior = st.session_state.get("_menu_anterior")
+    if op_anterior and op_anterior != op:
+        st.session_state.pop("perfil_alumno_id", None)
+        st.session_state.pop("_perfil_ultimo_id", None)
+        st.session_state.pop("carn_ver_seccion", None)
+        st.session_state.pop("carn_grado_sel", None)
+        st.session_state.pop("carn_sel_alumnos", None)
+        st.session_state.pop("incidencia_ver_id", None)
+
+    st.session_state["_menu_anterior"] = op
     v()
 
 def _control_faltas():
