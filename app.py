@@ -2474,19 +2474,9 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
     est = getSampleStyleSheet()
     
-    # Estilos personalizados
-    estilo_titulo = ParagraphStyle(
-        'TituloReporte', parent=est['Heading1'],
-        fontSize=16, textColor=colors.HexColor('#B85C38'), spaceAfter=6, fontName='Helvetica-Bold'
-    )
-    estilo_subtitulo = ParagraphStyle(
-        'SubtituloReporte', parent=est['Heading2'],
-        fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=4, fontName='Helvetica-Bold'
-    )
-    estilo_texto = ParagraphStyle(
-        'TextoReporte', parent=est['Normal'],
-        fontSize=9, textColor=colors.HexColor('#666666'), fontName='Helvetica'
-    )
+    estilo_titulo = ParagraphStyle('TituloReporte', parent=est['Heading1'], fontSize=16, textColor=colors.HexColor('#B85C38'), spaceAfter=6, fontName='Helvetica-Bold')
+    estilo_subtitulo = ParagraphStyle('SubtituloReporte', parent=est['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=4, fontName='Helvetica-Bold')
+    estilo_texto = ParagraphStyle('TextoReporte', parent=est['Normal'], fontSize=9, textColor=colors.HexColor('#666666'), fontName='Helvetica')
 
     el = []
     primera = True
@@ -2497,13 +2487,13 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(PageBreak())
         primera = False
 
-        # ─── CABECERA ELEGANTE CON ESCUDO A LA DERECHA ───
+        # CABECERA CON ESCUDO
         cabecera_data = []
         if escudo_path.exists():
             try:
                 img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
                 cabecera_data = [[
-                    Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')} - Los alumnos que lleguen después no figuran.</font>", estilo_titulo),
+                    Paragraph(f"<b>{titulo_base}</b><br/><font size=10 color='#666666'>{nombre_hoja}</font><br/><font size=8 color='#999999'>Generado hasta: {ahora().strftime('%H:%M:%S')}</font>", estilo_titulo),
                     img_escudo
                 ]]
             except Exception:
@@ -2520,7 +2510,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('LINEBELOW', (0, 0), (-1, -1), 1.5, colors.HexColor('#B85C38')),
+            ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#B85C38')),
         ]))
         el.append(tabla_cabecera)
         el.append(Spacer(1, 12))
@@ -2532,84 +2522,77 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(Spacer(1, 6))
             
             if df is None or df.empty:
-                el.append(Paragraph("Sin registros para mostrar.", estilo_texto))
+                el.append(Paragraph("Sin registros.", estilo_texto))
                 el.append(Spacer(1, 10))
                 continue
 
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
-            at = 21 * cm # Ancho total disponible (A4 ancho - margenes)
+            at = 21 * cm 
 
             if es_hoja_faltas:
-                # Hoja de faltas: 4 columnas (Grado, Alumno, Grado, Alumno)
                 ancho_grado = 2.0 * cm
                 ancho_alumno = (at - 2 * ancho_grado) / 2
                 col_widths = [ancho_grado, ancho_alumno, ancho_grado, ancho_alumno]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
-                estilos = [
+                t.setStyle(TableStyle([
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#4CAF50')), # Verde para justificados
-                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#F44336')), # Rojo para injustificados
+                    ("BACKGROUND", (0, 0), (1, 0), colors.HexColor('#4CAF50')),
+                    ("BACKGROUND", (2, 0), (3, 0), colors.HexColor('#F44336')),
                     ("ALIGN", (0, 0), (0, -1), "CENTER"),
                     ("ALIGN", (2, 0), (2, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
-                    ("TOPPADDING", (0, 0), (-1, -1), 5),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                ]
-                for i in range(1, len(datos)):
-                    if i % 2 == 0:
-                        estilos.append(("BACKGROUND", (0, i), (1, i), colors.HexColor("#F1F8E9")))
-                        estilos.append(("BACKGROUND", (2, i), (3, i), colors.HexColor("#FFF3E0")))
-                t.setStyle(TableStyle(estilos))
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
+                ]))
             else:
-                # Reportes normales: Ajuste inteligente de columnas
-                n_cols = len(df.columns)
+                # 🆕 AJUSTE INTELIGENTE DE ANCHOS (Números angostos, nombres anchos)
                 col_widths = []
                 for col in df.columns:
                     cl = str(col).lower()
-                    if "apellido" in cl or "nombre" in cl or "alumno" in cl:
-                        col_widths.append(at * 0.35) # 35% para nombres
+                    if cl == "n":
+                        col_widths.append(1.2 * cm) # Columna "N" angosta
+                    elif cl == "estado":
+                        col_widths.append(1.8 * cm) # Columna "Estado" angosta
+                    elif "hora" in cl:
+                        col_widths.append(2.0 * cm)
+                    elif "apellido" in cl or "nombre" in cl:
+                        col_widths.append(8.0 * cm) # Nombres anchos
                     elif "observacion" in cl:
-                        col_widths.append(at * 0.25) # 25% para observaciones
-                    elif "grado" in cl or "seccion" in cl or "turno" in cl or "estado" in cl:
-                        col_widths.append(at * 0.10) # 10% para grado/seccion/estado
+                        col_widths.append(5.0 * cm)
                     else:
-                        col_widths.append(at * 0.20) # 20% para el resto
+                        col_widths.append(3.0 * cm)
                 
-                # Normalizar para que sumen exactamente el ancho total
                 total_w = sum(col_widths)
-                col_widths = [(w / total_w) * at for w in col_widths]
+                if total_w < at:
+                    sobra = at - total_w
+                    for i, col in enumerate(df.columns):
+                        cl = str(col).lower()
+                        if "apellido" in cl or "nombre" in cl:
+                            col_widths[i] += (sobra / 2)
                 
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')), # Naranja institucional
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E0E0')),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FAFAFA")]),
                 ]
                 
-                # Colorear celdas de estado (P, T, F)
                 col_estado = None
                 for j, c in enumerate(df.columns):
                     if str(c).lower() == "estado":
                         col_estado = j
                         break
                 if col_estado is not None:
-                    mapa = {
-                        "P": colors.HexColor("#22C55E"),
-                        "T": colors.HexColor("#F59E0B"),
-                        "J": colors.HexColor("#EAB308"),
-                        "F": colors.HexColor("#EF4444"),
-                        "PERMISO": colors.HexColor("#3B82F6"),
-                    }
+                    mapa = {"P": colors.HexColor("#22C55E"), "T": colors.HexColor("#F59E0B"), "J": colors.HexColor("#EAB308"), "F": colors.HexColor("#EF4444")}
                     for i in range(1, len(datos)):
                         val = str(datos[i][col_estado]).strip().upper()
                         if val in mapa:
@@ -3086,7 +3069,6 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     el = []
     escudo_path = Path("escudo.png")
 
-    # Cabecera elegante
     cab_data = []
     if escudo_path.exists():
         try:
@@ -3103,7 +3085,7 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (1,0), (1,0), 'RIGHT'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('LINEBELOW', (0,0), (-1,-1), 1.5, colors.HexColor('#B85C38')),
+        ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#B85C38')),
     ]))
     el.append(t_cab)
     
@@ -3116,31 +3098,34 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
         datos = [df.columns.tolist()] + df.astype(str).values.tolist()
         at = 21 * cm
         
-        # Ajuste de anchos inteligente
-        anchos = []
+        # 🆕 AJUSTE INTELIGENTE DE ANCHOS (Números angostos, Auxiliar ancho)
+        col_widths = []
         for col in df.columns:
             cl = str(col).lower()
-            if any(k in cl for k in ["auxiliar", "apellido", "nombres", "alumno", "observacion"]):
-                anchos.append(3.5)
-            elif any(k in cl for k in ["grado", "seccion", "turno", "tipo", "estado"]):
-                anchos.append(1.5)
-            elif any(k in cl for k in ["fecha", "hora"]):
-                anchos.append(1.8)
-            else:
-                anchos.append(1.0)
-        
-        sm = sum(anchos)
-        anchos = [a * at / sm for a in anchos]
-        
+            if "auxiliar" in cl:
+                col_widths.append(7.0 * cm) # Auxiliar ancho
+            elif "grado" in cl or "seccion" in cl:
+                col_widths.append(2.5 * cm)
+            else: # Puntuales, Faltas, Total (Números angostos)
+                col_widths.append(2.0 * cm)
+                
+        total_w = sum(col_widths)
+        if total_w < at:
+            sobra = at - total_w
+            col_widths[0] += sobra # Le damos el espacio sobrante al Auxiliar
+            
+        if total_w > at:
+            col_widths = [(w / total_w) * at for w in col_widths]
+            
         if fuente_chica:
-            fc = ff = 6
+            fc = ff = 7
             pad = 3
         else:
             fc = 9
             ff = 8
             pad = 4
             
-        t = Table(datos, colWidths=anchos, repeatRows=1)
+        t = Table(datos, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), fc),
@@ -3164,7 +3149,6 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     doc.build(el)
     buf.seek(0)
     return buf.getvalue()
-
 
 def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from reportlab.lib import colors
