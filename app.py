@@ -6166,103 +6166,53 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS (Fondo usando un pseudo-elemento, CERO DIVS EN EL MARKDOWN)
+    # 1. CSS MÍNIMO (Solo para centrar y dar un toque elegante al título)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* 🆕 EL TRUCO: Usamos un pseudo-elemento en el body para el fondo.
-       Así no hay <div> que Streamlit pueda imprimir como texto. */
-    body::before {
-        content: "";
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background: linear-gradient(135deg, rgba(255,248,240,0.9) 0%, rgba(255,228,214,0.9) 100%);
-        z-index: -1;
-        pointer-events: none;
-    }
-
-    /* Tarjeta central */
-    .login-card {
-        background: var(--secondary-background-color, #FFFFFF);
-        border-radius: 24px;
-        padding: 50px 30px 40px 30px;
-        box-shadow: 0 20px 40px rgba(232,123,74,0.15);
-        border: 1px solid rgba(232,123,74,0.2);
-        text-align: center;
-        margin-top: 40px;
-        margin-bottom: -20px;
-        position: relative;
-        z-index: 1;
-    }
+    /* Solo ajustamos el título para que sea grande y naranja */
     .login-title {
-        font-size: 38px; font-weight: 900; color: #E87B4A !important;
-        margin-bottom: 8px; letter-spacing: -1px;
+        font-size: 38px; 
+        font-weight: 900; 
+        color: #E87B4A !important;
+        text-align: center;
+        margin-bottom: 5px; 
+        letter-spacing: -1px;
     }
     .login-sub { 
-        font-size: 16px; color: var(--text-color, #666) !important; 
-        margin-bottom: 10px; font-weight: 600; opacity: 0.8;
-    }
-    /* Formulario integrado */
-    div[data-testid="stForm"] {
-        background: var(--secondary-background-color, #FFFFFF) !important;
-        border-radius: 0 0 24px 24px !important;
-        padding: 0px 30px 30px 30px !important;
-        box-shadow: 0 20px 40px rgba(232,123,74,0.15) !important;
-        border: 1px solid rgba(232,123,74,0.2) !important;
-        border-top: none !important;
-        position: relative;
-        z-index: 1;
-    }
-    /* Inputs */
-    .stTextInput > div > div > input {
-        border-radius: 10px !important;
-        border: 2px solid rgba(232,123,74,0.3) !important;
-        padding: 12px 15px !important;
-    }
-    /* Botón */
-    .stFormSubmitButton > button {
-        background: #E87B4A !important;
-        color: white !important;
-        border-radius: 10px !important;
-        font-weight: 800 !important;
-        border: none !important;
-        padding: 14px !important;
-        width: 100% !important;
-        margin-top: 15px !important;
-        font-size: 16px !important;
-        transition: all 0.2s;
-    }
-    .stFormSubmitButton > button:hover {
-        background: #D66535 !important;
-        transform: translateY(-2px);
+        font-size: 16px; 
+        text-align: center;
+        margin-bottom: 20px; 
+        font-weight: 600; 
+        opacity: 0.7;
     }
     </style>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Sin emojis, sin escudos)
+    # 2. ESTRUCTURA NATIVA (Cero forcéo de fondos)
     # ══════════════════════════════════════════════════════════════════
+    # Columnas para centrar el contenido
     _, centro, _ = st.columns([1, 1.2, 1])
     
     with centro:
-        # Tarjeta de texto
-        st.markdown("""<div class="login-card">
-            <div class="login-title">asisyarina</div>
-            <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
-        </div>""", unsafe_allow_html=True)
-        
-        # Formulario
-        with st.form("login"):
-            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario", label_visibility="collapsed")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed")
-            enviado = st.form_submit_button("Ingresar al Sistema")
+        # 🆕 Usamos el contenedor nativo con borde. Streamlit lo pinta perfecto en modo claro y oscuro.
+        with st.container(border=True):
+            st.markdown('<div class="login-title">asisyarina</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>', unsafe_allow_html=True)
             
-            if enviado:
-                datos, err = autenticar(usuario, password)
-                if datos:
-                    st.session_state["user"] = datos
-                    auditar(datos["usuario"], "Login")
-                    st.rerun()
-                else:
-                    st.error(err or "Credenciales incorrectas")
+            # Formulario nativo
+            with st.form("login"):
+                usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
+                password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
+                enviado = st.form_submit_button("Ingresar al Sistema", type="primary", use_container_width=True)
+                
+                if enviado:
+                    datos, err = autenticar(usuario, password)
+                    if datos:
+                        st.session_state["user"] = datos
+                        auditar(datos["usuario"], "Login")
+                        st.rerun()
+                    else:
+                        st.error(err or "Credenciales incorrectas")
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
