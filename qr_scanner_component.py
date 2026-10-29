@@ -13,7 +13,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     css="""
     #qr-wrapper {
         width: 100%;
-        max-width: 340px; /* 🆕 Achicamos el ancho para que no ocupe toda la pantalla */
+        max-width: 340px;
         margin: 0 auto;
     }
     #qr-reader {
@@ -21,8 +21,8 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         overflow: hidden;
         border: 3px solid #E65100;
         background: #000;
-        height: 320px; /* 🆕 Altura fija para evitar que se estire hacia abajo */
-        min-height: 320px;
+        height: 260px; /* 🆕 Altura reducida para que los mensajes suban */
+        min-height: 260px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -31,7 +31,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         border-radius: 8px;
         width: 100% !important;
         height: 100% !important;
-        object-fit: cover; /* 🆕 Llena la caja sin distorsionar */
+        object-fit: cover;
     }
     #qr-status {
         text-align: center;
