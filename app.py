@@ -65,28 +65,30 @@ from datetime import datetime, timezone, timedelta
 from sync import subir_bd
 from db import DB_PATH
 def _hilo_backup_programado():
-    # 🆕 HORAS EXACTAS: 9:00 AM y 3:00 PM
-    HORAS_BACKUP = ["09:00", "15:00"] 
+    # HORAS EXACTAS: 9:00 AM y 3:00 PM
+    HORAS_BACKUP = ["09:00", "15:00"]
     ultimo_backup_fecha = None
-    
+
     while True:
         try:
             # Hora de Perú (UTC-5)
             ahora = datetime.now(timezone.utc) - timedelta(hours=5)
             hora_actual_str = ahora.strftime("%H:%M")
             fecha_actual_str = ahora.strftime("%Y-%m-%d")
-            
-            # Si la hora actual está en la lista Y no hemos hecho backup a esa hora hoy
+
             if hora_actual_str in HORAS_BACKUP and ultimo_backup_fecha != f"{fecha_actual_str}_{hora_actual_str}":
                 log.info(f"Iniciando backup automático a las {hora_actual_str}...")
-                subir_bd(DB_PATH)
-                ultimo_backup_fecha = f"{fecha_actual_str}_{hora_actual_str}"
-                log.info("Backup automático completado exitosamente.")
-                
+                try:
+                    subir_bd(DB_PATH)
+                    ultimo_backup_fecha = f"{fecha_actual_str}_{hora_actual_str}"
+                    log.info("Backup automático completado exitosamente.")
+                except Exception as e:
+                    log.error(f"Fallo backup automático: {e}")
+
         except Exception as e:
             log.error(f"Error en el hilo de backup: {e}")
-            
-        # 🆕 Revisa la hora cada 10 minutos (600 segundos) para no gastar CPU
+
+        # Revisa la hora cada 10 minutos
         time.sleep(600)
 
 
@@ -5495,8 +5497,18 @@ def _frag_usuarios_crear():
                                     "VALUES(?,?,?,?,?,0)",
                                     (u_norm, hashear_password(p), r, n, idt))
                         auditar(usuario["usuario"], "Creo usuario " + u_norm)
+
+                        # 🆕 SUBIR A R2 AL INSTANTE (CRÍTICO)
+                        try:
+                            from sync import subir_bd
+                            from db import DB_PATH
+                            subir_bd(DB_PATH)
+                            log.info(f"✅ Usuario {u_norm} creado y respaldado en R2")
+                        except Exception as e:
+                            log.error(f"Fallo backup tras crear usuario: {e}")
+
                         st.session_state["_aviso_usuarios"] = {
-                            "tipo": "ok", "msg": "Usuario creado."}
+                            "tipo": "ok", "msg": "Usuario creado y respaldado en R2."}
                         for k in ["crear_u_usuario", "crear_u_pass",
                                    "crear_u_nombres", "crear_u_rol",
                                    "crear_u_turno"]:
@@ -5542,18 +5554,20 @@ def _frag_usuarios_asignar():
                     "WHERE usuario_id=?", (ida,))
         asig = {r["seccion_id"] for r in cur.fetchall()}
 
-    st.write("Secciones disponibles:")
-    sel_s = []
-    for s in secs:
-        if s["id"] in asignadas_a_otros:
-            continue
-        etiqueta = f"{s['grado']} {s['nombre']}"
-        if st.checkbox(etiqueta, value=s["id"] in asig,
-                       key=f"asig_{ida}_{s['id']}"):
-            sel_s.append(s["id"])
+    # 🛡️ TODO DENTRO DE UN st.form (los checkboxes NO disparan rerun)
+    with st.form(f"form_asig_{ida}"):
+        st.write("Secciones disponibles:")
+        sel_s = []
+        for s in secs:
+            if s["id"] in asignadas_a_otros:
+                continue
+            etiqueta = f"{s['grado']} {s['nombre']}"
+            if st.checkbox(etiqueta, value=s["id"] in asig):
+                sel_s.append(s["id"])
 
-    if confirmar_accion("asig_" + str(ida), "Guardar asignaciones",
-                         "¿Estas seguro de guardar estas asignaciones?"):
+        guardar = st.form_submit_button("Guardar asignaciones", type="primary")
+
+    if guardar:
         with cursor() as (con, cur):
             cur.execute("DELETE FROM auxiliar_secciones WHERE usuario_id=?",
                         (ida,))
@@ -5567,10 +5581,19 @@ def _frag_usuarios_asignar():
                         st.warning("La seccion ya estaba asignada.")
         auditar(usuario["usuario"],
                 f"Asigno {len(sel_s)} secciones a usuario_id={ida}")
-        st.session_state["_aviso_usuarios"] = {
-            "tipo": "ok", "msg": "Asignaciones guardadas."}
-        st.rerun()
 
+        # 🆕 SUBIR A R2 AL INSTANTE (CRÍTICO)
+        try:
+            from sync import subir_bd
+            from db import DB_PATH
+            subir_bd(DB_PATH)
+            log.info(f"✅ {len(sel_s)} secciones asignadas a usuario_id={ida} y respaldadas en R2")
+        except Exception as e:
+            log.error(f"Fallo backup tras asignar secciones: {e}")
+
+        st.session_state["_aviso_usuarios"] = {
+            "tipo": "ok", "msg": "Asignaciones guardadas y respaldadas en R2."}
+        st.rerun()
 
 def _frag_usuarios_mantenimiento():
     usuario = st.session_state["user"]
@@ -7368,27 +7391,35 @@ def _control_faltas():
 # ─── MAIN ──────────────────────────────────────────────────────────────────
 
 
+d@st.cache_resource
+def _iniciar_hilo_backup_una_vez():
+    """Arranca el hilo de backup UNA SOLA VEZ por proceso de Python."""
+    hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
+    hilo.start()
+    log.info("✅ Hilo de backup encendido (9:00 AM y 3:00 PM) - UNA VEZ por proceso.")
+    return True
+
+
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
-        # 🆕 SIEMPRE descarga la BD más reciente de R2 al arrancar (ruta correcta)
-        from sync import descargar_bd_si_no_existe
-        from db import DB_PATH
-        descargar_bd_si_no_existe(str(DB_PATH))
+        # 🛡️ CRÍTICO: Descargar de R2 SOLO UNA VEZ por sesión
+        if not st.session_state.get("_bd_descargada"):
+            from sync import descargar_bd_si_no_existe
+            from db import DB_PATH
+            descargar_bd_si_no_existe(str(DB_PATH))
+            st.session_state["_bd_descargada"] = True
+            log.info("✅ BD descargada de R2 (1 sola vez en esta sesión).")
 
         inicializar_bd()
         aplicar_estilos()
 
-        # 🆕 ENCENDEMOS EL RELOJ DE BACKUP (9:00 AM y 3:00 PM)
-        if "backup_hilo_iniciado" not in st.session_state:
-            st.session_state["backup_hilo_iniciado"] = True
-            hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
-            hilo.start()
-            log.info("Hilo de backup encendido (9:00 AM y 3:00 PM).")
+        # 🛡️ ARRANCAR HILO CON CACHÉ (1 sola vez por proceso)
+        _iniciar_hilo_backup_una_vez()
 
-        # 🆕 RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
+        # RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
         if not st.session_state.get("user"):
             token = st.query_params.get("sesion")
             ts_str = st.query_params.get("ts")
@@ -7419,7 +7450,7 @@ def main():
             vista_login()
             return
 
-        # --- VALIDACIONES DE SISTEMA ---
+        # VALIDACIONES DE SISTEMA
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
             st.info("Contacta al desarrollador para restaurar el acceso.")
