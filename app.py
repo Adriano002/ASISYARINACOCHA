@@ -1070,52 +1070,80 @@ def vista_mantenimiento_datos():
     tabs = st.tabs(["Registro Manual (Pasado)", "Limpiar Base de Datos (R2)"])
     
     # ══════════════════════════════════════════════════════════════════
-    # TAB 1: REGISTRO MANUAL PASADO
+    # TAB 1: REGISTRO MANUAL PASADO (Estilo Puerta Manual)
     # ══════════════════════════════════════════════════════════════════
     with tabs[0]:
         st.subheader("Registrar Asistencia de Días Anteriores")
         st.info("Usa esta opción si hubo caída de internet o luz y se tomó asistencia en papel.")
         
-        with st.container(border=True):
-            st.markdown("**Paso 1: Buscar al Alumno**")
-            busqueda = st.text_input("DNI o Nombre del alumno", placeholder="Ej: 74105299", key="busq_pasado")
-            
-            al_sel = None
-            if busqueda:
-                df_res = buscar_alumnos(busqueda, limite=5)
-                if df_res.empty:
-                    st.warning("No se encontraron alumnos.")
-                else:
-                    ops = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df_res.iterrows()}
-                    sel = st.selectbox("Selecciona al alumno", list(ops.keys()), key="sel_pasado")
-                    idal = ops[sel]
-                    
-                    with cursor() as (con, cur):
-                        cur.execute("SELECT dni FROM alumnos WHERE id=?", (idal,))
-                        al_sel = cur.fetchone()["dni"]
+        # 🆕 1. SELECCIONAR FECHA
+        fecha_reg = st.date_input("Paso 1: Selecciona la fecha a registrar", max_value=hoy_date(), key="fecha_pasado")
+        fecha_str = fecha_reg.strftime("%Y-%m-%d")
         
-        if al_sel:
+        st.markdown("---")
+        st.markdown("**Paso 2: Selecciona el grado y la sección**")
+        
+        clave = "mant_sel"
+        idsec = _selector_grado_seccion(clave, "Elige el grado")
+        if not idsec:
+            return
+        
+        # Validamos que la sección exista
+        with cursor() as (con, cur):
+            cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
+                           t.nombre AS turno FROM secciones s
+                           JOIN grados g ON s.grado_id=g.id
+                           JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
+                        (idsec,))
+            sec = cur.fetchone()
+            
+        if not sec:
+            st.warning("Seccion no encontrada.")
+            return
+            
+        st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+        
+        df = alumnos_de_seccion(idsec)
+        if df.empty:
+            st.info("Sin alumnos activos.")
+            return
+
+        st.caption(f"{len(df)} alumnos. Marca el estado de cada uno para la fecha **{fecha_str}**.")
+        
+        # 🆕 3. BOTONES RÁPIDOS POR ALUMNO
+        for _, al in df.iterrows():
             with st.container(border=True):
-                st.markdown("**Paso 2: Registrar la fecha y estado**")
-                c1, c2 = st.columns(2)
+                c1, c2, c3, c4 = st.columns([4, 1, 1, 1])
                 with c1:
-                    fecha_reg = st.date_input("Fecha del registro", max_value=hoy_date(), key="fecha_pasado")
-                with c2:
-                    estado_reg = st.selectbox("Estado", [PUNTUAL, TARDANZA, FALTA], key="estado_pasado")
-                    
-                motivo = st.text_input("¿Por qué se registra tarde? (Obligatorio)", placeholder="Ej: Caída de internet", key="motivo_pasado")
+                    st.write(f"**{al['nombre_completo']}**")
                 
-                if st.button("Guardar Registro", type="primary", use_container_width=True, key="btn_guardar_pasado"):
-                    if not motivo.strip():
-                        st.error("El motivo es obligatorio para auditoría.")
-                    else:
-                        fecha_str = fecha_reg.strftime("%Y-%m-%d")
+                with c2:
+                    if st.button("Puntual", key=f"punt_{al['id']}", type="primary", width='stretch'):
                         ok, msg = registrar_asistencia_manual_pasada(
-                            al_sel, fecha_str, estado_reg, usuario, motivo.strip()
+                            al["dni"], fecha_str, PUNTUAL, usuario, "Registro tardío en papel (Puntual)"
                         )
                         if ok:
-                            st.success(msg)
-                            time.sleep(1)
+                            st.toast(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                with c3:
+                    if st.button("Tardanza", key=f"tard_{al['id']}", width='stretch'):
+                        ok, msg = registrar_asistencia_manual_pasada(
+                            al["dni"], fecha_str, TARDANZA, usuario, "Registro tardío en papel (Tardanza)"
+                        )
+                        if ok:
+                            st.toast(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                with c4:
+                    if st.button("Falta", key=f"falt_{al['id']}", width='stretch'):
+                        ok, msg = registrar_asistencia_manual_pasada(
+                            al["dni"], fecha_str, FALTA, usuario, "Registro tardío en papel (Falta)"
+                        )
+                        if ok:
+                            st.toast(msg)
                             st.rerun()
                         else:
                             st.error(msg)
