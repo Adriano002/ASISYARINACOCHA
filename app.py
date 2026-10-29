@@ -4567,69 +4567,53 @@ def _carnets_ver_seccion(idsec):
                        JOIN grados g ON s.grado_id=g.id
                        JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""", (idsec,))
         sec = cur.fetchone()
+        
     if not sec:
         st.warning("Seccion no encontrada.")
         st.session_state.pop("carn_ver_seccion", None)
         return
-    if st.button("Regresar a grados", key="carn_volver"):
+        
+    if st.button("← Regresar a grados", key="carn_volver"):
         st.session_state.pop("carn_ver_seccion", None)
         st.session_state.pop("carn_sel_alumnos", None)
         st.rerun()
+        
     st.subheader(f"{sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
+    
     df = alumnos_de_seccion(idsec)
     if df.empty:
         st.info("Sin alumnos activos.")
         return
-    st.caption(f"{len(df)} alumnos. Aprieta un nombre para seleccionarlo.")
-    if "carn_sel_alumnos" not in st.session_state:
-        st.session_state["carn_sel_alumnos"] = set()
-    sel = st.session_state["carn_sel_alumnos"]
-    for _, al in df.iterrows():
-        if al["id"] in sel:
-            st.markdown('<div class="btn-sel">', unsafe_allow_html=True)
-            if st.button(al['nombre_completo'],
-                         key="carn_al_" + str(al['id']),
-                         width='stretch'):
-                sel.discard(al["id"])
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            if st.button(al['nombre_completo'],
-                         key="carn_al_" + str(al['id']),
-                         width='stretch'):
-                sel.add(al["id"])
-                st.rerun()
-    st.markdown("---")
-    st.write(f"Seleccionados: {len(sel)}")
-    c1, c2, c3 = st.columns(3)
+        
+    st.caption(f"{len(df)} alumnos en total.")
+
+    # 🆕 SELECTORES DESPLEGABLES (Cero RAM en botones)
+    c1, c2 = st.columns(2)
     with c1:
-        if sel:
-            if st.button("Descargar seleccionados", type="primary",
-                         width='stretch', key="carn_dl_sel"):
-                pdf = pdf_carnets_seleccionados(
-                    list(sel),
-                    titulo=f"Carnets - {sec['grado']} {sec['seccion']}")
-                if pdf:
-                    st.download_button(
-                        "Guardar PDF", pdf,
-                        f"carnets_sel_{sec['grado']}{sec['seccion']}.pdf",
-                        "application/pdf", width='stretch')
-        else:
-            st.info("Marca al menos un alumno.")
-    with c2:
-        if st.button("Descargar todo el salon", width='stretch',
-                     key="carn_dl_todo"):
-            pdf = pdf_carnets_por_seccion(idsec)
+        st.markdown("**Descargar carnet individual:**")
+        ops_alumnos = {al["nombre_completo"]: al["id"] for _, al in df.iterrows()}
+        alumno_sel = st.selectbox("Selecciona un alumno", list(ops_alumnos.keys()), label_visibility="collapsed")
+        if st.button("Generar Carnet Individual (PDF)", width='stretch'):
+            pdf = pdf_carnets_seleccionados([ops_alumnos[alumno_sel]])
             if pdf:
                 st.download_button(
-                    "Guardar PDF", pdf,
-                    f"carnets_{sec['grado']}{sec['seccion']}.pdf",
-                    "application/pdf", width='stretch')
-    with c3:
-        if st.button("Limpiar seleccion", width='stretch', key="carn_limpiar"):
-            st.session_state["carn_sel_alumnos"] = set()
-            st.rerun()
-
+                    "⬇️ Guardar PDF", pdf,
+                    f"carnet_{alumno_sel.replace(' ', '_')}.pdf",
+                    "application/pdf", width='stretch', key="dl_individual")
+                
+    with c2:
+        st.markdown("**Descargar todo el salón:**")
+        st.write("Genera un solo PDF con los carnets de todos los alumnos de esta sección.")
+        if st.button("Generar PDF de todo el Salón", type="primary", width='stretch', key="carn_dl_todo"):
+            with st.spinner("Generando PDF del salón..."):
+                pdf = pdf_carnets_por_seccion(idsec)
+                if pdf:
+                    st.download_button(
+                        "⬇️ Guardar PDF del Salón", pdf,
+                        f"carnets_{sec['grado']}{sec['seccion']}.pdf",
+                        "application/pdf", width='stretch', key="dl_salon")
+                else:
+                    st.error("No se pudo generar el PDF.")
 
 # ─── VENTANAS ──────────────────────────────────────────────────────────────
 def vista_ventanas():
