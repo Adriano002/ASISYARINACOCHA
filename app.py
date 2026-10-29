@@ -6316,52 +6316,92 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       SIDEBAR (ESCRITORIO)
+       SIDEBAR (ESCRITORIO Y MÓVIL)
        ══════════════════════════════════════════════════════════════════ */
-    section[data-testid="stSidebar"]{
+    section[data-testid="stSidebar"] {
         border-right: 1px solid var(--primario-borde);
     }
-    section[data-testid="stSidebar"] .stRadio label{
-        border-radius: var(--radius-sm) !important;
-        padding: 12px 15px !important;
-        font-weight: 600 !important;
-        font-size: var(--fs-small) !important;
-        margin: 2px 0 !important;
-        cursor: pointer;
-        border-left: 3px solid transparent;
-        transition: all .15s ease;
-    }
-    section[data-testid="stSidebar"] .stRadio label:hover{
-        background: var(--primario-soft) !important;
-        border-left-color: var(--primario);
-    }
-    section[data-testid="stSidebar"] .stRadio input{display:none;}
 
-    .encabezado-sidebar{
+    /* 🆕 ELIMINAMOS EL CIRCULITO FEO DEL RADIO BUTTON */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+        display: none !important; 
+    }
+
+    /* Estilo general de las opciones */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        border-radius: var(--radius-sm) !important;
+        padding: 12px 16px !important;
+        font-weight: 700 !important;
+        font-size: var(--fs-small) !important;
+        margin: 4px 8px !important; 
+        cursor: pointer;
+        border-left: 4px solid transparent; 
+        transition: all .2s ease;
+    }
+
+    /* Efecto Hover */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: var(--primario-soft) !important;
+    }
+
+    /* Opción SELECCIONADA */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: var(--primario-soft) !important;
+        border-left: 4px solid var(--primario) !important;
+        color: var(--primario) !important;
+    }
+
+    /* 🆕 TARJETA DE USUARIO (Más angosta y con el escudo) */
+    .encabezado-sidebar {
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
-        padding: 20px 16px;
-        margin: 8px 10px 18px 10px;
-        border-radius: var(--radius);
+        padding: 15px 10px !important;
+        margin: 10px 12px 20px 12px !important;
+        border-radius: var(--radius) !important;
         text-align: center;
         color: #FFF;
-        box-shadow: var(--sombra);
+        box-shadow: 0 4px 10px rgba(232,123,74,0.2);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
     }
-    .encabezado-sidebar .avatar{
-        width: 58px; height: 58px; border-radius: 50%;
-        background: rgba(255,255,255,.25);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 24px; font-weight: 800; color: #FFF;
-        margin: 0 auto 10px auto;
-        border: 2px solid rgba(255,255,255,.5);
+
+    /* El círculo blanco donde va el escudo */
+    .encabezado-sidebar .escudo {
+        width: 60px; 
+        height: 60px; 
+        border-radius: 50%; 
+        background: #FFF; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        margin-bottom: 8px;
+        border: 2px solid rgba(255,255,255,0.5);
+        overflow: hidden;
     }
-    .encabezado-sidebar .nombre{
-        font-size: 16px; font-weight: 700; color: #FFF !important;
+    .encabezado-sidebar .escudo img {
+        width: 80%; 
+        height: auto;
     }
-    .encabezado-sidebar .rol{
-        display: inline-block; margin-top: 8px; padding: 4px 12px;
-        background: rgba(255,255,255,.25); border-radius: 20px;
-        font-size: 11px; font-weight: 800; text-transform: uppercase;
-        letter-spacing: .10em; color: #FFF !important;
+
+    .encabezado-sidebar .nombre {
+        font-size: 15px !important; 
+        font-weight: 800 !important; 
+        color: #FFF !important;
+        margin-bottom: 4px;
+        line-height: 1.1;
+    }
+
+    .encabezado-sidebar .rol {
+        display: inline-block; 
+        padding: 3px 10px;
+        background: rgba(255,255,255,.25); 
+        border-radius: 12px;
+        font-size: 9px !important; 
+        font-weight: 900; 
+        text-transform: uppercase;
+        letter-spacing: .10em; 
+        color: #FFF !important;
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -6659,53 +6699,27 @@ def aplicar_estilos():
         .info-linea{ flex-direction: column; }
         .info-label{ min-width: auto; margin-bottom: 2px; }
 
-        /* 1. Achicamos el sidebar para que no ocupe toda la pantalla */
+        /* Ajustes para móvil */
         section[data-testid="stSidebar"] {
-            min-width: 270px !important;
-            max-width: 270px !important;
+            min-width: 260px !important;
+            max-width: 260px !important;
         }
 
-        /* 2. Hacemos los botones del menú más grandes y cómodos al tacto */
         section[data-testid="stSidebar"] div[role="radiogroup"] label {
-            width: 100% !important;
-            padding: 14px 16px !important; /* Botones más altos para el dedo */
-            margin-bottom: 6px !important;
-            border-radius: 12px !important; /* Esquinas bien redondeadas */
-            background-color: rgba(128,128,128,0.05) !important; /* Fondo gris suave para todos */
+            padding: 14px 16px !important;
+            margin: 4px 6px !important;
+            background-color: rgba(128,128,128,0.05) !important;
             border: 1px solid transparent !important;
-            transition: all 0.2s ease;
-            display: flex !important;
-            align-items: center !important;
         }
-
-        /* 3. Efecto cuando tocas un botón */
+        
         section[data-testid="stSidebar"] div[role="radiogroup"] label:active {
-            transform: scale(0.98); /* Efecto de "presión" */
+            transform: scale(0.98);
         }
 
-        /* 4. El botón SELECCIONADO (El que está activo) */
         section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
             background-color: rgba(232,123,74,0.12) !important;
-            border: 1px solid #E87B4A !important;
-            color: #E87B4A !important;
-            font-weight: 800 !important;
-        }
-
-        /* 5. Achicamos el circulito para que no ocupe espacio */
-        section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-            margin-right: 12px !important;
-            transform: scale(0.9);
-        }
-
-        /* 6. Achicamos un poco la tarjeta naranja del perfil */
-        .encabezado-sidebar {
-            padding: 16px 10px !important;
-            margin-bottom: 15px !important;
-        }
-        .encabezado-sidebar .avatar {
-            width: 50px !important; 
-            height: 50px !important; 
-            font-size: 20px !important;
+            border: 1px solid var(--primario) !important;
+            border-left: 4px solid var(--primario) !important;
         }
     }
     </style>
@@ -6893,23 +6907,29 @@ def menu_lateral():
     usuario = st.session_state["user"]
     rol = usuario["rol"]
     opciones = obtener_opciones_por_rol(usuario)
+    
     with st.sidebar:
-        inicial = (usuario["nombres"] or "?")[0].upper()
+        # 🆕 TARJETA DE USUARIO CON EL ESCUDO
         st.markdown(
             f'<div class="encabezado-sidebar">'
-            f'<div class="avatar">{inicial}</div>'
-            f'<div class="nombre">{usuario["nombres"]}</div>'
-            f'<div class="rol">{rol}</div>'
+            f'  <div class="escudo"><img src="app/static/escudo.png" alt="Escudo"></div>'
+            f'  <div class="nombre">{usuario["nombres"]}</div>'
+            f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
+        
         if "menu" not in st.session_state or \
                 st.session_state["menu"] not in opciones:
             st.session_state["menu"] = opciones[0]
+            
         op = st.radio("Menu", opciones, key="menu",
                       label_visibility="collapsed")
+        
         st.markdown("---")
+        
         if st.button("Cerrar sesion", width='stretch'):
             cerrar_sesion()
             st.rerun()
+            
     return op
 
 
