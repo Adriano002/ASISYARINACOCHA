@@ -3592,10 +3592,49 @@ def _puerta_manual(usuario, fecha):
         return
     _puerta_manual_alumnos(idsec, usuario)
 
-
+def _buscador_rapido_puerta():
+    with st.expander("Buscador rápido de alumnos", expanded=False):
+        busqueda = st.text_input("Escribe el nombre o DNI del alumno", 
+                                 placeholder="Ej: Carlos o 74105299",
+                                 key="busqueda_puerta")
+        
+        if busqueda:
+            df_res = buscar_alumnos(busqueda, limite=5)
+            
+            if df_res.empty:
+                st.warning("No se encontró a ningún alumno con ese nombre/DNI.")
+            else:
+                for _, al in df_res.iterrows():
+                    with cursor() as (con, cur):
+                        cur.execute("""
+                            SELECT estado, hora FROM asistencias 
+                            WHERE alumno_id=? AND fecha=? AND tipo IN ('clases', 'evento')
+                            ORDER BY hora DESC LIMIT 1
+                        """, (al["id"], hoy_date()))
+                        asistencia = cur.fetchone()
+                    
+                    if asistencia:
+                        estado = asistencia["estado"]
+                        hora = fmt_time(asistencia["hora"])
+                        
+                        if estado == "Puntual":
+                            st.success(f"**{al['nombre_completo']}** - Asistió PUNTUAL a las {hora}")
+                        elif estado == "Tardanza":
+                            st.warning(f"**{al['nombre_completo']}** - Asistió con TARDANZA a las {hora}")
+                        elif estado == "Permiso":
+                            st.info(f"**{al['nombre_completo']}** - Tiene PERMISO registrado hoy")
+                        elif estado == "Falta":
+                            st.error(f"**{al['nombre_completo']}** - FALTÓ hoy (No se presentó)")
+                    else:
+                        bloq = alumno_bloqueado(al["id"])
+                        if bloq:
+                            st.error(f"**{al['nombre_completo']}** - ESTÁ BLOQUEADO. No puede entrar.")
+                        else:
+                            st.info(f"**{al['nombre_completo']}** - Aún no tiene registro de asistencia hoy.")
 def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
+    
     st.markdown(f"""
     <div class="puerta-header">
         <div class="titulo">Control de Puerta</div>
@@ -3603,6 +3642,9 @@ def vista_puerta():
     </div>
     """, unsafe_allow_html=True)
     
+    # Llamada al buscador (ahora se verá solo el texto formal)
+    _buscador_rapido_puerta()
+
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
         
@@ -3610,7 +3652,6 @@ def vista_puerta():
                     horizontal=True, label_visibility="collapsed")
                     
     if modo == "Escanear QR":
-        # 🆕 FIX CÁMARA: Si acaba de entrar al escáner, forzamos un reinicio limpio
         if st.session_state.get("_ultimo_modo") != "Escanear QR":
             st.session_state["puerta_qr_mount"] = st.session_state.get("puerta_qr_mount", 0) + 1
             st.session_state["_ultimo_modo"] = "Escanear QR"
