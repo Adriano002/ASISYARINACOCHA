@@ -4769,8 +4769,7 @@ def vista_alumnos():
 # ─── GRADOS Y SECCIONES ────────────────────────────────────────────────────
 def vista_grados_secciones():
     st.title("Grados y Secciones")
-    st.caption("Vista de referencia. Las secciones se crean automaticamente "
-               "al importar el Excel de alumnos.")
+    st.caption("Vista de referencia. Las secciones se crean automaticamente al importar el Excel.")
 
     df = leer_df("""
         SELECT g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
@@ -4785,22 +4784,44 @@ def vista_grados_secciones():
         st.info("No hay secciones creadas todavia.")
         return
 
-    st.subheader("Resumen por grado")
-    resumen = df.groupby("Grado", as_index=False)["Alumnos"].sum()
-    resumen.columns = ["Grado", "Total alumnos"]
-    st.dataframe(resumen, width='stretch', hide_index=True)
+    # ==========================================
+    # 1. RESUMEN POR GRADO (Gráfico de barras)
+    # ==========================================
+    st.subheader("Alumnos por Grado")
+    resumen_grado = df.groupby("Grado", as_index=False)["Alumnos"].sum()
+    # Usamos st.bar_chart pasando el índice como Grado
+    st.bar_chart(resumen_grado.set_index("Grado"), height=250)
 
-    st.subheader("Resumen por turno")
-    resumen_t = df.groupby("Turno", as_index=False)["Alumnos"].sum()
-    resumen_t.columns = ["Turno", "Total alumnos"]
-    st.dataframe(resumen_t, width='stretch', hide_index=True)
+    # ==========================================
+    # 2. RESUMEN POR TURNO (Métricas rápidas)
+    # ==========================================
+    st.markdown("---")
+    st.subheader("Alumnos por Turno")
+    resumen_turno = df.groupby("Turno", as_index=False)["Alumnos"].sum()
+    
+    c1, c2 = st.columns(2)
+    for i, (_, row) in enumerate(resumen_turno.iterrows()):
+        # Ponemos una métrica en cada columna
+        if i == 0:
+            c1.metric(f"Turno {row['Turno']}", f"{row['Alumnos']} alumnos")
+        elif i == 1:
+            c2.metric(f"Turno {row['Turno']}", f"{row['Alumnos']} alumnos")
 
-    st.subheader("Detalle por seccion")
-    st.dataframe(df, width='stretch', hide_index=True)
+    # ==========================================
+    # 3. DETALLE POR SECCIÓN (Dataframe colapsable)
+    # ==========================================
+    st.markdown("---")
+    with st.expander("Ver detalle completo por sección"):
+        st.dataframe(df, width='stretch', hide_index=True)
 
-    st.metric("Total de secciones", len(df))
-    st.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
-
+    # ==========================================
+    # 4. TOTALES GENERALES
+    # ==========================================
+    st.markdown("---")
+    st.subheader("Totales Generales")
+    c1, c2 = st.columns(2)
+    c1.metric("Total de secciones", len(df))
+    c2.metric("Total de alumnos activos", int(df["Alumnos"].sum()))
 
 # ─── CARNETS ───────────────────────────────────────────────────────────────
 def vista_carnets():
