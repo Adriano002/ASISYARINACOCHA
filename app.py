@@ -2078,6 +2078,7 @@ def _perfil_alumno(idal):
 
 
 # ─── MÉTRICAS ──────────────────────────────────────────────────────────────
+@st.cache_data(ttl=10, show_spinner=False)
 def metricas_dia_turno(fecha, id_turno):
     fecha_d = to_date(fecha)
     with cursor() as (con, cur):
@@ -2140,11 +2141,11 @@ def metricas_dia_turno(fecha, id_turno):
             WHERE b.activo=1 AND s.turno_id=?
         """, (id_turno,))
         bloqueados = cur.fetchone()["n"]
+        
     return {"total": total, "puntuales": puntuales, "tardanzas": tardanzas,
             "faltas": faltas, "ref_asistio": ref_asistio,
             "bloqueados": bloqueados, "justificadas": just_hoy,
             "permisos": permisos}
-
 
 def ultimos_registros_turno(fecha, id_turno, limite=30):
     return leer_df("""
@@ -3802,11 +3803,11 @@ def vista_panel_direccion():
     ventana = info["ventana"]
     estado = info["estado"]
     
-    # Llamamos a tus métricas
+    # Llamamos a tus métricas (que ahora están cacheadas por 10 segundos)
     m = metricas_dia_turno(fecha, turno["id"])
 
     # ══════════════════════════════════════════════════════════════════
-    # CABECERA (Fíjate que empieza pegado a las comillas)
+    # CABECERA
     # ══════════════════════════════════════════════════════════════════
     color_estado = "#4CAF50" if estado == "activo" else "#F44336"
     
@@ -3845,16 +3846,16 @@ def vista_panel_direccion():
     st.markdown(html_header, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # BOTÓN ACTUALIZAR
+    # BOTÓN ACTUALIZAR (Fuerza bruta: limpia caché y recarga)
     # ══════════════════════════════════════════════════════════════════
     c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
         if st.button("🔄 Actualizar", key="btn_actualizar_dash", width='stretch'):
-            if hasattr(metricas_dia_turno, "clear"):
-                metricas_dia_turno.clear()
+            st.cache_data.clear() # Borra TODA la caché (métricas, asistencias, etc.)
+            st.rerun()            # Vuelve a pintar la pantalla con datos frescos
 
     # ══════════════════════════════════════════════════════════════════
-    # KPIs (HTML con estilos INLINE - Cero errores)
+    # KPIs (HTML Inline)
     # ══════════════════════════════════════════════════════════════════
     def _kpi_card_inline(icon, value, label, color_borde, color_valor):
         return f"""<div style="
@@ -3902,7 +3903,7 @@ def vista_panel_direccion():
     st.markdown(html_kpis, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # BARRAS DE PROGRESO (100% HTML Inline)
+    # BARRAS DE PROGRESO
     # ══════════════════════════════════════════════════════════════════
     total = m["total"] if m["total"] > 0 else 1
 
@@ -3926,7 +3927,6 @@ def vista_panel_direccion():
     </div>"""
     
     st.markdown(html_progress, unsafe_allow_html=True)
-
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
