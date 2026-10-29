@@ -1687,357 +1687,7 @@ def _render_mensaje_qr(msg):
                         st.session_state["_qr_mensajes"][1:]
                 st.rerun()
 # ─── PERFIL ALUMNO ─────────────────────────────────────────────────────────
-def _perfil_alumno(idal):
-    d = perfil_alumno_datos(idal)
-    if not d:
-        st.warning("Alumno no encontrado.")
-        st.session_state.pop("perfil_alumno_id", None)
-        return
 
-    al = d["alumno"]
-    usuario = st.session_state["user"]
-
-    ultimo_id = st.session_state.get("_perfil_ultimo_id")
-    if ultimo_id != idal:
-        for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"):
-            st.session_state.pop(k, None)
-    st.session_state["_perfil_ultimo_id"] = idal
-
-    if st.button("Volver a la lista", key="volver_perfil"):
-        st.session_state.pop("perfil_alumno_id", None)
-        st.session_state.pop("_perfil_ultimo_id", None)
-        st.rerun()
-
-    nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") +
-              ", " + al['nombres']).strip(", ")
-    inicial = (al['apellido_paterno'] or al['nombres'] or "?")[0].upper()
-    badge_txt = "BLOQUEADO" if d["bloqueado"] else "ACTIVO"
-
-    st.markdown(f"""
-    <div class="perfil-hero">
-        <div class="hero-avatar">{inicial}</div>
-        <div class="hero-info">
-            <div class="hero-nombre">{nombre}</div>
-            <div class="hero-meta">{al['grado']} {al['seccion']} | Turno {al['turno']} | DNI {al['dni']}</div>
-            <span class="hero-badge">{badge_txt}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    apo = al['nombre_apoderado'] or '-'
-    tel = al['telefono_apoderado'] or '-'
-    st.markdown(f"""
-    <div class="perfil-bloque">
-        <div class="titulo-seccion">Datos del Apoderado</div>
-        <div class="info-linea"><span class="info-label">Apoderado:</span><span class="info-valor">{apo}</span></div>
-        <div class="info-linea"><span class="info-label">Telefono:</span><span class="info-valor">{tel}</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    tard_injust = d['tard_injust']
-    tard_injust_class = "kpi-lbl-alerta" if tard_injust > 0 else "kpi-lbl"
-    bloqueado_txt = "SI" if d['bloqueado'] else "NO"
-    bloqueado_class = "kpi-lbl-alerta" if d['bloqueado'] else "kpi-lbl"
-    limite_txt = d['limite']
-    reinc_txt = "SI" if d['reincidente'] else "NO"
-    reinc_class = "kpi-lbl-alerta" if d['reincidente'] else "kpi-lbl"
-
-    st.markdown(f"""
-    <div class="perfil-bloque">
-        <div class="titulo-seccion">Estadisticas del Periodo</div>
-        <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-num">{d['total_puntuales']}</div><div class="kpi-lbl">Puntuales</div></div>
-            <div class="kpi-card"><div class="kpi-num">{d['total_tardanzas']}</div><div class="kpi-lbl">Tardanzas</div></div>
-            <div class="kpi-card"><div class="kpi-num">{d['total_faltas']}</div><div class="kpi-lbl">Faltas</div></div>
-            <div class="kpi-card"><div class="kpi-num">{d['total_ref_asistio']}</div><div class="kpi-lbl">Reforzamiento</div></div>
-            <div class="kpi-card"><div class="kpi-num">{tard_injust}</div><div class="{tard_injust_class}">Tard. Injust.</div></div>
-            <div class="kpi-card"><div class="kpi-num">{d['n_ciclo']}</div><div class="kpi-lbl">Tard. desde desbloqueo</div></div>
-            <div class="kpi-card"><div class="kpi-num">{limite_txt}</div><div class="kpi-lbl">Limite permitido</div></div>
-            <div class="kpi-card"><div class="kpi-num">{reinc_txt}</div><div class="{reinc_class}">Reincidente</div></div>
-            <div class="kpi-card"><div class="kpi-num">{bloqueado_txt}</div><div class="{bloqueado_class}">Bloqueado</div></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Acciones</div>',
-                unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        pdf = pdf_carnet_alumno(al["dni"])
-        if pdf:
-            st.download_button("Carnet QR", pdf, f"carnet_{al['dni']}.pdf",
-                               "application/pdf", width='stretch',
-                               key="acc_carnet")
-    with c2:
-        st.download_button("Historial (Excel)",
-                           df_a_xlsx(d["asistencias"], "Historial"),
-                           f"historial_{al['dni']}.xlsx", width='stretch',
-                           key="acc_hist")
-    with c3:
-        pdf_res = pdf_resumen_alumno(al["id"])
-        if pdf_res:
-            st.download_button("Resumen (PDF)", pdf_res,
-                               f"resumen_{al['dni']}.pdf",
-                               "application/pdf", width='stretch',
-                               key="acc_res")
-    with c4:
-        if usuario["rol"] == "Admin":
-            if al.get("activo", 1) == 1:
-                if st.button("Desactivar", width='stretch', key="acc_desac"):
-                    st.session_state["_desac_al"] = True
-            else:
-                if st.button("Reactivar", width='stretch', key="acc_reac"):
-                    st.session_state["_reac_al"] = True
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ==========================================
-    # ZONA DE BLOQUEO MANUAL (SIN EMOJIS)
-    # ==========================================
-    st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Gestion de Bloqueo Manual</div>', unsafe_allow_html=True)
-    if d["bloqueado"]:
-        st.error("Este alumno esta BLOQUEADO actualmente.")
-        if st.button("Desbloquear Alumno Ahora", type="primary", width='stretch', key="btn_desbloq_manual"):
-            liberar_bloqueo(al["id"], usuario, "Desbloqueado manualmente desde perfil")
-            st.toast("Alumno desbloqueado.")
-            st.rerun()
-    else:
-        st.info("El alumno no esta bloqueado actualmente. Puedes bloquearlo manualmente si es necesario.")
-        motivo_manual = st.text_input("Motivo del bloqueo manual (obligatorio)", key="motivo_bloq_manual", placeholder="Ej: Falta grave, acumulacion de faltas, etc.")
-        if st.button("Bloquear Alumno Ahora", type="primary", width='stretch', key="btn_bloq_manual"):
-            if not motivo_manual.strip():
-                st.error("El motivo es obligatorio.")
-            else:
-                crear_bloqueo(al["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
-                st.toast(f"Alumno {al['nombres']} bloqueado manualmente.")
-                st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ==========================================
-    if st.session_state.get("_desac_al"):
-        with st.expander("Confirmar desactivacion", expanded=True):
-            if confirmar_accion("desac_al", "Confirmar",
-                                 "¿Estas seguro de desactivar a este alumno?"):
-                ok, msg = retirar_alumno(al["id"], al["dni"], usuario)
-                st.session_state.pop("_desac_al", None)
-                st.toast(msg)
-                st.rerun()
-    if st.session_state.get("_reac_al"):
-        with st.expander("Confirmar reactivacion", expanded=True):
-            if confirmar_accion("reac_al", "Confirmar",
-                                 "¿Estas seguro de reactivar a este alumno?"):
-                ok, msg = reactivar_alumno(al["id"], al["dni"], usuario)
-                st.session_state.pop("_reac_al", None)
-                st.toast(msg)
-                st.rerun()
-
-    st.markdown('<div class="perfil-bloque"><div class="titulo-seccion">Codigo QR</div>',
-                unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        st.image(generar_qr(al["dni"]), width=220)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos",
-                    "Justificaciones previas"])
-
-    with tabs[0]:
-        if d["asistencias"].empty:
-            st.info("Sin asistencias.")
-        else:
-            for _, ast in d["asistencias"].head(50).iterrows():
-                c1, c2, c3, c4 = st.columns([2, 3, 2, 1])
-                c1.write(f"**{ast['fecha']}**")
-                desc = str(ast['tipo']) + " - " + str(ast['estado'])
-                if ast['tipo'] == "evento" and ast.get("evento_nombre"):
-                    desc += " - " + str(ast['evento_nombre'])
-                c2.write(desc)
-                just_flag = bool(ast["justificada"]) if not pd.isna(ast["justificada"]) else False
-                just_por = ast.get("justificado_por") or ""
-                just_txt = "Justificada"
-                if just_flag and just_por:
-                    just_txt += " por " + str(just_por)
-                c3.write(just_txt if just_flag else "Sin justificar")
-                if just_flag:
-                    if c4.button("Quitar", key="quitar_" + str(ast['id'])):
-                        ok, msg = quitar_justificacion(ast["id"], usuario)
-                        if ok:
-                            st.toast(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-                else:
-                    if ast["estado"] == "Falta":
-                        puede, _m = _puede_justificar(
-                            fmt_date(ast["fecha"]),
-                            tipo_asistencia=FALTA,
-                            ventana_id=ast.get("ventana_id"))
-                        if puede:
-                            if c4.button("Justificar", key="just_" + str(ast['id'])):
-                                st.session_state["justif_id"] = ast["id"]
-                                st.rerun()
-                        else:
-                            c4.caption("Cerrada")
-
-            if st.session_state.get("justif_id"):
-                jid = st.session_state["justif_id"]
-                st.markdown("---")
-                st.markdown("Justificar falta")
-                obs = st.text_input("Observacion (obligatoria)", key="justif_obs")
-                cc1, cc2 = st.columns(2)
-                with cc1:
-                    if st.button("Confirmar", type="primary"):
-                        if not obs.strip():
-                            st.error("La observacion es obligatoria.")
-                        else:
-                            ok, msg = justificar_asistencia(jid, obs, usuario)
-                            if ok:
-                                st.session_state.pop("justif_id", None)
-                                st.toast(msg)
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                with cc2:
-                    if st.button("Cancelar"):
-                        st.session_state.pop("justif_id", None)
-                        st.rerun()
-
-    with tabs[1]:
-        if d["tardanzas"].empty:
-            st.info("Sin tardanzas.")
-        else:
-            st.dataframe(d["tardanzas"], width='stretch', hide_index=True)
-
-    with tabs[2]:
-        if d["bloqueos"].empty:
-            st.info("Sin bloqueos.")
-        else:
-            st.dataframe(d["bloqueos"], width='stretch', hide_index=True)
-
-    with tabs[3]:
-        if d["permisos"].empty:
-            st.info("Sin permisos registrados para este alumno.")
-        else:
-            st.caption(f"{len(d['permisos'])} permiso(s) registrado(s). "
-                       "Solo se pueden anular los PENDIENTES (futuros).")
-            for _, perm in d["permisos"].iterrows():
-                c1, c2, c3 = st.columns([4, 2, 1])
-                activo = bool(perm["activo"]) if not pd.isna(perm["activo"]) else False
-                with cursor() as (con, cur):
-                    cur.execute("""
-                        SELECT COUNT(*) AS n FROM asistencias
-                        WHERE alumno_id=? AND fecha BETWEEN ? AND ?
-                          AND estado='Permiso'
-                    """, (al["id"], to_date(perm['fecha_inicio']),
-                          to_date(perm['fecha_fin'])))
-                    aplicado = (cur.fetchone()["n"] or 0) > 0
-                if not activo:
-                    estado_txt = "Anulado"
-                elif aplicado:
-                    estado_txt = "Aplicado"
-                else:
-                    estado_txt = "Pendiente"
-                c1.write(f"**{perm['fecha_inicio']} -> {perm['fecha_fin']}** - {perm['motivo']}")
-                c2.write(estado_txt)
-                if activo and not aplicado:
-                    if c3.button("Anular", key=f"anul_perm_{perm['id']}"):
-                        st.session_state["_anular_perm_id"] = int(perm["id"])
-                        st.rerun()
-
-            if st.session_state.get("_anular_perm_id"):
-                pid = st.session_state["_anular_perm_id"]
-                st.markdown("---")
-                st.warning("Vas a anular este permiso (pendiente).")
-                motivo_elim = st.text_input("Motivo de anulacion (opcional)",
-                                             key=f"anul_perm_motivo_{pid}")
-                if confirmar_accion(f"anul_perm_{pid}", "Confirmar anulacion",
-                                     "¿Estas seguro de anular este permiso?"):
-                    ok, msg = eliminar_permiso(pid, usuario, motivo_elim)
-                    st.session_state.pop("_anular_perm_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"anul_perm_cancel_{pid}"):
-                    st.session_state.pop("_anular_perm_id", None)
-                    st.rerun()
-
-    with tabs[4]:
-        if d["justificaciones_previas"].empty:
-            st.info("Sin justificaciones previas registradas para este alumno.")
-        else:
-            dj = d["justificaciones_previas"].copy()
-
-            def _estado_jp(v):
-                try:
-                    v = int(v)
-                except (ValueError, TypeError):
-                    v = 0
-                if v == 1:
-                    return "Aplicada"
-                if v == -1:
-                    return "Anulada"
-                return "Pendiente"
-
-            dj["estado_txt"] = dj["aplicada"].apply(_estado_jp)
-            st.caption(f"{len(dj)} justificacion(es) previa(s). "
-                       "Solo se anulan las PENDIENTES.")
-
-            for _, jp in dj.iterrows():
-                c1, c2, c3, c4 = st.columns([3, 3, 2, 1])
-                c1.write(f"**{jp['fecha_objetivo']}**")
-                c2.write(jp["motivo"])
-                c3.write(jp["estado_txt"])
-                try:
-                    aplicada = int(jp["aplicada"])
-                except (ValueError, TypeError):
-                    aplicada = 0
-                if aplicada == 0:
-                    if c4.button("Anular", key=f"anul_jp_{jp['id']}"):
-                        st.session_state["_anular_jp_id"] = int(jp["id"])
-                        st.rerun()
-                elif aplicada == -1:
-                    if c4.button("Reactivar", key=f"reac_jp_{jp['id']}"):
-                        st.session_state["_reactivar_jp_id"] = int(jp["id"])
-                        st.rerun()
-
-            if st.session_state.get("_anular_jp_id"):
-                jid = st.session_state["_anular_jp_id"]
-                st.markdown("---")
-                st.warning("Vas a anular esta justificacion previa (pendiente).")
-                motivo_anul = st.text_input("Motivo de anulacion (opcional)",
-                                             key=f"anul_jp_motivo_{jid}")
-                if confirmar_accion(f"anul_jp_{jid}", "Confirmar anulacion",
-                                     "¿Estas seguro de anular esta justificacion?"):
-                    ok, msg = anular_justificacion_previa(jid, usuario, motivo_anul)
-                    st.session_state.pop("_anular_jp_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"anul_jp_cancel_{jid}"):
-                    st.session_state.pop("_anular_jp_id", None)
-                    st.rerun()
-
-            if st.session_state.get("_reactivar_jp_id"):
-                jid = st.session_state["_reactivar_jp_id"]
-                st.markdown("---")
-                st.info("Vas a reactivar esta justificacion previa (quedara pendiente).")
-                motivo_nuevo = st.text_input("Motivo nuevo (opcional)",
-                                             key=f"reac_jp_motivo_{jid}")
-                if confirmar_accion(f"reac_jp_{jid}", "Confirmar reactivacion",
-                                     "¿Estas seguro de reactivar esta justificacion?"):
-                    ok, msg = reactivar_justificacion_previa(jid, usuario, motivo_nuevo)
-                    st.session_state.pop("_reactivar_jp_id", None)
-                    if ok:
-                        st.toast(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                if st.button("Cancelar", key=f"reac_jp_cancel_{jid}"):
-                    st.session_state.pop("_reactivar_jp_id", None)
-                    st.rerun()
 def perfil_alumno_datos(idal):
     try:
         with cursor() as (con, cur):
@@ -5161,13 +4811,24 @@ def _frag_importar_excel():
         if st.session_state.get("_iv"):
             if confirmar_accion("importar_excel", "Importar validas",
                                  "¿Estas seguro de importar los alumnos validos?"):
-                ins, reac, errs = insertar_alumnos_validos(
-                    st.session_state["_iv"])
+                with st.spinner("Insertando alumnos y respaldando en la nube..."):
+                    ins, reac, errs = insertar_alumnos_validos(
+                        st.session_state["_iv"])
+                    
+                    # 🆕 RESPALDO AUTOMÁTICO A R2
+                    from sync import subir_bd
+                    from db import DB_PATH
+                    try:
+                        subir_bd(DB_PATH)
+                    except Exception as e:
+                        log.error(f"Fallo backup automático: {e}")
+                
                 st.toast(f"{ins} importados, {reac} reactivados.")
                 if errs:
                     st.warning(f"{len(errs)} errores al insertar")
                 for k in ["_iv", "_ie", "_ir"]:
                     st.session_state.pop(k, None)
+                time.sleep(1)
                 st.rerun()
 
 
@@ -5175,7 +4836,6 @@ def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
     
-    # Pestañas de Auditoría
     tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
     
     with tabs[0]:
@@ -5185,7 +4845,6 @@ def vista_auditoria():
             st.dataframe(df, width='stretch')
             
     with tabs[1]:
-        # 🆕 SECCIÓN PARA CREAR EL PERIODO
         st.subheader("Crear nuevo periodo")
         with st.form("crear_periodo_form"):
             c1, c2, c3 = st.columns(3)
@@ -5230,7 +4889,6 @@ def vista_auditoria():
             else:
                 st.warning("El periodo NO tiene alumnos. Sube el Excel aquí abajo.")
             
-            # 🆕 SECCIÓN PARA IMPORTAR EL EXCEL
             _frag_importar_excel()
         else:
             st.warning("Primero debes crear un periodo arriba para poder cargar alumnos.")
