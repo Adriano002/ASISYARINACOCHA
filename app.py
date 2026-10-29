@@ -3780,20 +3780,26 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    st.title("Panel Direccion")
+    # 🆕 Auto-refresh opcional (si quieres que se actualice solo cada 30 seg)
+    # st_autorefresh(interval=30000, key="panel_dir_refresh")
+    
+    st.title("Panel de Control - Dirección")
     fecha = hoy_str()
+    st.caption(f"Resumen operativo del día: **{fecha}**")
+
     turnos_info = _turnos_para_panel()
     if not turnos_info:
         st.info("No hay turnos configurados.")
         return
 
+    # Selector de turno
     etiquetas = []
     for info in turnos_info:
         t = info["turno"]
         est = "EN CURSO" if info["estado"] == "activo" else "CERRADO"
-        etiquetas.append(f"{t['nombre']} ({est})")
+        etiquetas.append(f"Turno {t['nombre']} ({est})")
 
-    sel = st.radio("Turno", etiquetas, horizontal=True,
+    sel = st.radio("Selecciona el turno a monitorear", etiquetas, horizontal=True,
                    key="panel_dir_turno", label_visibility="collapsed")
     idx = etiquetas.index(sel)
     info = turnos_info[idx]
@@ -3801,32 +3807,56 @@ def vista_panel_direccion():
     ventana = info["ventana"]
     estado = info["estado"]
 
+    # Banner de estado
     if estado == "activo":
-        st.success(f"Turno **{turno['nombre']}** en curso — "
-                   f"ventana: {ventana['nombre']} "
-                   f"({ventana['hora_apertura']} a {ventana['hora_cierre']})")
+        st.success(f"🟢 El turno **{turno['nombre']}** está EN CURSO. Ventana: {ventana['nombre']} ({ventana['hora_apertura']} - {ventana['hora_cierre']})")
     else:
-        st.info(f"Turno **{turno['nombre']}** ya cerro — "
-                f"ventana: {ventana['nombre']} "
-                f"(cerro a las {ventana['hora_cierre']})")
-
-    if st.button("Actualizar Datos", key="refresh_panel"):
-        marcar_faltas_al_cierre()
-        st.rerun()
+        st.info(f"🔴 El turno **{turno['nombre']}** está CERRADO. La ventana cerró a las {ventana['hora_cierre']}.")
 
     m = metricas_dia_turno(fecha, turno["id"])
-    st.subheader(f"Resumen del turno {turno['nombre']}")
+    
+    # ==========================================
+    # FILA 1: MÉTRICAS PRINCIPALES (Tarjetas grandes)
+    # ==========================================
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total alumnos", m["total"])
-    c2.metric("Puntuales", m["puntuales"])
-    c3.metric("Tardanzas", m["tardanzas"])
-    c4.metric("Faltas", m["faltas"])
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Reforzamiento asistio", m["ref_asistio"])
-    c2.metric("Bloqueados", m["bloqueados"])
-    c3.metric("Justificadas hoy", m["justificadas"])
-    c4.metric("Permisos hoy", m["permisos"])
+    c1.metric("Total Alumnos", m["total"])
+    c2.metric("Puntuales", m["puntuales"], delta=f"{m['puntuales'] - m['tardanzas']} vs tardanzas", delta_color="off")
+    c3.metric("Tardanzas", m["tardanzas"], delta_color="inverse" if m["tardanzas"] > 0 else "normal")
+    c4.metric("Faltas", m["faltas"], delta_color="inverse" if m["faltas"] > 0 else "normal")
 
+    # ==========================================
+    # FILA 2: DETALLES OPERATIVOS
+    # ==========================================
+    st.markdown("---")
+    st.markdown("**Detalles Operativos**")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Reforzamiento", m["ref_asistio"])
+    c2.metric("Bloqueados", m["bloqueados"])
+    c3.metric("Justificadas Hoy", m["justificadas"])
+    c4.metric("Permisos Hoy", m["permisos"])
+
+    # ==========================================
+    # FILA 3: GRÁFICO DE ASISTENCIA
+    # ==========================================
+    st.markdown("---")
+    st.markdown("**Progreso de Asistencia del Turno**")
+    
+    # Armamos un pequeño DataFrame para el gráfico
+    datos_grafico = pd.DataFrame({
+        "Estado": ["Puntuales", "Tardanzas", "Faltas"],
+        "Cantidad": [m["puntuales"], m["tardanzas"], m["faltas"]]
+    })
+    
+    # 🆕 Gráfico de barras nativo (Cero RAM extra)
+    st.bar_chart(datos_grafico.set_index("Estado"), height=250)
+    
+    # Nota: Si quieres ver la lista de escaneos, la dejamos oculta en un expander para no gastar RAM visual
+    with st.expander("Ver lista de últimos escaneos"):
+        df = ultimos_registros_turno(fecha, turno["id"], 50)
+        if df.empty:
+            st.info("Sin escaneos hoy en este turno.")
+        else:
+            st.dataframe(df, width='stretch', hide_index=True)
 
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
