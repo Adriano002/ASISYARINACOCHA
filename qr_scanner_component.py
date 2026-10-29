@@ -1,7 +1,7 @@
 import streamlit as st
 
 QR_SCANNER_COMPONENT = st.components.v2.component(
-    name="mi_qr_scanner_v19",
+    name="mi_qr_scanner_v18",
     isolate_styles=False,
     html="""
     <div id="qr-wrapper">
@@ -13,7 +13,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     css="""
     #qr-wrapper {
         width: 100%;
-        max-width: 320px; /* Lo mantenemos angostito */
+        max-width: 340px; /* 🆕 Achicamos el ancho para que no ocupe toda la pantalla */
         margin: 0 auto;
     }
     #qr-reader {
@@ -21,14 +21,17 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
         overflow: hidden;
         border: 3px solid #E65100;
         background: #000;
-        width: 100%;
-        /* 🆕 ELIMINAMOS LA ALTURA FIJA. Dejamos que el video dicte el tamaño */
+        height: 320px; /* 🆕 Altura fija para evitar que se estire hacia abajo */
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     #qr-reader video {
         border-radius: 8px;
         width: 100% !important;
-        height: auto !important; /* 🆕 Mantiene la proporción natural del video */
-        display: block;
+        height: 100% !important;
+        object-fit: cover; /* 🆕 Llena la caja sin distorsionar */
     }
     #qr-status {
         text-align: center;
@@ -317,6 +320,7 @@ QR_SCANNER_COMPONENT = st.components.v2.component(
     }
     """,
 )
+
 
 def qr_scanner(key="qr_scanner", on_scan=None):
     if on_scan is None:
