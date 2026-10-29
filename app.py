@@ -3360,63 +3360,25 @@ def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
 
-    # ══════════════════════════════════════════════════════════════════
-    # 1. CSS EXCLUSIVO PARA LA PUERTA (Cero gasto de RAM global)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown("""<style>
-    .puerta-header {
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
-        border-radius: 20px;
-        padding: 24px 30px;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px rgba(232,123,74,0.25);
-    }
-    .puerta-header h1 {
-        margin: 0; font-size: 32px; font-weight: 900; color: white !important;
-    }
-    .puerta-header p {
-        margin: 5px 0 0 0; opacity: 0.9; font-size: 15px;
-    }
-    .puerta-fecha {
-        background: rgba(255,255,255,0.2); padding: 8px 20px; 
-        border-radius: 12px; font-size: 18px; font-weight: 800;
-        border: 1px solid rgba(255,255,255,0.4);
-    }
-    </style>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════
-    # 2. HEADER DE LA VISTA (HTML)
-    # ══════════════════════════════════════════════════════════════════
-    st.markdown(f"""<div class="puerta-header">
+    st.markdown(f"""<div style="background: var(--secondary-background-color); border-radius: 16px; padding: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-left: 6px solid #E87B4A;">
         <div>
-            <h1>Control de Puerta</h1>
-            <p>Escanea el QR del estudiante para registrar su asistencia</p>
+            <h2 style="margin: 0; color: #E87B4A; font-weight: 900;">Control de Puerta</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.8;">Escanea el QR del estudiante para registrar su asistencia.</p>
         </div>
-        <div class="puerta-fecha">{fecha}</div>
+        <div style="font-weight: 800; font-size: 16px; color: var(--text-color);">{fecha}</div>
     </div>""", unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════
-    # 3. LÓGICA DE MODOS (Streamlit puro)
-    # ══════════════════════════════════════════════════════════════════
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
         
-    # Usamos columnas para que el radio no ocupe toda la pantalla
     _, col_modo, _ = st.columns([1, 2, 1])
     with col_modo:
-        modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
-                        horizontal=True, label_visibility="collapsed")
+        modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo", horizontal=True, label_visibility="collapsed")
                     
     if modo == "Escanear QR":
-        # Forzamos un reinicio limpio de la cámara si acabamos de entrar
         if st.session_state.get("_ultimo_modo") != "Escanear QR":
             st.session_state["puerta_qr_mount"] = st.session_state.get("puerta_qr_mount", 0) + 1
             st.session_state["_ultimo_modo"] = "Escanear QR"
-            
         _puerta_escanear(usuario, fecha)
     else:
         st.session_state["_ultimo_modo"] = "Manual"
@@ -3425,20 +3387,16 @@ def vista_puerta():
 # ─── BLOQUEADOS ────────────────────────────────────────────────────────────
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
-    st.caption(
-        "Reglas automaticas: alumno nuevo → 3 tardanzas → bloqueo al dia siguiente. "
-        "Alumno reincidente → 1 tardanza → bloqueo al dia siguiente."
-    )
     usuario = st.session_state["user"]
-
     df = listar_bloqueados()
-    st.metric("Total bloqueados", len(df))
-
+    
     if df.empty:
         st.success("No hay alumnos bloqueados actualmente.")
         return
 
-    st.dataframe(df, width='stretch', hide_index=True)
+    with st.container(border=True):
+        st.metric("Total bloqueados", len(df))
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.subheader("Desbloquear alumno")
@@ -3448,11 +3406,7 @@ def vista_bloqueados():
     if not idsec:
         return
 
-    al = _selector_alumno_accion(
-        clave, idsec,
-        texto_boton="Seleccionar",
-        key_boton="bloq_sel_btn",
-        on_click_key="bloq_al_sel_id")
+    al = _selector_alumno_accion(clave, idsec, "Seleccionar", "bloq_sel_btn", "bloq_al_sel_id")
     if not al:
         return
 
@@ -3464,37 +3418,20 @@ def vista_bloqueados():
             st.rerun()
         return
 
-    st.markdown("---")
-    st.markdown(f"### Desbloquear a {al['apellido_paterno']} "
-                f"{(al['apellido_materno'] or '')}, {al['nombres']}")
-    st.markdown(f"**DNI:** {al['dni']}  \n"
-                f"**{al['grado']} {al['seccion']}** — Turno {al['turno']}")
-
-    st.info(f"Motivo del bloqueo: **{bloq['motivo']}**  \n"
-            f"Fecha de bloqueo: **{bloq['fecha_inicio']}**")
-
-    with st.expander("Historial completo de bloqueos", expanded=False):
-        st.dataframe(historial_bloqueos_alumno(al["id"]), width='stretch',
-                     hide_index=True)
-
-    st.markdown("---")
-    motivo = st.text_input("Motivo de desbloqueo (obligatorio)",
-                            key=f"bloq_motivo_{al['id']}")
-
-    if confirmar_accion(f"bloq_{al['id']}",
-                        texto_boton="Desbloquear alumno",
-                        texto_check="¿Estas seguro de desbloquear a este alumno?"):
-        if not motivo.strip():
-            st.error("El motivo es obligatorio.")
-        else:
-            liberar_bloqueo(al["id"], usuario, motivo.strip())
-            st.toast(f"Alumno {al['nombres']} desbloqueado.")
-            _reset_selector(clave, "bloq_al_sel_id")
-            st.rerun()
-
-    if st.button("Cancelar", key=f"bloq_cancel_{al['id']}"):
-        _reset_selector(clave, "bloq_al_sel_id")
-        st.rerun()
+    with st.container(border=True):
+        st.markdown(f"### Desbloquear a {al['apellido_paterno']} {(al['apellido_materno'] or '')}, {al['nombres']}")
+        st.write(f"**DNI:** {al['dni']} | **{al['grado']} {al['seccion']}** — Turno {al['turno']}")
+        st.info(f"Motivo: **{bloq['motivo']}** | Fecha: **{bloq['fecha_inicio']}**")
+        
+        motivo = st.text_input("Motivo de desbloqueo (obligatorio)", key=f"bloq_motivo_{al['id']}")
+        if st.button("Desbloquear alumno", type="primary", key=f"btn_desbloq_{al['id']}"):
+            if not motivo.strip():
+                st.error("El motivo es obligatorio.")
+            else:
+                liberar_bloqueo(al["id"], usuario, motivo.strip())
+                st.toast(f"Alumno {al['nombres']} desbloqueado.")
+                _reset_selector(clave, "bloq_al_sel_id")
+                st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
     fecha = hoy_str()
@@ -3923,19 +3860,14 @@ def vista_reportes():
     usuario = st.session_state["user"]
     rol = usuario["rol"]
     if not st.session_state.get("_rep_iniciado"):
-        for k in ["rep_grado_sel", "rep_idsec", "rep_tipo", "rep_idsec_val",
-                  "rep_desde_val", "rep_hasta_val", "rep_modo_admin"]:
+        for k in ["rep_grado_sel", "rep_idsec", "rep_tipo", "rep_idsec_val", "rep_desde_val", "rep_hasta_val", "rep_modo_admin"]:
             st.session_state.pop(k, None)
         st.session_state["_rep_iniciado"] = True
 
     if rol == "Admin":
-        modo = st.radio("Modo",
-                        ["Por seccion", "Reporte general por auxiliar"],
-                        key="rep_modo_admin", horizontal=True,
-                        label_visibility="collapsed")
+        modo = st.radio("Modo", ["Por seccion", "Reporte general por auxiliar"], key="rep_modo_admin", horizontal=True, label_visibility="collapsed")
         if modo == "Reporte general por auxiliar":
-            if st.button("← Volver a reportes por seccion",
-                         key="rep_volver_modo"):
+            if st.button("← Volver a reportes por seccion", key="rep_volver_modo"):
                 st.session_state.pop("rep_modo_admin", None)
                 st.session_state["_rep_iniciado"] = False
                 st.rerun()
@@ -3943,10 +3875,7 @@ def vista_reportes():
             return
 
     if st.session_state.get("rep_tipo") and st.session_state.get("rep_idsec_val"):
-        _rep_mostrar_reporte(st.session_state.get("rep_idsec_val"),
-                             st.session_state.get("rep_tipo"),
-                             ahora().date() - timedelta(days=30),
-                             ahora().date())
+        _rep_mostrar_reporte(st.session_state.get("rep_idsec_val"), st.session_state.get("rep_tipo"), ahora().date() - timedelta(days=30), ahora().date())
         return
     if st.session_state.get("rep_idsec"):
         _rep_pantalla_tipos(st.session_state["rep_idsec"])
@@ -4473,30 +4402,14 @@ def vista_ventanas():
         st.subheader("Turno " + turno['nombre'])
         for v in listar_ventanas(turno["id"]):
             with st.expander(f"{v['nombre']} ({v['tipo']})"):
-                ap_t = st.time_input(
-                    "Apertura",
-                    value=datetime.strptime(v["hora_apertura"], "%H:%M").time(),
-                    key="ap_" + str(v['id']))
+                ap_t = st.time_input("Apertura", value=datetime.strptime(v["hora_apertura"], "%H:%M").time(), key="ap_" + str(v['id']))
                 lim_val = v["hora_limite_puntual"] or v["hora_apertura"]
-                lim_t = st.time_input(
-                    "Limite puntual",
-                    value=datetime.strptime(lim_val, "%H:%M").time(),
-                    key="lim_" + str(v['id']))
-                ci_t = st.time_input(
-                    "Cierre",
-                    value=datetime.strptime(v["hora_cierre"], "%H:%M").time(),
-                    key="ci_" + str(v['id']))
-                if confirmar_accion(
-                        f"vent_{v['id']}", "Guardar",
-                        "¿Estas seguro de guardar los cambios de esta ventana?"):
-                    ap = ap_t.strftime("%H:%M")
-                    lim = lim_t.strftime("%H:%M")
-                    ci = ci_t.strftime("%H:%M")
-                    escribir("UPDATE ventanas SET hora_apertura=?,"
-                             "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
-                             (ap, lim, ci, v["id"]))
-                    auditar(st.session_state["user"]["usuario"],
-                            f"Edito ventana id={v['id']}")
+                lim_t = st.time_input("Limite puntual", value=datetime.strptime(lim_val, "%H:%M").time(), key="lim_" + str(v['id']))
+                ci_t = st.time_input("Cierre", value=datetime.strptime(v["hora_cierre"], "%H:%M").time(), key="ci_" + str(v['id']))
+                if confirmar_accion(f"vent_{v['id']}", "Guardar", "¿Estas seguro de guardar los cambios de esta ventana?"):
+                    ap = ap_t.strftime("%H:%M"); lim = lim_t.strftime("%H:%M"); ci = ci_t.strftime("%H:%M")
+                    escribir("UPDATE ventanas SET hora_apertura=?,hora_limite_puntual=?,hora_cierre=? WHERE id=?", (ap, lim, ci, v["id"]))
+                    auditar(st.session_state["user"]["usuario"], f"Edito ventana id={v['id']}")
                     st.toast("Ventana actualizada")
                     st.rerun()
 
@@ -4812,14 +4725,10 @@ def _frag_usuarios_mantenimiento():
 def vista_usuarios():
     st.title("Usuarios")
     tabs = st.tabs(["Usuarios", "Crear", "Asignar secciones", "Mantenimiento"])
-    with tabs[0]:
-        _frag_usuarios_botones()
-    with tabs[1]:
-        _frag_usuarios_crear()
-    with tabs[2]:
-        _frag_usuarios_asignar()
-    with tabs[3]:
-        _frag_usuarios_mantenimiento()
+    with tabs[0]: _frag_usuarios_botones()
+    with tabs[1]: _frag_usuarios_crear()
+    with tabs[2]: _frag_usuarios_asignar()
+    with tabs[3]: _frag_usuarios_mantenimiento()
 
 
 # ─── AUDITORÍA ─────────────────────────────────────────────────────────────
@@ -4895,159 +4804,56 @@ def _frag_importar_excel():
 def vista_auditoria():
     st.title("Auditoria y Periodos")
     usuario = st.session_state["user"]
-    
     tabs = st.tabs(["Registros", "Periodos", "Cierre de año"])
-    
     with tabs[0]:
         df = obtener_auditoria(500)
         st.write(f"{len(df)} registros")
-        if not df.empty:
-            st.dataframe(df, width='stretch')
-            
+        if not df.empty: st.dataframe(df, use_container_width=True)
     with tabs[1]:
         st.subheader("Crear nuevo periodo")
         with st.form("crear_periodo_form"):
             c1, c2, c3 = st.columns(3)
-            with c1:
-                nom = st.text_input("Nombre del periodo (ej: 2026)")
-            with c2:
-                fi = st.date_input("Fecha de inicio", ahora().date())
-            with c3:
-                ff = st.date_input("Fecha de fin", ahora().date() + timedelta(days=270))
-            
+            with c1: nom = st.text_input("Nombre del periodo (ej: 2026)")
+            with c2: fi = st.date_input("Fecha de inicio", ahora().date())
+            with c3: ff = st.date_input("Fecha de fin", ahora().date() + timedelta(days=270))
             if st.form_submit_button("Crear y Activar Periodo", type="primary"):
-                if not nom.strip():
-                    st.error("Ingresa un nombre para el periodo.")
-                elif (ff - fi).days < 30:
-                    st.error("El periodo debe durar mínimo 1 mes.")
+                if not nom.strip(): st.error("Ingresa un nombre.")
+                elif (ff - fi).days < 30: st.error("Mínimo 1 mes.")
                 else:
                     with cursor() as (con, cur):
-                        cur.execute("INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) VALUES(?,?,?,1,0)", 
-                                    (nom.strip(), to_date(fi), to_date(ff)))
+                        cur.execute("INSERT INTO periodos(nombre,fecha_inicio,fecha_fin,activo,cerrado) VALUES(?,?,?,1,0)", (nom.strip(), to_date(fi), to_date(ff)))
                         nuevo_id = cur.lastrowid
                         cur.execute("UPDATE periodos SET activo=0 WHERE id!=?", (nuevo_id,))
                     auditar(usuario["usuario"], f"Creo periodo {nom}", tb="periodos", rid=nuevo_id)
-                    st.success(f"Periodo '{nom}' creado y activado con éxito.")
-                    time.sleep(1)
                     st.rerun()
-
-        st.markdown("---")
-        st.subheader("Periodos registrados")
         df_info = info_periodo_con_alumnos()
-        if df_info.empty:
-            st.info("Aún no hay periodos creados.")
-        else:
-            st.dataframe(df_info, width='stretch', hide_index=True)
-
+        if not df_info.empty: st.dataframe(df_info, use_container_width=True, hide_index=True)
         st.markdown("---")
-        st.subheader("Cargar alumnos al periodo activo")
         p = obtener_periodo_activo()
         if p:
-            st.info(f"Periodo activo: **{p['nombre']}** ({p['fecha_inicio']} - {p['fecha_fin']})")
-            if periodo_tiene_alumnos(p["id"]):
-                st.success("El periodo ya tiene alumnos cargados.")
-            else:
-                st.warning("El periodo NO tiene alumnos. Sube el Excel aquí abajo.")
-            
+            st.info(f"Periodo activo: **{p['nombre']}**")
             _frag_importar_excel()
-        else:
-            st.warning("Primero debes crear un periodo arriba para poder cargar alumnos.")
-
-        st.markdown("---")
-        st.subheader("Activar otro periodo (solo no cerrados)")
-        df2 = listar_periodos()
-        df2 = df2[df2["cerrado"] == 0]
+        df2 = listar_periodos(); df2 = df2[df2["cerrado"] == 0]
         if not df2.empty:
-            ops = {}
-            for _, r in df2.iterrows():
-                et = f"{r['nombre']} ({r['fecha_inicio']} - {r['fecha_fin']})"
-                if r["activo"]:
-                    et += " [ACTIVO]"
-                ops[et] = r["id"]
-            sel = st.selectbox("Selecciona el periodo a activar", list(ops.keys()),
-                               key="act_periodo_sel")
-            if confirmar_accion("activar_periodo", "Activar periodo",
-                                 "¿Estas seguro de activar este periodo?"):
-                ok, msg = activar_periodo(ops[sel], usuario)
-                if ok:
-                    st.toast(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-        else:
-            st.info("No hay otros periodos abiertos para activar.")
-
+            ops = {f"{r['nombre']} ({r['fecha_inicio']} - {r['fecha_fin']})": r["id"] for _, r in df2.iterrows()}
+            sel = st.selectbox("Selecciona el periodo a activar", list(ops.keys()))
+            if confirmar_accion("activar_periodo", "Activar periodo", "¿Estas seguro?"):
+                activar_periodo(ops[sel], usuario)
+                st.rerun()
     with tabs[2]:
-        st.subheader("Cierre de año escolar")
-        st.warning("Al cerrar el periodo se desactivan TODOS los alumnos y se crea uno nuevo.")
         p = obtener_periodo_activo()
-        if not p:
-            st.info("No hay periodo activo.")
-            return
-        st.info(f"Periodo activo: {p['nombre']} ({p['fecha_inicio']} - {p['fecha_fin']})")
-        
-        st.markdown("Reporte resumen del periodo:")
-        df_rep = reporte_cierre_anual(p["id"])
-        if not df_rep.empty:
-            st.dataframe(df_rep, width='stretch')
-
-        st.markdown("---")
-        st.markdown("**Paso 1: Descargar reporte anual detallado (OBLIGATORIO)**")
-        if st.button("Generar y descargar reporte anual", key="btn_desc_anual"):
-            hojas = reporte_detallado_por_mes(p["id"])
-            if not hojas:
-                st.warning("Sin datos.")
-            else:
-                st.download_button(
-                    "Descargar Excel anual",
-                    df_a_xlsx_multilhoja(hojas),
-                    f"reporte_anual_{p['nombre']}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                st.session_state["_reporte_descargado"] = True
-                st.toast("Reporte generado.")
-
-        st.markdown("---")
-        st.markdown("**Paso 2: Cerrar periodo (creara uno nuevo)**")
-        desc = st.session_state.get("_reporte_descargado", False)
-        if not desc:
-            st.info("Debes descargar el reporte anual antes.")
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            nn = st.text_input("Nombre nuevo periodo", value=str(ahora().year + 1))
-        with c2:
-            fi = st.date_input("Inicio nuevo", date(ahora().year + 1, 3, 1))
-        with c3:
-            ff = st.date_input("Fin nuevo", date(ahora().year + 1, 12, 31))
-        conf = st.text_input("Escribe CERRAR para confirmar")
-
-        if confirmar_accion("cerrar_ano", "Cerrar año escolar",
-                             "¿Estas seguro de cerrar el año escolar?"):
-            if not desc:
-                st.error("Primero debes descargar el reporte anual.")
-            elif conf.strip() != "CERRAR":
-                st.error("Debes escribir exactamente CERRAR.")
-            else:
-                ok, msg = cerrar_ano_escolar(
-                    usuario, p["id"], nn,
-                    fi.strftime("%Y-%m-%d"),
-                    ff.strftime("%Y-%m-%d"))
-                if ok:
-                    st.session_state.pop("_reporte_descargado", None)
-                    st.success(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-
-        st.markdown("---")
-        st.markdown("Cierres anteriores:")
-        dfc = listar_cierres_anuales()
-        if not dfc.empty:
-            st.dataframe(dfc, width='stretch')
-        st.markdown("Periodos cerrados (solo consulta):")
-        dfp = listar_periodos_cerrados()
-        if not dfp.empty:
-            st.dataframe(dfp, width='stretch')
+        if not p: st.info("No hay periodo activo.")
+        else:
+            st.info(f"Periodo activo: {p['nombre']}")
+            df_rep = reporte_cierre_anual(p["id"])
+            if not df_rep.empty: st.dataframe(df_rep, use_container_width=True)
+            if st.button("Generar y descargar reporte anual", key="btn_desc_anual"):
+                hojas = reporte_detallado_por_mes(p["id"])
+                if hojas: st.download_button("Descargar Excel anual", df_a_xlsx_multilhoja(hojas), f"reporte_anual_{p['nombre']}.xlsx")
+            conf = st.text_input("Escribe CERRAR para confirmar")
+            if confirmar_accion("cerrar_ano", "Cerrar año escolar", "¿Estas seguro?"):
+                if conf.strip() != "CERRAR": st.error("Debes escribir CERRAR.")
+                else: cerrar_ano_escolar(usuario, p["id"], "Nuevo", "2026-03-01", "2026-12-31")
 
 
 # ─── DÍAS ESPECIALES ───────────────────────────────────────────────────────
@@ -5056,147 +4862,40 @@ def vista_dias_especiales():
     usuario = st.session_state["user"]
     tabs = st.tabs(["Crear", "Listar / eliminar"])
     with tabs[0]:
-        st.caption("Puedes crear varios eventos para el mismo dia.")
-        for k in list(st.session_state.keys()):
-            if (k.startswith("dia_sec_") or k.startswith("dia_grado_")):
-                if k not in st.session_state.get("_dia_keys_actuales", set()):
-                    del st.session_state[k]
-        if "dia_tipo" not in st.session_state:
-            st.session_state["dia_tipo"] = "Evento"
-        tipo = st.radio("Tipo", ["Evento", "Feriado"], key="dia_tipo",
-                        horizontal=True)
-
+        if "dia_tipo" not in st.session_state: st.session_state["dia_tipo"] = "Evento"
+        tipo = st.radio("Tipo", ["Evento", "Feriado"], key="dia_tipo", horizontal=True)
         c1, c2 = st.columns(2)
         with c1:
-            fecha = st.date_input("Fecha", min_value=ahora().date(),
-                                   key="dia_fecha")
-            desc = st.text_input("Descripcion / Nombre del evento",
-                                  key="dia_desc")
+            fecha = st.date_input("Fecha", min_value=ahora().date(), key="dia_fecha")
+            desc = st.text_input("Descripcion / Nombre del evento", key="dia_desc")
         with c2:
             if tipo == "Evento":
-                turnos_opts = {"Ambos": None}
-                turnos_opts.update({t["nombre"]: t["id"] for t in listar_turnos()})
-                t_lbl = st.selectbox("Turno", list(turnos_opts.keys()),
-                                      key="dia_turno")
-                hora_t = st.time_input(
-                    "Hora entrada",
-                    value=datetime.strptime("08:00", "%H:%M").time(),
-                    key="dia_hora")
+                turnos_opts = {"Ambos": None}; turnos_opts.update({t["nombre"]: t["id"] for t in listar_turnos()})
+                t_lbl = st.selectbox("Turno", list(turnos_opts.keys()), key="dia_turno")
+                hora_t = st.time_input("Hora entrada", value=datetime.strptime("08:00", "%H:%M").time(), key="dia_hora")
                 hora = hora_t.strftime("%H:%M")
             else:
-                turnos_opts = {"Ambos": None}
-                t_lbl = "Ambos"
-                hora = "00:00"
+                turnos_opts = {"Ambos": None}; t_lbl = "Ambos"; hora = "00:00"
                 st.info("Los feriados no tienen horario ni turno.")
-
-        contar_como_clases = False
-        if tipo == "Evento":
-            contar_como_clases = st.checkbox(
-                "Contar como CLASES NORMALES (no como evento)",
-                value=False, key="dia_contar_clases")
-
-        alcance = "Todo el colegio"
-        if tipo == "Evento":
-            alcance = st.radio(
-                "Aplica a:",
-                ["Todo el colegio", "Solo algunas secciones"],
-                key="dia_alcance", horizontal=True)
-
-        keys_actuales = set()
-        selecciones_secciones = []
-        if tipo == "Evento" and alcance == "Solo algunas secciones":
-            st.markdown("**Alcance del dia especial:**")
-            with st.expander("Seleccionar grados y secciones", expanded=True):
-                grados = listar_grados()
-                for g in grados:
-                    k_grado = "dia_grado_" + str(g["id"])
-                    keys_actuales.add(k_grado)
-                    st.checkbox("Todo " + g["nombre"], key=k_grado)
-                    secs = secciones_por_grado(g["id"])
-                    for s in secs:
-                        k_sec = f"dia_sec_{g['id']}_{s['id']}"
-                        keys_actuales.add(k_sec)
-                        if st.checkbox(f"   {g['nombre']} {s['nombre']}",
-                                       key=k_sec):
-                            selecciones_secciones.append(s["id"])
-
-        st.session_state["_dia_keys_actuales"] = keys_actuales
-
-        if confirmar_accion("dia_crear", "Crear evento",
-                             "¿Estas seguro de crear este dia especial?"):
-            if not desc.strip():
-                st.error("Descripcion requerida.")
-            elif tipo == "Evento" and alcance == "Solo algunas secciones" \
-                    and not selecciones_secciones:
-                st.error("Selecciona al menos una seccion.")
+        if confirmar_accion("dia_crear", "Crear evento", "¿Estas seguro de crear este dia especial?"):
+            if not desc.strip(): st.error("Descripcion requerida.")
             else:
-                selecciones_secciones = list(set(selecciones_secciones))
                 idt = turnos_opts.get(t_lbl) if tipo == "Evento" else None
-                per = obtener_periodo_activo()
-                pid = per["id"] if per else None
+                per = obtener_periodo_activo(); pid = per["id"] if per else None
                 with cursor() as (con, cur):
-                    cur.execute("""
-                        INSERT INTO dias_especiales(fecha,descripcion,turno_id,
-                            hora_entrada,tipo,periodo_id,contar_como_clases)
-                        VALUES(?,?,?,?,?,?,?)
-                    """, (to_date(fecha), desc.strip(), idt,
-                          to_time(hora) if tipo == "Evento" else to_time("00:00"),
-                          "evento" if tipo == "Evento" else "feriado",
-                          pid, 1 if contar_como_clases else 0))
-                    idd = cur.lastrowid
-                    for sid in selecciones_secciones:
-                        try:
-                            cur.execute("INSERT INTO dias_especiales_secciones"
-                                        "(dia_especial_id,seccion_id) VALUES(?,?)",
-                                        (idd, sid))
-                        except Exception as e:
-                            if "unique" not in str(e).lower():
-                                log.warning("dia_sec: %s", e)
+                    cur.execute("INSERT INTO dias_especiales(fecha,descripcion,turno_id,hora_entrada,tipo,periodo_id,contar_como_clases) VALUES(?,?,?,?,?,?,?)", (to_date(fecha), desc.strip(), idt, to_time(hora) if tipo == "Evento" else to_time("00:00"), "evento" if tipo == "Evento" else "feriado", pid, 0))
                 auditar(usuario["usuario"], "Creo dia especial " + desc)
-                for k in list(st.session_state.keys()):
-                    if k.startswith("dia_sec_") or k.startswith("dia_grado_"):
-                        del st.session_state[k]
-                st.session_state.pop("_dia_keys_actuales", None)
-                st.session_state["_aviso_usuarios"] = {
-                    "tipo": "ok", "msg": "Evento creado."}
                 st.rerun()
-
     with tabs[1]:
-        df = leer_df("""
-            SELECT d.id, d.fecha, d.descripcion,
-                   COALESCE(t.nombre, 'Ambos') AS turno,
-                   d.hora_entrada, d.tipo, d.contar_como_clases,
-                   (SELECT GROUP_CONCAT(g.nombre || ' ' || s.nombre, ', ')
-                    FROM dias_especiales_secciones ds
-                    JOIN secciones s ON ds.seccion_id = s.id
-                    JOIN grados g ON s.grado_id = g.id
-                    WHERE ds.dia_especial_id = d.id) AS secciones_aplicadas
-            FROM dias_especiales d
-            LEFT JOIN turnos t ON d.turno_id = t.id
-            WHERE d.fecha >= ? AND d.activo=1
-            ORDER BY d.fecha, d.hora_entrada
-        """, (to_date(hoy_str()),))
-        if df.empty:
-            st.info("Sin dias especiales.")
+        df = leer_df("SELECT d.id, d.fecha, d.descripcion, COALESCE(t.nombre, 'Ambos') AS turno, d.hora_entrada, d.tipo FROM dias_especiales d LEFT JOIN turnos t ON d.turno_id = t.id WHERE d.fecha >= ? AND d.activo=1 ORDER BY d.fecha, d.hora_entrada", (to_date(hoy_str()),))
+        if df.empty: st.info("Sin dias especiales.")
         else:
-            df_display = df.copy()
-            df_display["contar_como_clases"] = df_display[
-                "contar_como_clases"].apply(
-                    lambda x: "Clases normales" if x else "Evento")
-            df_display["secciones_aplicadas"] = df_display[
-                "secciones_aplicadas"].fillna("Todo el colegio")
-            st.dataframe(df_display, width='stretch')
-            ops = {f"{r['fecha']} {r['hora_entrada']} - {r['descripcion']}": r["id"]
-                   for _, r in df.iterrows()}
+            st.dataframe(df, use_container_width=True)
+            ops = {f"{r['fecha']} {r['hora_entrada']} - {r['descripcion']}": r["id"] for _, r in df.iterrows()}
             sel = st.selectbox("Eliminar", list(ops.keys()))
-            st.warning("Esta accion es irreversible.")
-            if confirmar_accion("del_dia", "Eliminar dia especial",
-                                 "¿Estas seguro de eliminar este dia especial?"):
+            if confirmar_accion("del_dia", "Eliminar dia especial", "¿Estas seguro de eliminar este dia especial?"):
                 escribir("DELETE FROM dias_especiales WHERE id=?", (ops[sel],))
-                auditar(usuario["usuario"],
-                        f"Elimino dia especial id={ops[sel]}")
-                st.session_state["_aviso_usuarios"] = {
-                    "tipo": "ok", "msg": "Dia especial eliminado."}
+                auditar(usuario["usuario"], f"Elimino dia especial id={ops[sel]}")
                 st.rerun()
 
 
@@ -5601,10 +5300,8 @@ def vista_justificaciones_permisos():
     st.title("Justificaciones y Permisos")
     usuario = st.session_state["user"]
     tabs = st.tabs(["Justificacion previa", "Permisos"])
-    with tabs[0]:
-        _frag_justificacion_previa(usuario)
-    with tabs[1]:
-        _frag_permisos(usuario)
+    with tabs[0]: _frag_justificacion_previa(usuario)
+    with tabs[1]: _frag_permisos(usuario)
 
 
 # ─── BACKUP ────────────────────────────────────────────────────────────────
@@ -5701,71 +5398,41 @@ def vista_cambio_password_obligatorio():
 def vista_mi_cuenta():
     st.title("Mi cuenta")
     usuario = st.session_state["user"]
-    inicial = (usuario["nombres"] or "?")[0].upper()
-    st.markdown(f"""
-    <div class="perfil-bloque">
-        <div class="perfil-hero" style="margin-bottom:0;">
-            <div class="hero-avatar">{inicial}</div>
-            <div class="hero-info">
-                <div class="hero-nombre">{usuario['nombres']}</div>
-                <div class="hero-meta">Usuario: {usuario['usuario']} &nbsp;|&nbsp; Rol: {usuario['rol']}</div>
-                <div class="hero-meta">Ultimo login: {usuario.get('ultimo_login') or 'Nunca'}</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.subheader(usuario['nombres'])
+        st.write(f"**Usuario:** {usuario['usuario']} | **Rol:** {usuario['rol']}")
+        st.write(f"**Ultimo login:** {usuario.get('ultimo_login') or 'Nunca'}")
 
     if usuario["rol"] == "Auxiliar":
-        df_secs = leer_df("""
-            SELECT g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
-            FROM auxiliar_secciones a
-            JOIN secciones s ON a.seccion_id=s.id
-            JOIN grados g ON s.grado_id=g.id
-            JOIN turnos t ON s.turno_id=t.id
-            WHERE a.usuario_id=? ORDER BY g.nombre, s.nombre
-        """, (usuario["id"],))
-        st.markdown("---")
+        df_secs = leer_df("SELECT g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno FROM auxiliar_secciones a JOIN secciones s ON a.seccion_id=s.id JOIN grados g ON s.grado_id=g.id JOIN turnos t ON s.turno_id=t.id WHERE a.usuario_id=? ORDER BY g.nombre, s.nombre", (usuario["id"],))
         st.subheader("Mis secciones asignadas")
-        if df_secs.empty:
-            st.warning("No tienes secciones asignadas.")
-        else:
-            st.dataframe(df_secs, width='stretch')
+        if df_secs.empty: st.warning("No tienes secciones asignadas.")
+        else: st.dataframe(df_secs, use_container_width=True)
 
-    st.markdown("---")
     st.subheader("Mi actividad reciente")
-    df_act = leer_df("SELECT accion,fecha FROM auditoria WHERE usuario=? "
-                     "ORDER BY id DESC LIMIT 10", (usuario["usuario"],))
-    if df_act.empty:
-        st.info("Sin actividad.")
-    else:
-        st.dataframe(df_act, width='stretch')
+    df_act = leer_df("SELECT accion,fecha FROM auditoria WHERE usuario=? ORDER BY id DESC LIMIT 10", (usuario["usuario"],))
+    if df_act.empty: st.info("Sin actividad.")
+    else: st.dataframe(df_act, use_container_width=True)
 
-    st.markdown("---")
     st.subheader("Cambiar contraseña")
     with st.form("cambiar_mi_pwd"):
         actual = st.text_input("Contraseña actual", type="password")
         nueva = st.text_input("Nueva contraseña", type="password")
         confirmar = st.text_input("Confirmar nueva contraseña", type="password")
         if st.form_submit_button("Cambiar contraseña", type="primary"):
-            if not verificar_password(actual, usuario["password"]):
-                st.error("Contraseña actual incorrecta.")
-            elif len(nueva) < 6:
-                st.error("Minimo 6 caracteres.")
-            elif nueva != confirmar:
-                st.error("No coinciden.")
+            if not verificar_password(actual, usuario["password"]): st.error("Contraseña actual incorrecta.")
+            elif len(nueva) < 6: st.error("Minimo 6 caracteres.")
+            elif nueva != confirmar: st.error("No coinciden.")
             else:
                 nueva_hash = hashear_password(nueva)
-                escribir("UPDATE usuarios SET password=? WHERE id=?",
-                         (nueva_hash, usuario["id"]))
+                escribir("UPDATE usuarios SET password=? WHERE id=?", (nueva_hash, usuario["id"]))
                 st.session_state["user"]["password"] = nueva_hash
                 auditar(usuario["usuario"], "Cambio su contraseña")
                 st.success("Contraseña actualizada.")
-
-    st.markdown("---")
-    if st.button("Cerrar sesion"):
+    if st.button("Cerrar sesion", type="primary"):
         cerrar_sesion()
         st.rerun()
-
 
 # ─── MENÚ Y RUTAS ──────────────────────────────────────────────────────────
 def obtener_opciones_por_rol(usuario):
