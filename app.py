@@ -6304,39 +6304,53 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS Y FONDO (Limpio, sin divs sueltos)
+    # 1. CSS (Usa la cajita transparente, no fuerza el fondo de la app)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* Fondo de pantalla completa forzado */
-    .stApp {
-        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%) !important;
+    /* La cajita de fondo que NO interrumpe el modo oscuro/claro */
+    .login-bg {
+        background: linear-gradient(135deg, rgba(255,248,240,0.8) 0%, rgba(255,228,214,0.8) 100%);
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
     }
     /* Tarjeta central */
     .login-card {
-        background: #FFFFFF;
+        background: var(--secondary-background-color, #FFFFFF);
         border-radius: 24px;
         padding: 50px 30px 40px 30px;
         box-shadow: 0 20px 40px rgba(232,123,74,0.15);
-        border: 1px solid #FFE4D6;
+        border: 1px solid rgba(232,123,74,0.2);
         text-align: center;
-        margin-top: 60px;
-        margin-bottom: 20px;
+        margin-top: 40px;
+        margin-bottom: -20px; /* Pega la tarjeta al formulario */
+        position: relative;
+        z-index: 1;
     }
     .login-title {
         font-size: 38px; font-weight: 900; color: #E87B4A !important;
         margin-bottom: 8px; letter-spacing: -1px;
     }
     .login-sub { 
-        font-size: 16px; color: #666 !important; 
-        margin-bottom: 20px; font-weight: 600; 
+        font-size: 16px; color: var(--text-color, #666) !important; 
+        margin-bottom: 10px; font-weight: 600; opacity: 0.8;
     }
-    /* Forzamos que los inputs se vean hermosos */
+    /* Contenedor del formulario para que parezca parte de la tarjeta */
+    div[data-testid="stForm"] {
+        background: var(--secondary-background-color, #FFFFFF) !important;
+        border-radius: 0 0 24px 24px !important;
+        padding: 0px 30px 30px 30px !important;
+        box-shadow: 0 20px 40px rgba(232,123,74,0.15) !important;
+        border: 1px solid rgba(232,123,74,0.2) !important;
+        border-top: none !important;
+        position: relative;
+        z-index: 1;
+    }
+    /* Inputs */
     .stTextInput > div > div > input {
         border-radius: 10px !important;
-        border: 2px solid #FFE4D6 !important;
+        border: 2px solid rgba(232,123,74,0.3) !important;
         padding: 12px 15px !important;
     }
-    /* Forzamos que el botón se vea hermoso */
+    /* Botón */
     .stFormSubmitButton > button {
         background: #E87B4A !important;
         color: white !important;
@@ -6352,17 +6366,17 @@ def vista_login():
     .stFormSubmitButton > button:hover {
         background: #D66535 !important;
         transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(232,123,74,0.3) !important;
     }
-    </style>""", unsafe_allow_html=True)
+    </style>
+    <div class="login-bg"></div>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Puro texto y formulario, cero imágenes)
+    # 2. ESTRUCTURA VISUAL (Sin emojis ni escudos)
     # ══════════════════════════════════════════════════════════════════
     _, centro, _ = st.columns([1, 1.2, 1])
     
     with centro:
-        # Abrimos la tarjeta
+        # Tarjeta de texto
         st.markdown("""<div class="login-card">
             <div class="login-title">asisyarina</div>
             <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
@@ -6382,7 +6396,6 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-
 
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
