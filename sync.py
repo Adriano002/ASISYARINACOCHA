@@ -23,8 +23,7 @@ def _get_r2_client():
 
 
 # ══════════════════════════════════════════════════════════════════
-# FORZAR CHECKPOINT DEL WAL ANTES DE SUBIR
-# Usa PASSIVE para NO bloquear escrituras durante el backup
+# FORZAR CHECKPOINT DEL WAL ANTES DE SUBIR (PASSIVE = NO bloquea)
 # ══════════════════════════════════════════════════════════════════
 def _forzar_checkpoint(ruta_local):
     try:
@@ -37,10 +36,10 @@ def _forzar_checkpoint(ruta_local):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 1. SUBIR BACKUP A R2 (Guarda con fecha y también sobrescribe el fijo)
+# 1. SUBIR BACKUP A R2
 # ══════════════════════════════════════════════════════════════════
 def subir_bd(ruta_local):
-    ruta_local = str(ruta_local)   # 🆕 normalizar Path → str
+    ruta_local = str(ruta_local)
     try:
         _forzar_checkpoint(ruta_local)
 
@@ -60,7 +59,7 @@ def subir_bd(ruta_local):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 2. LISTAR BACKUPS DISPONIBLES EN R2
+# 2. LISTAR BACKUPS EN R2
 # ══════════════════════════════════════════════════════════════════
 def listar_backups_r2():
     try:
@@ -89,10 +88,10 @@ def listar_backups_r2():
 
 
 # ══════════════════════════════════════════════════════════════════
-# 3. DESCARGAR UN BACKUP ESPECÍFICO (Restauración)
+# 3. DESCARGAR UN BACKUP ESPECÍFICO
 # ══════════════════════════════════════════════════════════════════
 def descargar_bd_especifica(key, ruta_local):
-    ruta_local = str(ruta_local)   # 🆕
+    ruta_local = str(ruta_local)
     try:
         s3 = _get_r2_client()
         s3.download_file(BUCKET_NAME, key, ruta_local)
@@ -104,7 +103,7 @@ def descargar_bd_especifica(key, ruta_local):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 4. LIMPIAR BACKUPS ANTIGUOS EN R2 (Retención)
+# 4. LIMPIAR BACKUPS ANTIGUOS EN R2
 # ══════════════════════════════════════════════════════════════════
 def limpiar_backups_antiguos_r2(meses_a_mantener):
     try:
@@ -135,18 +134,31 @@ def limpiar_backups_antiguos_r2(meses_a_mantener):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 5. DESCARGAR LA BD FIJA AL INICIAR (SIEMPRE sobrescribe con la de R2)
+# 5. DESCARGAR LA BD AL INICIAR (PROTEGIDO contra sobrescrituras)
 # ══════════════════════════════════════════════════════════════════
 def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
     """
-    Al arrancar SIEMPRE descarga la versión de R2 (la nube manda).
-    Si R2 falla, restaura el backup local como fallback.
+    Al arrancar descarga R2 SOLO si el local NO es más reciente.
+    Nunca sobrescribe datos nuevos con datos viejos.
     """
-    ruta_local = str(ruta_local)   # 🆕 normalizar Path → str
+    ruta_local = str(ruta_local)
     try:
         s3 = _get_r2_client()
 
-        # Crear la carpeta si no existe (por si acaso)
+        # 🛡️ PROTECCIÓN: Si el local existe y es más reciente que R2, NO descargar
+        if os.path.exists(ruta_local) and os.path.getsize(ruta_local) > 50_000:
+            try:
+                mtime_local = os.path.getmtime(ruta_local)
+                obj = s3.head_object(Bucket=BUCKET_NAME, Key="asistencia.db")
+                mtime_r2 = obj["LastModified"].timestamp()
+
+                if mtime_local > mtime_r2:
+                    print(f"✅ Local más reciente que R2. NO descargar (protección activa).")
+                    return True
+            except Exception as e:
+                print(f"No se pudo comparar fechas: {e}")
+
+        # Crear carpeta si no existe
         parent = os.path.dirname(ruta_local)
         if parent and not os.path.exists(parent):
             os.makedirs(parent, exist_ok=True)
@@ -170,12 +182,10 @@ def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
 
     except Exception as e:
         print(f"⚠️ No se pudo descargar BD de R2: {e}")
-
         if os.path.exists(ruta_local + ".bak"):
             try:
                 os.replace(ruta_local + ".bak", ruta_local)
                 print("↩️ Restaurado backup local como fallback.")
             except Exception:
                 pass
-
         return False
