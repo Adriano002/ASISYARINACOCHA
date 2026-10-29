@@ -3780,211 +3780,239 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    # 🆕 CSS EXCLUSIVO PARA EL DASHBOARD
-    st.markdown("""
-    <style>
-    .dash-header {
-        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
-        border-radius: 16px;
-        padding: 30px;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-        box-shadow: 0 10px 20px rgba(232,123,74,0.2);
-    }
-    .dash-header h1 {
-        margin: 0;
-        font-size: 32px;
-        font-weight: 800;
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-    .dash-header p {
-        margin: 5px 0 0 0;
-        opacity: 0.9;
-        font-size: 15px;
-    }
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 20px;
-        margin-bottom: 24px;
-    }
-    .kpi-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        border-bottom: 5px solid #E87B4A;
-    }
-    .kpi-icon { font-size: 28px; margin-bottom: 10px; display: block; }
-    .kpi-value { font-size: 36px; font-weight: 800; line-height: 1.1; margin-bottom: 5px; }
-    .kpi-label {
-        font-size: 12px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 1px; color: #666;
-    }
-    .kpi-exito { border-bottom-color: #22C55E; }
-    .kpi-exito .kpi-value { color: #22C55E; }
-    .kpi-peligro { border-bottom-color: #EF4444; }
-    .kpi-peligro .kpi-value { color: #EF4444; }
-    .kpi-alerta { border-bottom-color: #F59E0B; }
-    .kpi-alerta .kpi-value { color: #F59E0B; }
-    .kpi-info { border-bottom-color: #3B82F6; }
-    .kpi-info .kpi-value { color: #3B82F6; }
-    
-    .progress-container {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-    }
-    .progress-title {
-        font-size: 14px;
-        font-weight: 800;
-        text-transform: uppercase;
-        color: #E87B4A;
-        margin-bottom: 15px;
-    }
-    .stProgress > div > div > div {
-        background-color: #E87B4A !important;
-        border-radius: 10px;
-    }
-    .stProgress > div > div {
-        background-color: #FFF0E8 !important;
-        border-radius: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # ══════════════════════════════════════════════════════════════════
+    # CSS SCOPED (solo dashboard, no toca el resto de la app)
+    # Se inyecta UNA sola vez por sesión para no re-renderizar en cada rerun
+    # ══════════════════════════════════════════════════════════════════
+    if not st.session_state.get("_dash_css_cargado"):
+        st.markdown("""
+        <style>
+        .dash-header {
+            background: linear-gradient(135deg, #E87B4A 0%, #D66535 60%, #B85C38 100%);
+            border-radius: 20px;
+            padding: 30px 34px;
+            color: #FFF;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 26px;
+            box-shadow: 0 10px 28px rgba(232,123,74,0.22);
+            position: relative;
+            overflow: hidden;
+        }
+        .dash-header::before {
+            content: '';
+            position: absolute;
+            top: -60%; right: -8%;
+            width: 280px; height: 280px;
+            background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .dash-header h1 {
+            margin: 0; font-size: 32px; font-weight: 900;
+            color: #FFF !important; -webkit-text-fill-color: #FFF !important;
+            letter-spacing: -0.5px;
+        }
+        .dash-header p {
+            margin: 6px 0 0 0; opacity: 0.92; font-size: 14px;
+        }
+        .dash-badge {
+            background: rgba(255,255,255,0.20);
+            padding: 6px 16px; border-radius: 20px;
+            font-weight: 800; font-size: 13px;
+            border: 1px solid rgba(255,255,255,0.40);
+            white-space: nowrap;
+        }
+        .dash-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .dash-kpi-card {
+            background: #FFF;
+            border-radius: 16px;
+            padding: 20px 16px;
+            text-align: center;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+            border-bottom: 5px solid #E87B4A;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .dash-kpi-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 22px rgba(232,123,74,0.15);
+        }
+        .dash-kpi-icon { font-size: 26px; margin-bottom: 8px; display: block; }
+        .dash-kpi-value {
+            font-size: 34px; font-weight: 900; line-height: 1.1; margin-bottom: 4px;
+        }
+        .dash-kpi-label {
+            font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.8px; color: #666;
+        }
+        .dash-kpi-exito  { border-bottom-color: #22C55E; }
+        .dash-kpi-exito  .dash-kpi-value { color: #22C55E; }
+        .dash-kpi-peligro{ border-bottom-color: #EF4444; }
+        .dash-kpi-peligro .dash-kpi-value { color: #EF4444; }
+        .dash-kpi-alerta { border-bottom-color: #F59E0B; }
+        .dash-kpi-alerta .dash-kpi-value { color: #F59E0B; }
+        .dash-kpi-info   { border-bottom-color: #3B82F6; }
+        .dash-kpi-info   .dash-kpi-value { color: #3B82F6; }
+        .dash-kpi-naranja{ border-bottom-color: #E87B4A; }
+        .dash-kpi-naranja .dash-kpi-value { color: #E87B4A; }
 
-    # ==========================================
-    # LÓGICA Y CÁLCULOS
-    # ==========================================
+        .dash-progress-container {
+            background: #FFF;
+            border-radius: 16px;
+            padding: 22px 26px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .dash-progress-title {
+            font-size: 13px; font-weight: 900; text-transform: uppercase;
+            letter-spacing: 1px; color: #E87B4A; margin-bottom: 16px;
+        }
+        .dash-bar-row { margin-bottom: 16px; }
+        .dash-bar-row:last-child { margin-bottom: 0; }
+        .dash-bar-label {
+            display: flex; justify-content: space-between;
+            margin-bottom: 6px; font-size: 13px; font-weight: 800;
+        }
+        .dash-bar-track {
+            background: #FFF0E8; border-radius: 10px;
+            height: 18px; overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .dash-bar-fill {
+            height: 100%; border-radius: 10px;
+            transition: width 0.6s ease;
+        }
+        @media (max-width: 768px) {
+            .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .dash-header { padding: 22px; }
+            .dash-header h1 { font-size: 24px; }
+            .dash-kpi-value { font-size: 26px; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        st.session_state["_dash_css_cargado"] = True
+
+    # ══════════════════════════════════════════════════════════════════
+    # LÓGICA
+    # ══════════════════════════════════════════════════════════════════
     fecha = hoy_str()
     turnos_info = _turnos_para_panel()
     if not turnos_info:
         st.info("No hay turnos configurados.")
         return
 
-    etiquetas = [f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})" for info in turnos_info]
-    sel = st.radio("Turno", etiquetas, horizontal=True, key="panel_dir_turno", label_visibility="collapsed")
-    
-    idx = etiquetas.index(sel)
-    info = turnos_info[idx]
+    etiquetas = [
+        f"Turno {info['turno']['nombre']} ({'EN CURSO' if info['estado']=='activo' else 'CERRADO'})"
+        for info in turnos_info
+    ]
+    sel = st.radio(
+        "Turno", etiquetas, horizontal=True,
+        key="panel_dir_turno", label_visibility="collapsed",
+    )
+    info = turnos_info[etiquetas.index(sel)]
     turno = info["turno"]
     ventana = info["ventana"]
     estado = info["estado"]
     m = metricas_dia_turno(fecha, turno["id"])
 
-    # ==========================================
-    # CABECERA (HTML)
-    # ==========================================
+    # ══════════════════════════════════════════════════════════════════
+    # HEADER (1 solo st.markdown)
+    # ══════════════════════════════════════════════════════════════════
     color_estado = "#4CAF50" if estado == "activo" else "#F44336"
-    
-    # Quitamos la indentación para que Streamlit no lo trate como código
-    html_header = f"""
-<div class="dash-header">
-<div>
-<h1>Panel de Control</h1>
-<p>Monitoreo en tiempo real del turno <b>{turno['nombre']}</b> — {fecha}</p>
-</div>
-<div style="text-align: right;">
-<span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; border: 1px solid rgba(255,255,255,0.4);">
-<span style="color: {color_estado}; font-size: 18px;">●</span> {estado.upper()}
-</span>
-<p style="margin-top: 8px; font-size: 13px;">Ventana: {ventana['nombre']}</p>
-</div>
-</div>
-"""
-    st.markdown(html_header, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="dash-header">
+        <div>
+            <h1>Panel de Control</h1>
+            <p>Monitoreo en tiempo real · Turno <b>{turno['nombre']}</b> · {fecha}</p>
+        </div>
+        <div style="text-align:right;">
+            <span class="dash-badge">
+                <span style="color:{color_estado};font-size:16px;">●</span> {estado.upper()}
+            </span>
+            <p style="margin-top:8px;font-size:12px;">Ventana: {ventana['nombre']}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ==========================================
-    # BOTÓN DE ACTUALIZAR
-    # ==========================================
-    c1, c2, c3 = st.columns([3, 1, 3])
+    # ══════════════════════════════════════════════════════════════════
+    # BOTÓN ACTUALIZAR (sin st.rerun redundante)
+    # ══════════════════════════════════════════════════════════════════
+    c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
-        if st.button("🔄 ACTUALIZAR", width='stretch', key="btn_actualizar_dash"):
-            st.rerun()
+        if st.button("🔄 Actualizar", key="btn_actualizar_dash", width='stretch'):
+            # Streamlit ya hace rerun automático al presionar.
+            # Forzamos limpieza de cache de métricas para traer datos frescos.
+            metricas_dia_turno.clear()
 
-    # ==========================================
-    # KPIs (HTML)
-    # ==========================================
-    kpi_puntuales_cls = "kpi-exito"
-    kpi_tardanzas_cls = "kpi-alerta" if m["tardanzas"] > 0 else "kpi-exito"
-    kpi_faltas_cls = "kpi-peligro" if m["faltas"] > 0 else "kpi-exito"
-    kpi_bloqueados_cls = "kpi-peligro" if m["bloqueados"] > 0 else "kpi-exito"
+    # ══════════════════════════════════════════════════════════════════
+    # KPIs (1 solo st.markdown, construido con join → menos RAM)
+    # ══════════════════════════════════════════════════════════════════
+    kpis_fila1 = [
+        ("👥", m["total"],       "Total Alumnos",  "dash-kpi-naranja"),
+        ("✅", m["puntuales"],   "Puntuales",      "dash-kpi-exito"),
+        ("⏳", m["tardanzas"],   "Tardanzas",      "dash-kpi-alerta" if m["tardanzas"] > 0 else "dash-kpi-exito"),
+        ("❌", m["faltas"],      "Faltas",         "dash-kpi-peligro" if m["faltas"] > 0 else "dash-kpi-exito"),
+    ]
+    kpis_fila2 = [
+        ("📚", m["ref_asistio"], "Reforzamiento",  "dash-kpi-info"),
+        ("🚫", m["bloqueados"],  "Bloqueados",     "dash-kpi-peligro" if m["bloqueados"] > 0 else "dash-kpi-exito"),
+        ("📝", m["justificadas"],"Justificadas",   "dash-kpi-info"),
+        ("📄", m["permisos"],    "Permisos",       "dash-kpi-info"),
+    ]
 
-    html_kpis = f"""
-<div class="kpi-grid">
-<div class="kpi-card">
-<span class="kpi-icon">👥</span>
-<div class="kpi-value" style="color: #E87B4A;">{m['total']}</div>
-<div class="kpi-label">Total Alumnos</div>
-</div>
-<div class="kpi-card {kpi_puntuales_cls}">
-<span class="kpi-icon">✅</span>
-<div class="kpi-value">{m['puntuales']}</div>
-<div class="kpi-label">Puntuales</div>
-</div>
-<div class="kpi-card {kpi_tardanzas_cls}">
-<span class="kpi-icon">⏳</span>
-<div class="kpi-value">{m['tardanzas']}</div>
-<div class="kpi-label">Tardanzas</div>
-</div>
-<div class="kpi-card {kpi_faltas_cls}">
-<span class="kpi-icon">❌</span>
-<div class="kpi-value">{m['faltas']}</div>
-<div class="kpi-label">Faltas</div>
-</div>
-</div>
+    def _kpi_card(icon, value, label, cls):
+        return (
+            f'<div class="dash-kpi-card {cls}">'
+            f'<span class="dash-kpi-icon">{icon}</span>'
+            f'<div class="dash-kpi-value">{value}</div>'
+            f'<div class="dash-kpi-label">{label}</div>'
+            f'</div>'
+        )
 
-<div class="kpi-grid">
-<div class="kpi-card kpi-info">
-<span class="kpi-icon">📚</span>
-<div class="kpi-value">{m['ref_asistio']}</div>
-<div class="kpi-label">Reforzamiento</div>
-</div>
-<div class="kpi-card {kpi_bloqueados_cls}">
-<span class="kpi-icon">🚫</span>
-<div class="kpi-value">{m['bloqueados']}</div>
-<div class="kpi-label">Bloqueados</div>
-</div>
-<div class="kpi-card kpi-info">
-<span class="kpi-icon">📝</span>
-<div class="kpi-value">{m['justificadas']}</div>
-<div class="kpi-label">Justificadas</div>
-</div>
-<div class="kpi-card kpi-info">
-<span class="kpi-icon">📄</span>
-<div class="kpi-value">{m['permisos']}</div>
-<div class="kpi-label">Permisos</div>
-</div>
-</div>
-"""
+    html_kpis = (
+        '<div class="dash-kpi-grid">'
+        + "".join(_kpi_card(*k) for k in kpis_fila1)
+        + '</div><div class="dash-kpi-grid">'
+        + "".join(_kpi_card(*k) for k in kpis_fila2)
+        + '</div>'
+    )
     st.markdown(html_kpis, unsafe_allow_html=True)
 
-    # ==========================================
-    # BARRAS DE PROGRESO
-    # ==========================================
-    html_progress_start = '<div class="progress-container"><div class="progress-title">Progreso de Asistencia del Turno</div>'
-    st.markdown(html_progress_start, unsafe_allow_html=True)
-    
+    # ══════════════════════════════════════════════════════════════════
+    # BARRAS DE PROGRESO (100% HTML, 1 solo st.markdown)
+    # ══════════════════════════════════════════════════════════════════
     total = m["total"] if m["total"] > 0 else 1
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.write(f"**Puntuales:** {m['puntuales']} / {m['total']}")
-        st.progress(m['puntuales'] / total)
-    with c2:
-        st.write(f"**Tardanzas:** {m['tardanzas']} / {m['total']}")
-        st.progress(m['tardanzas'] / total)
-    with c3:
-        st.write(f"**Faltas:** {m['faltas']} / {m['total']}")
-        st.progress(m['faltas'] / total)
-        
-    st.markdown('</div>', unsafe_allow_html=True)
+
+    def _bar(label, valor, color):
+        pct = (valor / total * 100) if total > 0 else 0
+        return (
+            f'<div class="dash-bar-row">'
+            f'<div class="dash-bar-label">'
+            f'<span>{label}</span>'
+            f'<span style="color:{color};">{valor} / {m["total"]}</span>'
+            f'</div>'
+            f'<div class="dash-bar-track">'
+            f'<div class="dash-bar-fill" style="width:{pct:.1f}%;background:{color};"></div>'
+            f'</div></div>'
+        )
+
+    html_progress = (
+        '<div class="dash-progress-container">'
+        '<div class="dash-progress-title">Progreso de Asistencia del Turno</div>'
+        + _bar("Puntuales", m["puntuales"], "#22C55E")
+        + _bar("Tardanzas", m["tardanzas"], "#F59E0B")
+        + _bar("Faltas",    m["faltas"],    "#EF4444")
+        + '</div>'
+    )
+    st.markdown(html_progress, unsafe_allow_html=True)
 
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
