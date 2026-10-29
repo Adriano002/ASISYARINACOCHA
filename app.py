@@ -4776,7 +4776,6 @@ def _frag_usuarios_botones():
         params = []
         
         if not soy_principal:
-            # Si no es principal, no puede ver a los otros Admins (excepto a sí mismo)
             query += " AND (id=? OR rol!='Admin')"
             params.append(usuario["id"])
 
@@ -4798,7 +4797,7 @@ def _frag_usuarios_botones():
 
         st.write(f"**{len(df)} usuarios encontrados**")
         
-        # 🆕 MOSTRAMOS SOLO UN DATAFRAME (Cero CSS, cero botones gastando RAM)
+        # 🆕 MOSTRAMOS SOLO UN DATAFRAME
         df_mostrar = df.copy()
         df_mostrar["estado"] = df_mostrar["activo"].apply(lambda x: "🟢 Activo" if x else "🔴 Inactivo")
         df_mostrar["rol_ui"] = df_mostrar.apply(
@@ -4806,7 +4805,6 @@ def _frag_usuarios_botones():
             else ("Sub Admin" if r["rol"] == "Admin" else r["rol"]), axis=1
         )
         
-        # Formateamos las columnas para que se vea limpio
         df_mostrar = df_mostrar[["nombres", "usuario", "rol_ui", "estado", "ultimo_login"]]
         df_mostrar.columns = ["Nombres", "Usuario", "Rol", "Estado", "Último Login"]
         
@@ -4815,30 +4813,28 @@ def _frag_usuarios_botones():
         st.markdown("---")
         st.subheader("Editar un usuario")
         
-        # El único botón que se genera es para el selectbox
         ops = {f"{r['nombres']} ({r['usuario']})": r["id"] for _, r in df.iterrows()}
         sel = st.selectbox("Selecciona el usuario a editar", list(ops.keys()))
         
+        # 🆕 GUARDAMOS EL ID DEL USUARIO QUE SE ESTÁ EDITANDO ACTUALMENTE
         if st.button("Ver / Editar usuario seleccionado", width='stretch'):
-            st.session_state["_editando_u_" + str(ops[sel])] = True
+            st.session_state["_usuario_editando_activo"] = ops[sel]
             st.rerun()
 
-    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Si se seleccionó a alguien)
-    for key in list(st.session_state.keys()):
-        if key.startswith("_editando_u_"):
-            idu = int(key.replace("_editando_u_", ""))
-            if st.session_state[key]:
-                st.markdown("---")
-                ok, msg = puede_gestionar_usuario(usuario, idu)
-                if not ok:
-                    st.warning(msg)
-                    st.session_state[key] = False
-                else:
-                    _usuario_form_editar(idu)
-                
-                if st.button("Cancelar edición", key=f"cancel_edit_{idu}"):
-                    st.session_state[key] = False
-                    st.rerun()
+    # 🆕 AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
+    usuario_editando = st.session_state.get("_usuario_editando_activo")
+    if usuario_editando:
+        st.markdown("---")
+        ok, msg = puede_gestionar_usuario(usuario, usuario_editando)
+        if not ok:
+            st.warning(msg)
+            st.session_state.pop("_usuario_editando_activo", None)
+        else:
+            _usuario_form_editar(usuario_editando)
+        
+        if st.button("Cancelar edición", key=f"cancel_edit_activo"):
+            st.session_state.pop("_usuario_editando_activo", None)
+            st.rerun()
 
 
 def _frag_usuarios_crear():
