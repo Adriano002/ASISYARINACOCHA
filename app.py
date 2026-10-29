@@ -3780,9 +3780,6 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
-    # 🆕 Auto-refresh opcional (si quieres que se actualice solo cada 30 seg)
-    # st_autorefresh(interval=30000, key="panel_dir_refresh")
-    
     st.title("Panel de Control - Dirección")
     fecha = hoy_str()
     st.caption(f"Resumen operativo del día: **{fecha}**")
@@ -3792,7 +3789,6 @@ def vista_panel_direccion():
         st.info("No hay turnos configurados.")
         return
 
-    # Selector de turno
     etiquetas = []
     for info in turnos_info:
         t = info["turno"]
@@ -3807,7 +3803,6 @@ def vista_panel_direccion():
     ventana = info["ventana"]
     estado = info["estado"]
 
-    # Banner de estado
     if estado == "activo":
         st.success(f"🟢 El turno **{turno['nombre']}** está EN CURSO. Ventana: {ventana['nombre']} ({ventana['hora_apertura']} - {ventana['hora_cierre']})")
     else:
@@ -3816,42 +3811,49 @@ def vista_panel_direccion():
     m = metricas_dia_turno(fecha, turno["id"])
     
     # ==========================================
-    # FILA 1: MÉTRICAS PRINCIPALES (Tarjetas grandes)
+    # FILA 1: MÉTRICAS PRINCIPALES
     # ==========================================
+    st.markdown("### Resumen General")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Alumnos", m["total"])
-    c2.metric("Puntuales", m["puntuales"], delta=f"{m['puntuales'] - m['tardanzas']} vs tardanzas", delta_color="off")
-    c3.metric("Tardanzas", m["tardanzas"], delta_color="inverse" if m["tardanzas"] > 0 else "normal")
-    c4.metric("Faltas", m["faltas"], delta_color="inverse" if m["faltas"] > 0 else "normal")
+    c2.metric("Puntuales", m["puntuales"])
+    c3.metric("Tardanzas", m["tardanzas"])
+    c4.metric("Faltas", m["faltas"])
 
     # ==========================================
-    # FILA 2: DETALLES OPERATIVOS
+    # FILA 2: BARRAS DE PROGRESO VISUALES
     # ==========================================
     st.markdown("---")
-    st.markdown("**Detalles Operativos**")
+    st.markdown("### Progreso de Asistencia")
+    
+    total = m["total"] if m["total"] > 0 else 1 # Evitar división por cero
+    
+    # Barras de progreso nativas (Cero RAM extra)
+    st.markdown(f"**Puntuales:** {m['puntuales']} de {m['total']} alumnos ({(m['puntuales']/total)*100:.1f}%)")
+    st.progress(m['puntuales'] / total)
+    
+    st.markdown(f"**Tardanzas:** {m['tardanzas']} de {m['total']} alumnos ({(m['tardanzas']/total)*100:.1f}%)")
+    st.progress(m['tardanzas'] / total)
+    
+    st.markdown(f"**Faltas:** {m['faltas']} de {m['total']} alumnos ({(m['faltas']/total)*100:.1f}%)")
+    st.progress(m['faltas'] / total)
+
+    # ==========================================
+    # FILA 3: DETALLES OPERATIVOS
+    # ==========================================
+    st.markdown("---")
+    st.markdown("### Detalles Operativos")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Reforzamiento", m["ref_asistio"])
     c2.metric("Bloqueados", m["bloqueados"])
-    c3.metric("Justificadas Hoy", m["justificadas"])
-    c4.metric("Permisos Hoy", m["permisos"])
+    c3.metric("Justificadas", m["justificadas"])
+    c4.metric("Permisos", m["permisos"])
 
     # ==========================================
-    # FILA 3: GRÁFICO DE ASISTENCIA
+    # FILA 4: ÚLTIMOS ESCANEOS (Oculto en Expander)
     # ==========================================
     st.markdown("---")
-    st.markdown("**Progreso de Asistencia del Turno**")
-    
-    # Armamos un pequeño DataFrame para el gráfico
-    datos_grafico = pd.DataFrame({
-        "Estado": ["Puntuales", "Tardanzas", "Faltas"],
-        "Cantidad": [m["puntuales"], m["tardanzas"], m["faltas"]]
-    })
-    
-    # 🆕 Gráfico de barras nativo (Cero RAM extra)
-    st.bar_chart(datos_grafico.set_index("Estado"), height=250)
-    
-    # Nota: Si quieres ver la lista de escaneos, la dejamos oculta en un expander para no gastar RAM visual
-    with st.expander("Ver lista de últimos escaneos"):
+    with st.expander("Ver lista detallada de los últimos escaneos"):
         df = ultimos_registros_turno(fecha, turno["id"], 50)
         if df.empty:
             st.info("Sin escaneos hoy en este turno.")
