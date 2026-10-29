@@ -2522,6 +2522,50 @@ def pdf_carnets_todos():
     return _render_carnets(filas, "Carnets - Todos los salones") if filas else None
 
 
+def pdf_carnet_individual(dni):
+    from reportlab.platypus import SimpleDocTemplate
+    from reportlab.lib.pagesizes import mm
+    from io import BytesIO
+    from reportlab.platypus import Image as RLImage
+    from pathlib import Path
+
+    with cursor() as (con, cur):
+        cur.execute("""
+            SELECT a.*, s.nombre AS seccion, g.nombre AS grado, t.nombre AS turno
+            FROM alumnos a
+            JOIN secciones s ON a.seccion_id=s.id
+            JOIN grados g ON s.grado_id=g.id
+            JOIN turnos t ON s.turno_id=t.id
+            WHERE a.dni=? AND a.activo=1
+        """, (dni,))
+        filas = [dict(r) for r in cur.fetchall()]
+        
+    if not filas:
+        return None
+        
+    alumno = filas[0]
+    escudo = Path("escudo.png")
+    img = _generar_fotocheck_pil(alumno, escudo if escudo.exists() else None)
+    
+    ib = BytesIO()
+    img.save(ib, format="PNG")
+    ib.seek(0)
+    
+    # Tamaño exacto de un carnet (85mm x 53mm)
+    ANCHO_CARNET = 85 * mm
+    ALTO_CARNET = 53 * mm
+    
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=(ANCHO_CARNET, ALTO_CARNET),
+                            rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0)
+    
+    img_rl = RLImage(ib, width=ANCHO_CARNET, height=ALTO_CARNET)
+    doc.build([img_rl])
+    
+    buf.seek(0)
+    return buf.getvalue()
+
+
 def pdf_carnet_alumno(dni):
     from reportlab.platypus import SimpleDocTemplate # 🆕 FIX
     with cursor() as (con, cur):
