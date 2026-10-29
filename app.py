@@ -1154,7 +1154,7 @@ def vista_mantenimiento_datos():
                             st.error(msg)
 
     # ══════════════════════════════════════════════════════════════════
-    # TAB 2: LIMPIEZA Y COMPACTACIÓN DE LA BASE DE DATOS
+    # TAB 2: LIMPIEZA Y COMPACTACIÓN DE LA BASE DE DATOS (RESTAURADO)
     # ══════════════════════════════════════════════════════════════════
     with tabs[1]:
         st.subheader("Limpieza de Asistencias Antiguas")
