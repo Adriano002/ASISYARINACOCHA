@@ -4625,14 +4625,15 @@ def _carnets_ver_seccion(idsec):
         st.info("Sin alumnos activos.")
         return
 
-    # 🆕 INICIALIZAMOS LA CANASTA
     if "canasta_carnets" not in st.session_state:
         st.session_state["canasta_carnets"] = []
 
     st.markdown("---")
     
-    # OPCIÓN 1: INDIVIDUAL
-    st.markdown("### 1. Generar Carnet Individual")
+    # ==========================================
+    # OPCIÓN 1: CARNET INDIVIDUAL (De este salón)
+    # ==========================================
+    st.markdown("### 1. Generar Carnet Individual (de este salón)")
     c1, c2 = st.columns([3, 1])
     with c1:
         ops_alumnos = {al["nombre_completo"]: al["id"] for _, al in df.iterrows()}
@@ -4649,11 +4650,13 @@ def _carnets_ver_seccion(idsec):
 
     st.markdown("---")
 
+    # ==========================================
     # OPCIÓN 2: SALÓN COMPLETO
+    # ==========================================
     st.markdown("### 2. Generar PDF de Todo el Salón")
-    st.caption("Genera un PDF con todos los alumnos de esta sección (2 carnets por hoja A4).")
+    st.caption("Genera un PDF con todos los alumnos de esta sección.")
     if st.button("📄 Generar PDF del Salón Completo", type="primary", width='stretch'):
-        with st.spinner("Generando PDF del salón..."):
+        with st.spinner("Generando PDF..."):
             pdf = pdf_carnets_por_seccion(idsec)
             if pdf:
                 st.download_button(
@@ -4663,23 +4666,41 @@ def _carnets_ver_seccion(idsec):
 
     st.markdown("---")
 
-    # OPCIÓN 3: CANASTA (SELECCIONADOS)
-    st.markdown("### 3. Generar PDF de Alumnos Seleccionados")
-    st.caption("Agrega alumnos de este o de otros salones para armar un PDF personalizado (2 por hoja A4).")
+    # ==========================================
+    # OPCIÓN 3: CANASTA (BUSCADOR GLOBAL)
+    # ==========================================
+    st.markdown("### 3. Generar PDF de Seleccionados (Cualquier Salón)")
+    st.caption("Busca a cualquier alumno del colegio (por nombre o DNI) para agregarlo a la lista.")
     
-    if st.button("➕ Agregar alumno a la lista", width='stretch'):
-        if id_sel not in st.session_state["canasta_carnets"]:
-            st.session_state["canasta_carnets"].append(id_sel)
-            st.toast(f"{alumno_sel} agregado.")
-            st.rerun()
+    # 🆕 BUSCADOR GLOBAL
+    busqueda = st.text_input("Buscar alumno por nombre o DNI", key="buscar_al_global", placeholder="Ej: Juan o 74105299")
+    
+    if busqueda:
+        # Buscamos en toda la base de datos
+        df_global = buscar_alumnos(texto=busqueda, limite=10)
+        
+        if df_global.empty:
+            st.info("No se encontraron alumnos con esa búsqueda.")
         else:
-            st.warning("Ese alumno ya está en la lista.")
+            # Mostramos los resultados de la búsqueda para seleccionar
+            ops_global = {f"{r['nombre_completo']} - {r['grado']} {r['seccion']}": r["id"] for _, r in df_global.iterrows()}
+            al_global_sel = st.selectbox("Selecciona el alumno encontrado", list(ops_global.keys()), key="global_al_sel")
+            
+            if st.button("➕ Agregar a la Lista", width='stretch'):
+                id_agregar = ops_global[al_global_sel]
+                if id_agregar not in st.session_state["canasta_carnets"]:
+                    st.session_state["canasta_carnets"].append(id_agregar)
+                    st.toast(f"{al_global_sel} agregado a la lista.")
+                    st.rerun()
+                else:
+                    st.warning("Ese alumno ya está en la lista.")
 
+    # MOSTRAMOS LA CANASTA
     canasta = st.session_state["canasta_carnets"]
     if canasta:
+        st.markdown("---")
         st.info(f"Tienes **{len(canasta)}** alumno(s) en la lista de seleccionados.")
         
-        # Mostramos los seleccionados
         with cursor() as (con, cur):
             ph = ",".join("?" * len(canasta))
             cur.execute(f"""
@@ -4704,8 +4725,8 @@ def _carnets_ver_seccion(idsec):
                 st.session_state["canasta_carnets"] = []
                 st.rerun()
         with c2:
-            if st.button("📄 Generar PDF de Seleccionados", type="primary", width='stretch'):
-                with st.spinner("Generando PDF de seleccionados..."):
+            if st.button("📄 Generar PDF de la Lista", type="primary", width='stretch'):
+                with st.spinner("Generando PDF..."):
                     pdf = pdf_carnets_seleccionados(canasta, titulo="Carnets Seleccionados")
                     if pdf:
                         st.download_button(
