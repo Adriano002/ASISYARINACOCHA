@@ -6247,7 +6247,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       TIPOGRAFÍA (Nunito) — SIN !important para no romper iconos
+       TIPOGRAFÍA (Nunito)
        ══════════════════════════════════════════════════════════════════ */
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
@@ -6316,7 +6316,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       SIDEBAR
+       SIDEBAR (ESCRITORIO)
        ══════════════════════════════════════════════════════════════════ */
     section[data-testid="stSidebar"]{
         border-right: 1px solid var(--primario-borde);
@@ -6645,7 +6645,7 @@ def aplicar_estilos():
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       RESPONSIVE
+       RESPONSIVE (CELULAR) Y SIDEBAR ESTILO APP MÓVIL
        ══════════════════════════════════════════════════════════════════ */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
@@ -6658,6 +6658,55 @@ def aplicar_estilos():
         .kpi-card .kpi-num{ font-size: 24px; }
         .info-linea{ flex-direction: column; }
         .info-label{ min-width: auto; margin-bottom: 2px; }
+
+        /* 1. Achicamos el sidebar para que no ocupe toda la pantalla */
+        section[data-testid="stSidebar"] {
+            min-width: 270px !important;
+            max-width: 270px !important;
+        }
+
+        /* 2. Hacemos los botones del menú más grandes y cómodos al tacto */
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {
+            width: 100% !important;
+            padding: 14px 16px !important; /* Botones más altos para el dedo */
+            margin-bottom: 6px !important;
+            border-radius: 12px !important; /* Esquinas bien redondeadas */
+            background-color: rgba(128,128,128,0.05) !important; /* Fondo gris suave para todos */
+            border: 1px solid transparent !important;
+            transition: all 0.2s ease;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* 3. Efecto cuando tocas un botón */
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:active {
+            transform: scale(0.98); /* Efecto de "presión" */
+        }
+
+        /* 4. El botón SELECCIONADO (El que está activo) */
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+            background-color: rgba(232,123,74,0.12) !important;
+            border: 1px solid #E87B4A !important;
+            color: #E87B4A !important;
+            font-weight: 800 !important;
+        }
+
+        /* 5. Achicamos el circulito para que no ocupe espacio */
+        section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+            margin-right: 12px !important;
+            transform: scale(0.9);
+        }
+
+        /* 6. Achicamos un poco la tarjeta naranja del perfil */
+        .encabezado-sidebar {
+            padding: 16px 10px !important;
+            margin-bottom: 15px !important;
+        }
+        .encabezado-sidebar .avatar {
+            width: 50px !important; 
+            height: 50px !important; 
+            font-size: 20px !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
