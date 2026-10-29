@@ -6304,29 +6304,24 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS Y FONDO (Inyectado de forma limpia)
+    # 1. CSS LOCAL (Igual al primero, pero sin emojis)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* Fondo de pantalla completa forzado */
-    .stApp {
-        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%) !important;
+    /* Fondo crema suave que cubre toda la pantalla */
+    .login-bg {
+        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%);
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
     }
     /* Tarjeta central */
     .login-card {
         background: #FFFFFF;
-        border-radius: 24px;
-        padding: 40px 30px;
-        box-shadow: 0 20px 40px rgba(232,123,74,0.15);
+        border-radius: 24px 24px 0 0;
+        padding: 40px 30px 20px 30px;
+        box-shadow: 0 -10px 40px rgba(232,123,74,0.05);
         border: 1px solid #FFE4D6;
+        border-bottom: none;
         text-align: center;
-        margin-bottom: -15px; 
-        position: relative;
-        z-index: 1;
-    }
-    .login-logo {
-        width: 110px;
-        height: auto;
-        margin-bottom: 15px;
+        margin-bottom: -20px; /* Pega la tarjeta con el formulario */
     }
     .login-title {
         font-size: 36px; font-weight: 900; color: #E87B4A !important;
@@ -6336,7 +6331,7 @@ def vista_login():
         font-size: 15px; color: #666 !important; 
         margin-bottom: 10px; font-weight: 600; 
     }
-    /* Contenedor del formulario */
+    /* Contenedor del formulario para que se vea como parte de la tarjeta */
     div[data-testid="stForm"] {
         background: white !important;
         border-radius: 0 0 24px 24px !important;
@@ -6360,32 +6355,38 @@ def vista_login():
         border: none !important;
         padding: 12px !important;
         width: 100% !important;
-        transition: all 0.2s;
     }
     .stFormSubmitButton > button:hover {
         background: #D66535 !important;
-        transform: translateY(-2px);
     }
-    </style>""", unsafe_allow_html=True)
+    </style>
+    <div class="login-bg"></div>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Solo la imagen, sin emojis)
+    # 2. ESTRUCTURA VISUAL (Sin Emojis)
     # ══════════════════════════════════════════════════════════════════
     _, centro, _ = st.columns([1, 1.2, 1])
     
     with centro:
+        # Abrimos la tarjeta
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        
+        # El escudo usando st.image (centrado con columnas)
+        c_img1, c_img2, c_img3 = st.columns([1, 1, 1])
+        with c_img2:
+            st.image("escudo.png", use_container_width=True) 
+            
+        # Título y subtítulo
         st.markdown("""
-        <div class="login-card">
-            <img src="app/static/escudo.png" class="login-logo" alt="Escudo">
             <div class="login-title">asisyarina</div>
             <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Formulario
+        # Formulario (Ocultamos los labels para que se vea más limpio)
         with st.form("login"):
-            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
+            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario", label_visibility="collapsed")
+            password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed")
             enviado = st.form_submit_button("Ingresar al Sistema")
             
             if enviado:
