@@ -3781,67 +3781,6 @@ def vista_bloqueados():
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
     # ══════════════════════════════════════════════════════════════════
-    # CSS SCOPED (Solo para el efecto HOVER y animaciones)
-    # Se inyecta UNA sola vez por sesión para no gastar RAM en reruns
-    # ══════════════════════════════════════════════════════════════════
-    if not st.session_state.get("_dash_css_cargado"):
-        st.markdown("""
-        <style>
-        .dash-kpi-card {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .dash-kpi-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 24px rgba(232,123,74,0.15) !important;
-        }
-        .dash-header {
-            background: linear-gradient(135deg, #E87B4A 0%, #D66535 60%, #B85C38 100%);
-            border-radius: 20px;
-            padding: 30px 34px;
-            color: #FFF;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-            margin-bottom: 26px;
-            box-shadow: 0 10px 28px rgba(232,123,74,0.22);
-            position: relative;
-            overflow: hidden;
-        }
-        .dash-header::before {
-            content: '';
-            position: absolute;
-            top: -60%; right: -8%;
-            width: 280px; height: 280px;
-            background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-        .dash-header h1 {
-            margin: 0; font-size: 32px; font-weight: 900;
-            color: #FFF !important; -webkit-text-fill-color: #FFF !important;
-            letter-spacing: -0.5px;
-        }
-        .dash-header p {
-            margin: 6px 0 0 0; opacity: 0.92; font-size: 14px;
-        }
-        .dash-badge {
-            background: rgba(255,255,255,0.20);
-            padding: 6px 16px; border-radius: 20px;
-            font-weight: 800; font-size: 13px;
-            border: 1px solid rgba(255,255,255,0.40);
-            white-space: nowrap;
-        }
-        @media (max-width: 768px) {
-            .dash-header { padding: 22px; }
-            .dash-header h1 { font-size: 24px; }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        st.session_state["_dash_css_cargado"] = True
-
-    # ══════════════════════════════════════════════════════════════════
     # LÓGICA Y CÁLCULOS
     # ══════════════════════════════════════════════════════════════════
     fecha = hoy_str()
@@ -3863,28 +3802,47 @@ def vista_panel_direccion():
     ventana = info["ventana"]
     estado = info["estado"]
     
-    # Si tienes la función cacheada, usa esto. Si no, quita el @st.cache_data
+    # Llamamos a tus métricas
     m = metricas_dia_turno(fecha, turno["id"])
 
     # ══════════════════════════════════════════════════════════════════
-    # CABECERA (HTML + CSS Scoped)
+    # CABECERA (Fíjate que empieza pegado a las comillas)
     # ══════════════════════════════════════════════════════════════════
     color_estado = "#4CAF50" if estado == "activo" else "#F44336"
     
-    st.markdown(f"""
-    <div class="dash-header">
+    html_header = f"""<div style="
+        background: linear-gradient(135deg, #E87B4A 0%, #D66535 60%, #B85C38 100%);
+        border-radius: 20px;
+        padding: 30px 34px;
+        color: #FFF;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 26px;
+        box-shadow: 0 10px 28px rgba(232,123,74,0.22);
+        position: relative;
+        overflow: hidden;
+    ">
         <div>
-            <h1>Panel de Control</h1>
-            <p>Monitoreo en tiempo real · Turno <b>{turno['nombre']}</b> · {fecha}</p>
+            <h1 style="margin: 0; font-size: 32px; font-weight: 900; color: #FFF; letter-spacing: -0.5px;">Panel de Control</h1>
+            <p style="margin: 6px 0 0 0; opacity: 0.92; font-size: 14px;">Monitoreo en tiempo real · Turno <b>{turno['nombre']}</b> · {fecha}</p>
         </div>
         <div style="text-align:right;">
-            <span class="dash-badge">
-                <span style="color:{color_estado};font-size:16px;">●</span> {estado.upper()}
+            <span style="
+                background: rgba(255,255,255,0.20);
+                padding: 6px 16px; border-radius: 20px;
+                font-weight: 800; font-size: 13px;
+                border: 1px solid rgba(255,255,255,0.40);
+                white-space: nowrap;
+            ">
+                <span style="color:{color_estado}; font-size:16px;">●</span> {estado.upper()}
             </span>
-            <p style="margin-top:8px;font-size:12px;">Ventana: {ventana['nombre']}</p>
+            <p style="margin-top:8px; font-size:12px;">Ventana: {ventana['nombre']}</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>"""
+    st.markdown(html_header, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
     # BOTÓN ACTUALIZAR
@@ -3892,16 +3850,14 @@ def vista_panel_direccion():
     c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
         if st.button("🔄 Actualizar", key="btn_actualizar_dash", width='stretch'):
-            # Si usas cache, esto limpia la caché para traer datos frescos
             if hasattr(metricas_dia_turno, "clear"):
                 metricas_dia_turno.clear()
 
     # ══════════════════════════════════════════════════════════════════
-    # KPIs (HTML con estilos INLINE para garantizar que se vea bien)
+    # KPIs (HTML con estilos INLINE - Cero errores)
     # ══════════════════════════════════════════════════════════════════
     def _kpi_card_inline(icon, value, label, color_borde, color_valor):
-        return f"""
-        <div class="dash-kpi-card" style="
+        return f"""<div style="
             background: #FFFFFF;
             border-radius: 16px;
             padding: 20px 16px;
@@ -3913,21 +3869,19 @@ def vista_panel_direccion():
             align-items: center;
             justify-content: center;
             min-height: 120px;
+            margin-bottom: 5px;
         ">
             <span style="font-size: 26px; margin-bottom: 8px; display: block;">{icon}</span>
             <div style="font-size: 34px; font-weight: 900; line-height: 1.1; margin-bottom: 4px; color: {color_valor};">{value}</div>
             <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #666;">{label}</div>
-        </div>
-        """
+        </div>"""
 
-    # Fila 1
     kpis_fila1 = [
         ("👥", m["total"],       "Total Alumnos",  "#E87B4A", "#E87B4A"),
         ("✅", m["puntuales"],   "Puntuales",      "#22C55E", "#22C55E"),
         ("⏳", m["tardanzas"],   "Tardanzas",      "#F59E0B" if m["tardanzas"] > 0 else "#22C55E", "#F59E0B" if m["tardanzas"] > 0 else "#22C55E"),
         ("❌", m["faltas"],      "Faltas",         "#EF4444" if m["faltas"] > 0 else "#22C55E", "#EF4444" if m["faltas"] > 0 else "#22C55E"),
     ]
-    # Fila 2
     kpis_fila2 = [
         ("📚", m["ref_asistio"], "Reforzamiento",  "#3B82F6", "#3B82F6"),
         ("🚫", m["bloqueados"],  "Bloqueados",     "#EF4444" if m["bloqueados"] > 0 else "#22C55E", "#EF4444" if m["bloqueados"] > 0 else "#22C55E"),
@@ -3954,8 +3908,7 @@ def vista_panel_direccion():
 
     def _bar_inline(label, valor, color):
         pct = (valor / total * 100) if total > 0 else 0
-        return f"""
-        <div style="margin-bottom: 16px;">
+        return f"""<div style="margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 800;">
                 <span>{label}</span>
                 <span style="color: {color};">{valor} / {m["total"]}</span>
@@ -3963,17 +3916,15 @@ def vista_panel_direccion():
             <div style="background: #FFF0E8; border-radius: 10px; height: 18px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);">
                 <div style="width: {pct:.1f}%; background: {color}; height: 100%; border-radius: 10px; transition: width 0.6s ease;"></div>
             </div>
-        </div>
-        """
+        </div>"""
 
-    html_progress = f"""
-    <div style="background: #FFFFFF; border-radius: 16px; padding: 22px 26px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); margin-bottom: 20px;">
+    html_progress = f"""<div style="background: #FFFFFF; border-radius: 16px; padding: 22px 26px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); margin-bottom: 20px;">
         <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #E87B4A; margin-bottom: 16px;">Progreso de Asistencia del Turno</div>
         {_bar_inline("Puntuales", m["puntuales"], "#22C55E")}
         {_bar_inline("Tardanzas", m["tardanzas"], "#F59E0B")}
         {_bar_inline("Faltas",    m["faltas"],    "#EF4444")}
-    </div>
-    """
+    </div>"""
+    
     st.markdown(html_progress, unsafe_allow_html=True)
 
 #REPORTES 
