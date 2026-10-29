@@ -6304,14 +6304,20 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS (Usa la cajita transparente, no fuerza el fondo de la app)
+    # 1. CSS (Fondo usando un pseudo-elemento, CERO DIVS EN EL MARKDOWN)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* La cajita de fondo que NO interrumpe el modo oscuro/claro */
-    .login-bg {
-        background: linear-gradient(135deg, rgba(255,248,240,0.8) 0%, rgba(255,228,214,0.8) 100%);
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+    /* 🆕 EL TRUCO: Usamos un pseudo-elemento en el body para el fondo.
+       Así no hay <div> que Streamlit pueda imprimir como texto. */
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: linear-gradient(135deg, rgba(255,248,240,0.9) 0%, rgba(255,228,214,0.9) 100%);
+        z-index: -1;
+        pointer-events: none;
     }
+
     /* Tarjeta central */
     .login-card {
         background: var(--secondary-background-color, #FFFFFF);
@@ -6321,7 +6327,7 @@ def vista_login():
         border: 1px solid rgba(232,123,74,0.2);
         text-align: center;
         margin-top: 40px;
-        margin-bottom: -20px; /* Pega la tarjeta al formulario */
+        margin-bottom: -20px;
         position: relative;
         z-index: 1;
     }
@@ -6333,7 +6339,7 @@ def vista_login():
         font-size: 16px; color: var(--text-color, #666) !important; 
         margin-bottom: 10px; font-weight: 600; opacity: 0.8;
     }
-    /* Contenedor del formulario para que parezca parte de la tarjeta */
+    /* Formulario integrado */
     div[data-testid="stForm"] {
         background: var(--secondary-background-color, #FFFFFF) !important;
         border-radius: 0 0 24px 24px !important;
@@ -6367,11 +6373,10 @@ def vista_login():
         background: #D66535 !important;
         transform: translateY(-2px);
     }
-    </style>
-    <div class="login-bg"></div>""", unsafe_allow_html=True)
+    </style>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA VISUAL (Sin emojis ni escudos)
+    # 2. ESTRUCTURA VISUAL (Sin emojis, sin escudos)
     # ══════════════════════════════════════════════════════════════════
     _, centro, _ = st.columns([1, 1.2, 1])
     
@@ -6396,7 +6401,6 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
