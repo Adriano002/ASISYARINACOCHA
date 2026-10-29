@@ -1070,25 +1070,23 @@ def vista_mantenimiento_datos():
     tabs = st.tabs(["Registro Manual (Pasado)", "Limpiar Base de Datos (R2)"])
     
     # ══════════════════════════════════════════════════════════════════
-    # TAB 1: REGISTRO MANUAL PASADO (Estilo Puerta Manual)
+    # TAB 1: REGISTRO MANUAL PASADO
     # ══════════════════════════════════════════════════════════════════
     with tabs[0]:
         st.subheader("Registrar Asistencia de Días Anteriores")
         st.info("Usa esta opción si hubo caída de internet o luz y se tomó asistencia en papel.")
         
-        # 🆕 1. SELECCIONAR FECHA
-        fecha_reg = st.date_input("Paso 1: Selecciona la fecha a registrar", max_value=hoy_date(), key="fecha_pasado")
+        fecha_reg = st.date_input("Selecciona la fecha a registrar", max_value=hoy_date(), key="fecha_pasado")
         fecha_str = fecha_reg.strftime("%Y-%m-%d")
         
         st.markdown("---")
-        st.markdown("**Paso 2: Selecciona el grado y la sección**")
+        st.markdown("**Selecciona el grado y la sección**")
         
         clave = "mant_sel"
         idsec = _selector_grado_seccion(clave, "Elige el grado")
         if not idsec:
             return
         
-        # Validamos que la sección exista
         with cursor() as (con, cur):
             cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
                            t.nombre AS turno FROM secciones s
@@ -1101,7 +1099,6 @@ def vista_mantenimiento_datos():
             st.warning("Seccion no encontrada.")
             return
 
-        # 🆕 BOTÓN PARA REGRESAR A GRADOS
         if st.button("← Regresar a grados", key="mant_volver_grados"):
             st.session_state.pop(clave + "_idsec", None)
             st.rerun()
@@ -1113,9 +1110,8 @@ def vista_mantenimiento_datos():
             st.info("Sin alumnos activos.")
             return
 
-        st.caption(f"{len(df)} alumnos. Marca el estado de cada uno para la fecha **{fecha_str}**.")
+        st.caption(f"{len(df)} alumnos. Marca el estado para la fecha **{fecha_str}**.")
         
-        # 🆕 3. BOTONES RÁPIDOS POR ALUMNO
         for _, al in df.iterrows():
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([4, 1, 1, 1])
@@ -1125,7 +1121,7 @@ def vista_mantenimiento_datos():
                 with c2:
                     if st.button("Puntual", key=f"punt_{al['id']}", type="primary", width='stretch'):
                         ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, PUNTUAL, usuario, "Registro tardío en papel (Puntual)"
+                            al["dni"], fecha_str, PUNTUAL, usuario, "Registro tardío (Puntual)"
                         )
                         if ok:
                             st.toast(msg)
@@ -1135,7 +1131,7 @@ def vista_mantenimiento_datos():
                 with c3:
                     if st.button("Tardanza", key=f"tard_{al['id']}", width='stretch'):
                         ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, TARDANZA, usuario, "Registro tardío en papel (Tardanza)"
+                            al["dni"], fecha_str, TARDANZA, usuario, "Registro tardío (Tardanza)"
                         )
                         if ok:
                             st.toast(msg)
@@ -1145,7 +1141,7 @@ def vista_mantenimiento_datos():
                 with c4:
                     if st.button("Falta", key=f"falt_{al['id']}", width='stretch'):
                         ok, msg = registrar_asistencia_manual_pasada(
-                            al["dni"], fecha_str, FALTA, usuario, "Registro tardío en papel (Falta)"
+                            al["dni"], fecha_str, FALTA, usuario, "Registro tardío (Falta)"
                         )
                         if ok:
                             st.toast(msg)
@@ -1154,29 +1150,36 @@ def vista_mantenimiento_datos():
                             st.error(msg)
 
     # ══════════════════════════════════════════════════════════════════
-    # TAB 2: LIMPIEZA Y COMPACTACIÓN DE LA BASE DE DATOS (RESTAURADO)
+    # TAB 2: LIMPIEZA Y COMPACTACIÓN (CORREGIDO)
     # ══════════════════════════════════════════════════════════════════
     with tabs[1]:
         st.subheader("Limpieza de Asistencias Antiguas")
         st.warning("Esta acción eliminará PERMANENTEMENTE las asistencias antiguas de la base de datos para reducir el peso del archivo que se sube a R2.")
         
         with st.container(border=True):
-            meses = st.slider("Mantener asistencias de los últimos (meses):", min_value=3, max_value=12, value=6, key="slider_meses")
+            meses = st.slider("Mantener asistencias de los últimos (meses):", 
+                              min_value=3, max_value=12, value=6, 
+                              key="slider_meses")
             
-            st.write(f"Se borrarán todos los registros anteriores a **{meses} meses**. (Ejemplo: si hoy es diciembre, se borrará marzo hacia atrás).")
+            st.write(f"Se borrarán todos los registros anteriores a **{meses} meses**.")
             
-            check = st.checkbox("Entiendo que esta acción borra datos y no se puede deshacer.")
+            check = st.checkbox("Entiendo que esta acción borra datos y no se puede deshacer.", 
+                                key="check_limpiar")
             
-            if st.button("Eliminar y Compactar Base de Datos", type="primary", use_container_width=True, disabled=not check, key="btn_limpiar_bd"):
+            if st.button("Eliminar y Compactar Base de Datos", 
+                         type="primary", 
+                         use_container_width=True, 
+                         disabled=not check, 
+                         key="btn_limpiar_bd"):
                 with st.spinner("Compactando base de datos... Esto puede tardar unos segundos."):
                     try:
+                        # 🆕 LLAMAMOS A LA FUNCIÓN CORRECTA
                         borrados_as, borrados_tar, fecha_limite = limpiar_asistencias_antiguas(meses_a_mantener=meses)
+                        
                         if borrados_as == 0 and borrados_tar == 0:
                             st.info("No hay registros tan antiguos para borrar.")
                         else:
                             st.success(f"¡Limpieza exitosa! Se eliminaron {borrados_as} asistencias y {borrados_tar} tardanzas anteriores al {fecha_limite}.")
-                            
-                            # Sugerimos hacer un backup inmediatamente después
                             st.info("El archivo local ahora pesa menos. Ve a la vista de 'Backup' y presiona 'Subir a R2' para actualizar la nube.")
                     except Exception as e:
                         st.error(f"Error al limpiar: {e}")
