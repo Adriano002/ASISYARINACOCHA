@@ -2467,16 +2467,40 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from reportlab.lib.units import cm
     from io import BytesIO
     from pathlib import Path
-    import os
 
     buf = BytesIO()
-    # Márgenes de 1.5cm a cada lado. Total ancho útil = 21 cm
-    doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
-                            rightMargin=1.5*cm, leftMargin=1.5*cm,
-                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    
+    # 🆕 HOJA VERTICAL (A4 normal)
+    def _pie_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#C4562A'))
+        canvas.setLineWidth(1)
+        canvas.line(2*cm, 2*cm, 19*cm, 2*cm) # Línea ajustada a lo ancho de la hoja vertical
+        
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#888888'))
+        canvas.drawString(2*cm, 1.5*cm, "Documento oficial generado por el Sistema de Asistencia I.E. Yarinacocha.")
+        canvas.drawRightString(19*cm, 1.5*cm, f"Página {doc.page}")
+
+        escudo_path = Path("escudo.png")
+        if escudo_path.exists():
+            try:
+                canvas.saveState()
+                canvas.setFillAlpha(0.05) # 5% de opacidad
+                # Centrado en hoja vertical (21 x 29.7 cm)
+                canvas.drawImage(str(escudo_path), 5.5*cm, 10*cm, width=10*cm, height=10*cm, mask='auto')
+                canvas.restoreState()
+            except Exception:
+                pass
+        
+        canvas.restoreState()
+
+    # Márgenes verticales (2cm a los lados, más abajo para el pie de página)
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2.5*cm)
     est = getSampleStyleSheet()
     
-    # Estilos
     estilo_titulo = ParagraphStyle('TituloReporte', parent=est['Heading1'], fontSize=18, textColor=colors.HexColor('#C4562A'), spaceAfter=2, fontName='Helvetica-Bold')
     estilo_subtitulo = ParagraphStyle('SubtituloReporte', parent=est['Heading2'], fontSize=12, textColor=colors.HexColor('#4A4A4A'), spaceAfter=2, fontName='Helvetica-Bold')
     estilo_texto = ParagraphStyle('TextoReporte', parent=est['Normal'], fontSize=8, textColor=colors.HexColor('#888888'), fontName='Helvetica-Oblique')
@@ -2491,11 +2515,10 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(PageBreak())
         primera = False
 
-        # ─── CABECERA ELEGANTE CON ESCUDO ───
         cabecera_data = []
         if escudo_path.exists():
             try:
-                img_escudo = Image(str(escudo_path), width=2.8*cm, height=2.8*cm)
+                img_escudo = Image(str(escudo_path), width=2.5*cm, height=2.5*cm)
                 cabecera_data = [[
                     Paragraph(f"<b>{titulo_base}</b><br/><font size=11 color='#4A4A4A'>{nombre_hoja}</font><br/><font size=8 color='#888888'>Generado: {ahora().strftime('%Y-%m-%d %H:%M:%S')}</font>", estilo_titulo),
                     img_escudo
@@ -2509,7 +2532,8 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 ""
             ]]
 
-        tabla_cabecera = Table(cabecera_data, colWidths=[18*cm, 3*cm])
+        # Ajuste de tabla cabecera para hoja vertical (17 cm de ancho)
+        tabla_cabecera = Table(cabecera_data, colWidths=[14.5*cm, 2.5*cm])
         tabla_cabecera.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
@@ -2517,7 +2541,17 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#C4562A')),
         ]))
         el.append(tabla_cabecera)
-        el.append(Spacer(1, 15))
+        el.append(Spacer(1, 12))
+
+        leyenda_html = (
+            "<font color='#2E7D32'><b>P</b></font> = Puntual &nbsp;|&nbsp;"
+            "<font color='#F57F17'><b>T</b></font> = Tardanza &nbsp;|&nbsp;"
+            "<font color='#F9A825'><b>J</b></font> = Justificada &nbsp;|&nbsp;"
+            "<font color='#C62828'><b>F</b></font> = Falta &nbsp;|&nbsp;"
+            "<font color='#1565C0'><b>PERMISO</b></font> = Permiso"
+        )
+        el.append(Paragraph(leyenda_html, estilo_texto))
+        el.append(Spacer(1, 10))
 
         es_hoja_faltas = (nombre_hoja == "ALUMNOS QUE FALTARON")
 
@@ -2532,8 +2566,8 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             datos = [df.columns.tolist()] + df.astype(str).values.tolist()
             
             if es_hoja_faltas:
-                # Hoja de faltas: 4 columnas
-                col_widths = [2.0*cm, 8.5*cm, 2.0*cm, 8.5*cm]
+                # 🆕 La "Hojaza" de faltas (Vertical)
+                col_widths = [2.0*cm, 6.5*cm, 2.0*cm, 6.5*cm]
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 t.setStyle(TableStyle([
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -2550,29 +2584,29 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ]))
             else:
-                # 🆕 ANCHOS MATEMÁTICOS EXACTOS (Suma = 21 cm)
+                # Ajuste de anchos para hoja vertical
                 col_widths = []
                 for col in df.columns:
                     cl = str(col).strip().lower()
                     if cl == "n":
-                        col_widths.append(1.5 * cm)    # N: bien chiquita
+                        col_widths.append(1.2 * cm)
                     elif cl == "estado":
-                        col_widths.append(2.5 * cm)    # Estado: chiquita
+                        col_widths.append(2.0 * cm)
                     elif "hora" in cl:
-                        col_widths.append(2.5 * cm)    # Hora: chiquita
+                        col_widths.append(2.0 * cm)
                     elif "apellido" in cl:
-                        col_widths.append(7.0 * cm)    # Apellidos: ancha
+                        col_widths.append(6.0 * cm)
                     elif "nombre" in cl:
-                        col_widths.append(7.5 * cm)    # Nombres: ancha
+                        col_widths.append(6.0 * cm)
                     else:
-                        col_widths.append(3.0 * cm)
+                        col_widths.append(2.5 * cm)
                 
                 t = Table(datos, colWidths=col_widths, repeatRows=1)
                 estilos = [
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#C4562A')), # Naranja oscuro elegante
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#C4562A')),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor('#C4562A')),
@@ -2590,11 +2624,11 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 
                 if col_estado is not None:
                     mapa = {
-                        "P": colors.HexColor("#2E7D32"), # Verde oscuro
-                        "T": colors.HexColor("#F57F17"), # Naranja oscuro
-                        "J": colors.HexColor("#F9A825"), # Amarillo oscuro
-                        "F": colors.HexColor("#C62828"), # Rojo oscuro
-                        "PERMISO": colors.HexColor("#1565C0") # Azul
+                        "P": colors.HexColor("#2E7D32"),
+                        "T": colors.HexColor("#F57F17"),
+                        "J": colors.HexColor("#F9A825"),
+                        "F": colors.HexColor("#C62828"),
+                        "PERMISO": colors.HexColor("#1565C0")
                     }
                     for i in range(1, len(datos)):
                         val = str(datos[i][col_estado]).strip().upper()
@@ -2607,7 +2641,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
             el.append(t)
             el.append(Spacer(1, 15))
     
-    doc.build(el)
+    doc.build(el, onFirstPage=_pie_pagina, onLaterPages=_pie_pagina)
     buf.seek(0)
     return buf.getvalue()
 
@@ -3061,12 +3095,25 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     from pathlib import Path
 
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=(A4[1], A4[0]),
-                            rightMargin=1.5*cm, leftMargin=1.5*cm,
-                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    
+    # 🆕 PIE DE PÁGINA VERTICAL
+    def _pie_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#C4562A'))
+        canvas.setLineWidth(1)
+        canvas.line(2*cm, 2*cm, 19*cm, 2*cm)
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#888888'))
+        canvas.drawString(2*cm, 1.5*cm, "Documento oficial generado por el Sistema de Asistencia I.E. Yarinacocha.")
+        canvas.drawRightString(19*cm, 1.5*cm, f"Página {doc.page}")
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2.5*cm)
     est = getSampleStyleSheet()
     
-    estilo_titulo = ParagraphStyle('Titulo', parent=est['Heading1'], fontSize=16, textColor=colors.HexColor('#B85C38'), fontName='Helvetica-Bold')
+    estilo_titulo = ParagraphStyle('Titulo', parent=est['Heading1'], fontSize=16, textColor=colors.HexColor('#C4562A'), fontName='Helvetica-Bold')
     estilo_sub = ParagraphStyle('Sub', parent=est['Normal'], fontSize=10, textColor=colors.HexColor('#666666'))
 
     el = []
@@ -3083,12 +3130,12 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     if not cab_data:
         cab_data = [[Paragraph(f"<b>{titulo}</b>", estilo_titulo), ""]]
 
-    t_cab = Table(cab_data, colWidths=[18*cm, 3*cm])
+    t_cab = Table(cab_data, colWidths=[14.5*cm, 2.5*cm])
     t_cab.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (1,0), (1,0), 'RIGHT'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#B85C38')),
+        ('LINEBELOW', (0,0), (-1,-1), 2, colors.HexColor('#C4562A')),
     ]))
     el.append(t_cab)
     
@@ -3099,26 +3146,26 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
 
     if not df.empty:
         datos = [df.columns.tolist()] + df.astype(str).values.tolist()
-        at = 21 * cm
         
-        # 🆕 AJUSTE INTELIGENTE DE ANCHOS (Números angostos, Auxiliar ancho)
+        # 🆕 AJUSTE DE COLUMNAS VERTICAL (Auxiliar ancho, números angostos)
         col_widths = []
         for col in df.columns:
             cl = str(col).lower()
             if "auxiliar" in cl:
-                col_widths.append(7.0 * cm) # Auxiliar ancho
+                col_widths.append(5.5 * cm) # Auxiliar bien ancho
             elif "grado" in cl or "seccion" in cl:
-                col_widths.append(2.5 * cm)
-            else: # Puntuales, Faltas, Total (Números angostos)
-                col_widths.append(2.0 * cm)
+                col_widths.append(1.8 * cm)
+            else: # Puntuales, Faltas, Total
+                col_widths.append(1.6 * cm)
                 
+        # Repartir espacio sobrante
         total_w = sum(col_widths)
-        if total_w < at:
-            sobra = at - total_w
-            col_widths[0] += sobra # Le damos el espacio sobrante al Auxiliar
+        if total_w < 17 * cm:
+            sobra = (17 * cm) - total_w
+            col_widths[0] += sobra # Se lo damos al auxiliar
             
-        if total_w > at:
-            col_widths = [(w / total_w) * at for w in col_widths]
+        if total_w > 17 * cm:
+            col_widths = [(w / total_w) * (17 * cm) for w in col_widths]
             
         if fuente_chica:
             fc = ff = 7
@@ -3134,8 +3181,8 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
             ("FONTSIZE", (0, 0), (-1, 0), fc),
             ("FONTSIZE", (0, 1), (-1, -1), ff),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#B85C38')),
-            ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.HexColor('#B85C38')),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor('#C4562A')),
+            ("LINEBELOW", (0, 0), (-1, 0), 1.2, colors.HexColor('#C4562A')),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E0E0E0")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -3149,7 +3196,7 @@ def generar_pdf_tabla_ancha(df, titulo, subtitulo=None, fuente_chica=False):
     else:
         el.append(Paragraph("Sin datos para mostrar.", estilo_sub))
 
-    doc.build(el)
+    doc.build(el, onFirstPage=_pie_pagina, onLaterPages=_pie_pagina)
     buf.seek(0)
     return buf.getvalue()
 
