@@ -60,6 +60,35 @@ HORAS_CIERRE_EVENTO = 2
 
 LIMITE_NUEVO = 3
 LIMITE_REINCIDENTE = 1
+import threading
+from datetime import datetime, timezone, timedelta
+from sync import subir_bd
+from db import DB_PATH
+def _hilo_backup_programado():
+    # 🆕 HORAS EXACTAS: 9:00 AM y 3:00 PM
+    HORAS_BACKUP = ["09:00", "15:00"] 
+    ultimo_backup_fecha = None
+    
+    while True:
+        try:
+            # Hora de Perú (UTC-5)
+            ahora = datetime.now(timezone.utc) - timedelta(hours=5)
+            hora_actual_str = ahora.strftime("%H:%M")
+            fecha_actual_str = ahora.strftime("%Y-%m-%d")
+            
+            # Si la hora actual está en la lista Y no hemos hecho backup a esa hora hoy
+            if hora_actual_str in HORAS_BACKUP and ultimo_backup_fecha != f"{fecha_actual_str}_{hora_actual_str}":
+                log.info(f"Iniciando backup automático a las {hora_actual_str}...")
+                subir_bd(DB_PATH)
+                ultimo_backup_fecha = f"{fecha_actual_str}_{hora_actual_str}"
+                log.info("Backup automático completado exitosamente.")
+                
+        except Exception as e:
+            log.error(f"Error en el hilo de backup: {e}")
+            
+        # Revisa la hora cada 5 minutos (300 segundos) para no gastar CPU
+        time.sleep(300)
+
 
 
 def ahora():
@@ -7128,14 +7157,20 @@ def main():
         inicializar_bd()
         aplicar_estilos()
 
-        # 🆕 RECUPERAR SESIÓN Y VALIDAR TIEMPO
+        # 🆕 ENCENDEMOS EL RELOJ DE BACKUP (Solo se inicia una vez)
+        if "backup_hilo_iniciado" not in st.session_state:
+            st.session_state["backup_hilo_iniciado"] = True
+            hilo = threading.Thread(target=_hilo_backup_programado, daemon=True)
+            hilo.start()
+            log.info("Hilo de backup encendido (9:00 AM y 3:00 PM).")
+
+        # 🆕 RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
         if not st.session_state.get("user"):
             token = st.query_params.get("sesion")
             ts_str = st.query_params.get("ts")
             
             if token and ts_str:
                 try:
-                    # Calculamos cuántos segundos pasaron
                     tiempo_ingreso = int(ts_str)
                     ahora_ts = int(time.time())
                     diferencia = ahora_ts - tiempo_ingreso
@@ -7153,26 +7188,31 @@ def main():
                                 u = dict(f)
                                 u["bloqueado_hasta"] = fmt_ts(u.get("bloqueado_hasta"))
                                 st.session_state["user"] = u
-                                # 🆕 RENOVAMOS EL TIEMPO en cada recarga para que los 5 min se cuenten desde la última interacción
+                                # Renovamos el tiempo en cada recarga
                                 st.query_params["ts"] = str(ahora_ts)
                 except Exception:
                     st.query_params.clear()
 
+        # 🆕 SEGURIDAD: SI NO HAY USUARIO, LIMPIAMOS LA URL Y AL LOGIN
         if not st.session_state.get("user"):
+            st.query_params.clear()
             vista_login()
             return
             
-        # ... (el resto de tu código: _verificar_admin_activo, menú, etc.) ...
+        # --- VALIDACIONES DE SISTEMA ---
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
             st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
+            
         if st.session_state["user"].get("debe_cambiar_password"):
             vista_cambio_password_obligatorio()
             return
+            
         if modo_mantenimiento() and st.session_state["user"]["rol"] != "Admin":
             vista_mantenimiento()
             return
+            
         if sistema_bloqueado():
             st.warning("El sistema no esta configurado. No hay periodo activo "
                        "con alumnos cargados.")
@@ -7185,15 +7225,17 @@ def main():
                 st.info("Contacta al Administrador.")
             return
         
-        # 🆕 Blinde para que no tumbe la app si la BD se traba
+        # Control de faltas (Cada 5 minutos)
         try:
             _control_faltas()
         except Exception as e:
             log.warning(f"No se pudieron procesar faltas: {e}")
             
+        # Menú y ruteo
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
+            
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
