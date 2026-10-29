@@ -1100,6 +1100,11 @@ def vista_mantenimiento_datos():
         if not sec:
             st.warning("Seccion no encontrada.")
             return
+
+        # 🆕 BOTÓN PARA REGRESAR A GRADOS
+        if st.button("← Regresar a grados", key="mant_volver_grados"):
+            st.session_state.pop(clave + "_idsec", None)
+            st.rerun()
             
         st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
         
