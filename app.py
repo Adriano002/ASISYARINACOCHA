@@ -6909,19 +6909,38 @@ def menu_lateral():
     opciones = obtener_opciones_por_rol(usuario)
     
     with st.sidebar:
-        # 🆕 TARJETA DE USUARIO (Diseño corregido)
-        st.markdown(
-            f'<div class="encabezado-sidebar" style="padding: 20px 10px 15px 10px !important;">'
-            f'  <div class="nombre" style="font-size: 16px; margin-bottom: 6px;">{usuario["nombres"]}</div>'
-            f'  <div class="rol">{rol}</div>'
-            f'</div>', unsafe_allow_html=True)
-        
-        # 🆕 EL ESCUDO CON TAMAÑO FIJO (No gigante)
-        # Usamos columnas más amplias para que quepa bien centrado
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            # width=75 significa que medirá 75 píxeles (tamaño perfecto)
-            st.image("escudo.png", width=75)
+        # 🆕 TARJETA CON EL ESCUDO ADENTRO
+        # Usamos un contenedor con estilo para que el escudo y el texto queden juntos
+        with st.container():
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
+                border-radius: 12px;
+                padding: 15px 10px 10px 10px;
+                text-align: center;
+                color: white;
+                box-shadow: 0 4px 10px rgba(232,123,74,0.2);
+                margin-bottom: 10px;
+            ">
+            """, unsafe_allow_html=True)
+
+            # El escudo usando columnas para centrarlo y achicarlo
+            c1, c2, c3 = st.columns([1, 1, 1])
+            with c2:
+                # width=50 lo hace a la mitad de tamaño
+                st.image("escudo.png", width=50)
+
+            # El nombre y el rol debajo del escudo
+            st.markdown(f"""
+                <div style="font-size: 15px; font-weight: 800; margin-top: -10px;">{usuario['nombres']}</div>
+                <div style="
+                    display: inline-block; margin-top: 6px; padding: 3px 12px;
+                    background: rgba(255,255,255,0.25); border-radius: 20px;
+                    font-size: 10px; font-weight: 900; text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                ">{rol}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
         # Lógica del menú
         if "menu" not in st.session_state or \
