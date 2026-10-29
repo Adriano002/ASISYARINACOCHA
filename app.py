@@ -6909,10 +6909,10 @@ def menu_lateral():
     opciones = obtener_opciones_por_rol(usuario)
     
     with st.sidebar:
-        # 🆕 TARJETA DE USUARIO CON EL ESCUDO
+        # 🆕 TARJETA DE USUARIO CON EL ESCUDO (Ruta corregida)
         st.markdown(
             f'<div class="encabezado-sidebar">'
-            f'  <div class="escudo"><img src="app/static/escudo.png" alt="Escudo"></div>'
+            f'  <div class="escudo"><img src="escudo.png" alt="Escudo"></div>'
             f'  <div class="nombre">{usuario["nombres"]}</div>'
             f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
@@ -6931,7 +6931,6 @@ def menu_lateral():
             st.rerun()
             
     return op
-
 
 def _enrutar(op, usuario):
     v = RUTAS.get(op)
