@@ -1,102 +1,144 @@
-# sync.py - Sincronización con Cloudflare R2
-import logging
-from pathlib import Path
-import time
-import streamlit as st
+# sync.py
+import boto3
+import os
+from datetime import datetime, timezone, timedelta
+from botocore.exceptions import ClientError
 
-log = logging.getLogger("sync")
+# ══════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN (Asegúrate de tener tus credenciales en las variables de entorno)
+# ══════════════════════════════════════════════════════════════════
+BUCKET_NAME = "tu-bucket" # <-- CAMBIA ESTO POR TU BUCKET REAL
 
-
-def _client():
-    """Crea cliente boto3 apuntando a Cloudflare R2."""
-    import boto3
-    from botocore.config import Config
-
-    cfg = Config(
-        signature_version="s3v4",
-        retries={"max_attempts": 3, "mode": "standard"},
-    )
-    return boto3.client(
-        "s3",
-        endpoint_url=st.secrets["r2"]["endpoint"],
-        aws_access_key_id=st.secrets["r2"]["access_key"],
-        aws_secret_access_key=st.secrets["r2"]["secret_key"],
-        region_name="auto",
-        config=cfg,
-    )
-
-
-def descargar_bd(destino: Path):
-    """Descarga la base de datos desde R2."""
+# ══════════════════════════════════════════════════════════════════
+# 1. SUBIR BACKUP A R2 (Guarda con fecha y también sobrescribe el fijo)
+# ══════════════════════════════════════════════════════════════════
+def subir_bd(ruta_local):
     try:
-        cliente = _client()
-        bucket = st.secrets["r2"]["bucket"]
-        # Nombre fijo original
-        key = "asistencia.db"
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        cliente.download_file(bucket, key, str(destino))
-        log.info("BD descargada: %s (%s bytes)", destino, destino.stat().st_size)
+        s3 = boto3.client(
+            's3',
+            endpoint_url=os.getenv("R2_ENDPOINT"),
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY")
+        )
+        
+        # 🆕 1. GUARDAMOS CON FECHA Y HORA (Historial)
+        fecha_str = (datetime.now(timezone.utc) - timedelta(hours=5)).strftime("%Y-%m-%d_%H-%M")
+        nombre_archivo_fecha = f"asistencia_{fecha_str}.db"
+        s3.upload_file(ruta_local, BUCKET_NAME, nombre_archivo_fecha)
+        
+        # 🆕 2. GUARDAMOS CON NOMBRE FIJO (Para que el sistema inicie rápido)
+        s3.upload_file(ruta_local, BUCKET_NAME, "asistencia.db")
+        
+        print(f"Backup exitoso: {nombre_archivo_fecha} y asistencia.db")
+        
+    except Exception as e:
+        print(f"Error subiendo a R2: {e}")
+        raise e
+
+# ══════════════════════════════════════════════════════════════════
+# 2. LISTAR BACKUPS DISPONIBLES EN R2
+# ══════════════════════════════════════════════════════════════════
+def listar_backups_r2():
+    try:
+        s3 = boto3.client(
+            's3',
+            endpoint_url=os.getenv("R2_ENDPOINT"),
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY")
+        )
+        
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="asistencia_")
+        
+        backups = []
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                key = obj['Key']
+                # Solo los que tienen fecha, NO el "asistencia.db" fijo
+                if key.startswith("asistencia_") and key.endswith(".db") and key != "asistencia.db":
+                    fecha_str = key.replace("asistencia_", "").replace(".db", "")
+                    try:
+                        fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d_%H-%M")
+                        backups.append({"key": key, "fecha": fecha_obj})
+                    except ValueError:
+                        pass
+                        
+        # Ordenamos del más reciente al más antiguo
+        backups.sort(key=lambda x: x["fecha"], reverse=True)
+        return backups
+        
+    except Exception as e:
+        print(f"Error listando backups: {e}")
+        return []
+
+# ══════════════════════════════════════════════════════════════════
+# 3. DESCARGAR UN BACKUP ESPECÍFICO (Restauración)
+# ══════════════════════════════════════════════════════════════════
+def descargar_bd_especifica(key, ruta_local):
+    try:
+        s3 = boto3.client(
+            's3',
+            endpoint_url=os.getenv("R2_ENDPOINT"),
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY")
+        )
+        s3.download_file(BUCKET_NAME, key, ruta_local)
+        print(f"Base de datos {key} descargada a {ruta_local}")
         return True
     except Exception as e:
-        log.warning("descargar_bd: %s", e)
+        print(f"Error descargando backup: {e}")
         return False
 
-
-def subir_bd(origen: Path):
-    """Sube la BD local a R2."""
+# ══════════════════════════════════════════════════════════════════
+# 4. LIMPIAR BACKUPS ANTIGUOS EN R2 (Retención)
+# ══════════════════════════════════════════════════════════════════
+def limpiar_backups_antiguos_r2(meses_a_mantener):
     try:
-        if not origen.exists():
-            log.warning("No existe BD local para subir")
-            return False
-        cliente = _client()
-        bucket = st.secrets["r2"]["bucket"]
-        # Nombre fijo original
-        key = "asistencia.db"
-        cliente.upload_file(str(origen), bucket, key)
-        log.info("BD subida a R2: %s bytes", origen.stat().st_size)
+        s3 = boto3.client(
+            's3',
+            endpoint_url=os.getenv("R2_ENDPOINT"),
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY")
+        )
+        
+        fecha_limite = datetime.now(timezone.utc) - timedelta(days=meses_a_mantener * 30)
+        
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="asistencia_")
+        borrados = 0
+        
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                key = obj['Key']
+                if key.startswith("asistencia_") and key.endswith(".db") and key != "asistencia.db":
+                    fecha_str = key.replace("asistencia_", "").replace(".db", "")
+                    try:
+                        fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d_%H-%M").replace(tzinfo=timezone.utc)
+                        if fecha_obj < fecha_limite:
+                            s3.delete_object(Bucket=BUCKET_NAME, Key=key)
+                            borrados += 1
+                    except ValueError:
+                        pass
+                        
+        return borrados
+    except Exception as e:
+        print(f"Error limpiando backups: {e}")
+        return -1
+
+# ══════════════════════════════════════════════════════════════════
+# 5. DESCARGAR LA BD FIJA (Para el inicio de la app)
+# ══════════════════════════════════════════════════════════════════
+def descargar_bd_si_no_existe(ruta_local="asistencia.db"):
+    if os.path.exists(ruta_local):
+        return True
+    try:
+        s3 = boto3.client(
+            's3',
+            endpoint_url=os.getenv("R2_ENDPOINT"),
+            aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("R2_SECRET_KEY")
+        )
+        s3.download_file(BUCKET_NAME, "asistencia.db", ruta_local)
+        print("BD fija descargada de R2 al iniciar.")
         return True
     except Exception as e:
-        log.error("subir_bd: %s", e)
+        print(f"No se pudo descargar la BD inicial: {e}")
         return False
-
-
-def boton_backup():
-    """Backup manual: subir / descargar desde R2."""
-    from db import DB_PATH, reset_pool
-
-    st.markdown("### Backup manual")
-
-    if DB_PATH.exists():
-        tam = DB_PATH.stat().st_size / 1024
-        st.success(f"BD local: {DB_PATH.name} ({tam:.1f} KB)")
-    else:
-        st.error("No hay base de datos local.")
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        if st.button("⬆️ Subir base de datos al almacenamiento",
-                     type="primary", width="stretch"):
-            with st.spinner("Subiendo..."):
-                if subir_bd(DB_PATH):
-                    st.success("Base de datos subida correctamente.")
-                else:
-                    st.error("Error al subir. Revisa los logs.")
-
-    with c2:
-        if st.button("⬇️ Descargar BD desde R2", width="stretch"):
-            with st.spinner("Descargando..."):
-                reset_pool()
-                if descargar_bd(DB_PATH):
-                    reset_pool()
-                    st.success("BD descargada. Recargando datos...")
-                    time.sleep(1)
-                    st.rerun() # 🆕 FORZAR RECARGA PARA LEER DATOS NUEVOS
-                else:
-                    st.error("Error al descargar.")
-
-    st.markdown("---")
-    st.caption(
-        " En Streamlit Cloud el filesystem es efímero. "
-        "Haz backup periódicamente o al terminar la jornada."
-    )
