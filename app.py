@@ -86,9 +86,8 @@ def _hilo_backup_programado():
         except Exception as e:
             log.error(f"Error en el hilo de backup: {e}")
             
-        # Revisa la hora cada 5 minutos (300 segundos) para no gastar CPU
-        time.sleep(300)
-
+        # 🆕 Revisa la hora cada 10 minutos (600 segundos) para no gastar CPU
+        time.sleep(600)
 
 
 def ahora():
@@ -454,6 +453,7 @@ def info_periodo_con_alumnos():
     """)
 
 
+@st.cache_data(ttl=60)
 def listar_turnos():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM turnos ORDER BY id")
@@ -568,12 +568,14 @@ def ventana_activa_para_alumno(id_turno, fecha, id_seccion=None):
     return None
 
 
+@st.cache_data(ttl=60)
 def listar_grados():
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM grados ORDER BY nombre")
         return [dict(f) for f in cur.fetchall()]
 
 
+@st.cache_data(ttl=60)
 def secciones_por_grado(idg):
     with cursor() as (con, cur):
         cur.execute("SELECT * FROM secciones WHERE grado_id=? ORDER BY nombre",
@@ -3864,7 +3866,12 @@ def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
     
-    # 🆕 HEADER MÁS ANGOSTO Y CON LETRA MÁS PEQUEÑA
+    # 🆕 CONTROL DE FALTAS (Solo cuando entran a la puerta)
+    try:
+        _control_faltas()
+    except Exception as e:
+        log.warning(f"No se pudieron procesar faltas: {e}")
+
     st.markdown(f"""
     <div style="
         background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
@@ -3891,7 +3898,6 @@ def vista_puerta():
     </div>
     """, unsafe_allow_html=True)
     
-    # Llamada al buscador rápido
     _buscador_rapido_puerta()
 
     if "puerta_modo" not in st.session_state:
@@ -3985,6 +3991,12 @@ def vista_bloqueados():
         st.rerun()
 # ─── PANEL DIRECCION ───────────────────────────────────────────────────────
 def vista_panel_direccion():
+    # 🆕 CONTROL DE FALTAS (Solo cuando entran al panel)
+    try:
+        _control_faltas()
+    except Exception as e:
+        log.warning(f"No se pudieron procesar faltas: {e}")
+
     st.title("Panel Direccion")
     fecha = hoy_str()
     turnos_info = _turnos_para_panel()
@@ -7225,11 +7237,7 @@ def main():
                 st.info("Contacta al Administrador.")
             return
         
-        # Control de faltas (Cada 5 minutos)
-        try:
-            _control_faltas()
-        except Exception as e:
-            log.warning(f"No se pudieron procesar faltas: {e}")
+        # 🆕 _control_faltas() ELIMINADO DEL MAIN (Se ejecuta en las vistas correspondientes)
             
         # Menú y ruteo
         op = menu_lateral()
@@ -7239,7 +7247,6 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
 
 if __name__ == "__main__":
     main()
