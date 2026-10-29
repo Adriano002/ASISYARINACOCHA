@@ -3511,9 +3511,7 @@ def vista_panel_direccion():
     estado = info["estado"]
     m = metricas_dia_turno(fecha, turno["id"])
 
-    # Header de la NASA con CSS Inline
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%); border-radius: 16px; padding: 25px; color: white; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(232,123,74,0.2);">
+    st.markdown(f"""<div style="background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%); border-radius: 16px; padding: 25px; color: white; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(232,123,74,0.2);">
         <div>
             <h1 style="margin: 0; font-size: 28px; font-weight: 900; color: white;">Panel de Control</h1>
             <p style="margin: 5px 0 0 0; opacity: 0.9; color: white;">Turno <b>{turno['nombre']}</b> · {fecha}</p>
@@ -3523,8 +3521,7 @@ def vista_panel_direccion():
                 ● {estado.upper()}
             </span>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
     _, c_btn, _ = st.columns([2, 1, 2])
     with c_btn:
@@ -3532,29 +3529,18 @@ def vista_panel_direccion():
             st.cache_data.clear()
             st.rerun()
 
-    # Tarjetas de métricas usando CSS Inline (Respetan modo oscuro)
     def _kpi(title, value, color):
-        return f"""
-        <div style="background: var(--secondary-background-color); border-radius: 16px; padding: 20px; text-align: center; border-bottom: 4px solid {color}; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        return f"""<div style="background: var(--secondary-background-color); border-radius: 16px; padding: 20px; text-align: center; border-bottom: 4px solid {color}; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
             <div style="font-size: 32px; font-weight: 900; color: {color}; margin-bottom: 5px;">{value}</div>
             <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; opacity: 0.7;">{title}</div>
-        </div>
-        """
+        </div>"""
 
-    st.markdown(f"""
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px;">
-        {_kpi("Total Alumnos", m['total'], "#E87B4A")}
-        {_kpi("Puntuales", m['puntuales'], "#22C55E")}
-        {_kpi("Tardanzas", m['tardanzas'], "#F59E0B")}
-        {_kpi("Faltas", m['faltas'], "#EF4444")}
+    st.markdown(f"""<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px;">
+        {_kpi("Total Alumnos", m['total'], "#E87B4A")}{_kpi("Puntuales", m['puntuales'], "#22C55E")}{_kpi("Tardanzas", m['tardanzas'], "#F59E0B")}{_kpi("Faltas", m['faltas'], "#EF4444")}
     </div>
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
-        {_kpi("Reforzamiento", m['ref_asistio'], "#3B82F6")}
-        {_kpi("Bloqueados", m['bloqueados'], "#EF4444")}
-        {_kpi("Justificadas", m['justificadas'], "#3B82F6")}
-        {_kpi("Permisos", m['permisos'], "#3B82F6")}
-    </div>
-    """, unsafe_allow_html=True)
+        {_kpi("Reforzamiento", m['ref_asistio'], "#3B82F6")}{_kpi("Bloqueados", m['bloqueados'], "#EF4444")}{_kpi("Justificadas", m['justificadas'], "#3B82F6")}{_kpi("Permisos", m['permisos'], "#3B82F6")}
+    </div>""", unsafe_allow_html=True)
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
