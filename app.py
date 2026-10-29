@@ -6379,25 +6379,21 @@ def vista_backup():
     st.title("Backup y Respaldo")
     usuario = st.session_state["user"]
     
-    # ══════════════════════════════════════════════════════════════════
-    # 1. HISTORIAL DE RESPALDOS (VISIBLE PARA TODOS)
-    # ══════════════════════════════════════════════════════════════════
     import os
     archivo_log = "historial_backups.txt"
     
+    # ══════════════════════════════════════════════════════════════════
+    # 1. HISTORIAL DE RESPALDOS
+    # ══════════════════════════════════════════════════════════════════
     st.subheader("Historial de Resguardos Automáticos")
     st.caption("El sistema respalda automáticamente a las 09:00 AM y 03:00 PM (Hora de Perú).")
     
     if os.path.exists(archivo_log):
         with open(archivo_log, "r") as f:
             lineas = f.readlines()
-        
-        # Mostramos los últimos 10 registros
         ultimos = lineas[-10:]
         ultimos.reverse()
-        
         for linea in ultimos:
-            # Limpiamos la línea para que se vea formal
             texto_limpio = linea.strip().replace("✅", "EXITOSO:").replace("❌", "ERROR:")
             if "EXITOSO" in texto_limpio:
                 st.success(texto_limpio)
@@ -6424,17 +6420,16 @@ def vista_backup():
     
     if clave_ingresada != CLAVE_MAESTRA:
         st.info("Zona bloqueada. El botón de subir y descargar está deshabilitado.")
-        return # Cortamos la ejecución aquí.
+        return 
         
-    # A partir de aquí, solo se ejecuta si la clave es correcta:
     st.success("Clave correcta. Acceso concedido.")
     st.markdown("---")
     
+    # ══════════════════════════════════════════════════════════════════
+    # 3. ACCIONES (Subir a R2 y Descargar Local)
+    # ══════════════════════════════════════════════════════════════════
     c1, c2 = st.columns(2)
     
-    # ══════════════════════════════════════════════════════════════════
-    # 3. BOTÓN DE EMERGENCIA (Subir a R2) - PROTEGIDO
-    # ══════════════════════════════════════════════════════════════════
     with c1:
         st.markdown("### Forzar Respaldo a R2")
         st.caption("Súbelo a la nube si el automático falló.")
@@ -6454,9 +6449,6 @@ def vista_backup():
                         f.write(f"[{ahora().strftime('%Y-%m-%d %H:%M')}] ERROR: Fallo en backup MANUAL: {e}\n")
                     st.error(f"Error al subir: {e}")
                     
-    # ══════════════════════════════════════════════════════════════════
-    # 4. DESCARGA LOCAL (.db) - PROTEGIDO
-    # ══════════════════════════════════════════════════════════════════
     with c2:
         st.markdown("### Descargar Copia Local (.db)")
         st.caption("Descarga el archivo a tu PC por seguridad.")
@@ -6473,6 +6465,73 @@ def vista_backup():
         except Exception as e:
             st.error(f"No se pudo leer el archivo: {e}")
 
+    st.markdown("---")
+    
+    # ══════════════════════════════════════════════════════════════════
+    # 4. RESTAURAR BACKUP ANTERIOR
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("Restaurar Base de Datos desde R2")
+    st.warning("⚠️ Esta acción reemplazará la base de datos actual con la versión que elijas. La app se reiniciará.")
+    
+    if st.button("🔄 Buscar Backups en R2"):
+        with st.spinner("Buscando backups..."):
+            from sync import listar_backups_r2
+            st.session_state["_backups_r2"] = listar_backups_r2()
+            
+    if st.session_state.get("_backups_r2") is not None:
+        backups = st.session_state["_backups_r2"]
+        if not backups:
+            st.info("No se encontraron backups en R2.")
+        else:
+            ops = {f"{b['fecha'].strftime('%Y-%m-%d %H:%M')}": b['key'] for b in backups}
+            sel = st.selectbox("Selecciona el backup a restaurar:", list(ops.keys()))
+            
+            if confirmar_accion("restaurar_bd", "Restaurar este Backup", "¿Estás seguro? Esto borrará la BD actual."):
+                with st.spinner("Descargando y restaurando..."):
+                    from sync import descargar_bd_especifica
+                    from db import DB_PATH
+                    key = ops[sel]
+                    
+                    exito = descargar_bd_especifica(key, DB_PATH)
+                    
+                    if exito:
+                        st.success("¡Base de datos restaurada con éxito! Reiniciando la app...")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("Error al restaurar. Revisa los logs.")
+                        
+    st.markdown("---")
+    
+    # ══════════════════════════════════════════════════════════════════
+    # 5. LIMPIAR BACKUPS ANTIGUOS EN R2
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("Limpiar Backups Antiguos en R2")
+    st.caption("Elimina de la nube los respaldos que ya no necesitas para no llenar el almacenamiento.")
+    
+    with st.container(border=True):
+        meses_r2 = st.slider("Eliminar backups de más de (meses):", 
+                             min_value=3, max_value=24, value=6, key="slider_meses_r2")
+        
+        check_r2 = st.checkbox("Entiendo que esto borrará los archivos de R2 permanentemente.", key="check_limpiar_r2")
+        
+        if st.button("Eliminar Backups Antiguos de R2", 
+                     type="primary", 
+                     use_container_width=True, 
+                     disabled=not check_r2, 
+                     key="btn_limpiar_r2"):
+            with st.spinner("Buscando y eliminando backups antiguos en R2..."):
+                from sync import limpiar_backups_antiguos_r2
+                borrados = limpiar_backups_antiguos_r2(meses_r2)
+                
+                if borrados == -1:
+                    st.error("Ocurrió un error al limpiar los backups. Revisa la consola.")
+                elif borrados == 0:
+                    st.info("No se encontraron backups tan antiguos para borrar.")
+                else:
+                    st.success(f"¡Limpieza exitosa! Se eliminaron {borrados} backups antiguos de R2.")
+                    time.sleep(1)
+                    st.rerun()
 
 # ─── ESTILOS CSS ───────────────────────────────────────────────────────────
 def aplicar_estilos():
