@@ -89,7 +89,9 @@ def boton_backup():
                 reset_pool()
                 if descargar_bd(DB_PATH):
                     reset_pool()
-                    st.success("BD descargada. Recarga la página.")
+                    st.success("BD descargada. Recargando datos...")
+                    time.sleep(1)
+                    st.rerun() # 🆕 FORZAR RECARGA PARA LEER DATOS NUEVOS
                 else:
                     st.error("Error al descargar.")
 
