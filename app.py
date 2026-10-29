@@ -3715,6 +3715,16 @@ def _buscador_rapido_puerta():
                         else:
                             st.info(f"**{al['nombre_completo']}** - Aún no tiene registro de asistencia hoy.")
 def vista_puerta():
+    # 🆕 ELIMINAR EL ESPACIO EN BLANCO SUPERIOR DE STREAMLIT
+    st.markdown("""
+        <style>
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 0rem !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     usuario = st.session_state["user"]
     fecha = hoy_str()
     
@@ -3745,7 +3755,7 @@ def vista_puerta():
     </div>
     """, unsafe_allow_html=True)
     
-    # Llamada al buscador rápido
+    # Llamada al buscador rápido (desplegable)
     _buscador_rapido_puerta()
 
     if "puerta_modo" not in st.session_state:
