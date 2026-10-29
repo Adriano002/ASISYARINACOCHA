@@ -3682,21 +3682,60 @@ def _puerta_manual(usuario, fecha):
 def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
-    st.markdown(f"""
-    <div class="puerta-header">
-        <div class="titulo">Control de Puerta</div>
-        <div class="fecha">{fecha}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+
+    # ══════════════════════════════════════════════════════════════════
+    # 1. CSS EXCLUSIVO PARA LA PUERTA (Cero gasto de RAM global)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("""<style>
+    .puerta-header {
+        background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
+        border-radius: 20px;
+        padding: 24px 30px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px rgba(232,123,74,0.25);
+    }
+    .puerta-header h1 {
+        margin: 0; font-size: 32px; font-weight: 900; color: white !important;
+    }
+    .puerta-header p {
+        margin: 5px 0 0 0; opacity: 0.9; font-size: 15px;
+    }
+    .puerta-fecha {
+        background: rgba(255,255,255,0.2); padding: 8px 20px; 
+        border-radius: 12px; font-size: 18px; font-weight: 800;
+        border: 1px solid rgba(255,255,255,0.4);
+    }
+    </style>""", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 2. HEADER DE LA VISTA (HTML)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown(f"""<div class="puerta-header">
+        <div>
+            <h1>Control de Puerta</h1>
+            <p>Escanea el QR del estudiante para registrar su asistencia</p>
+        </div>
+        <div class="puerta-fecha">{fecha}</div>
+    </div>""", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 3. LÓGICA DE MODOS (Streamlit puro)
+    # ══════════════════════════════════════════════════════════════════
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
         
-    modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
-                    horizontal=True, label_visibility="collapsed")
+    # Usamos columnas para que el radio no ocupe toda la pantalla
+    _, col_modo, _ = st.columns([1, 2, 1])
+    with col_modo:
+        modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
+                        horizontal=True, label_visibility="collapsed")
                     
     if modo == "Escanear QR":
-        # 🆕 FIX CÁMARA: Si acaba de entrar al escáner, forzamos un reinicio limpio
+        # Forzamos un reinicio limpio de la cámara si acabamos de entrar
         if st.session_state.get("_ultimo_modo") != "Escanear QR":
             st.session_state["puerta_qr_mount"] = st.session_state.get("puerta_qr_mount", 0) + 1
             st.session_state["_ultimo_modo"] = "Escanear QR"
