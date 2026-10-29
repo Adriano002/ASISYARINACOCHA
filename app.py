@@ -4140,16 +4140,11 @@ def _perfil_alumno(idal):
         st.warning("Alumno no encontrado.")
         st.session_state.pop("perfil_alumno_id", None)
         return
-
     al = d["alumno"]
     usuario = st.session_state["user"]
-
-    ultimo_id = st.session_state.get("_perfil_ultimo_id")
-    if ultimo_id != idal:
-        for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"):
-            st.session_state.pop(k, None)
+    if st.session_state.get("_perfil_ultimo_id") != idal:
+        for k in ("_anular_perm_id", "_anular_jp_id", "justif_id"): st.session_state.pop(k, None)
     st.session_state["_perfil_ultimo_id"] = idal
-
     if st.button("← Volver a la lista", key="volver_perfil"):
         st.session_state.pop("perfil_alumno_id", None)
         st.session_state.pop("_perfil_ultimo_id", None)
@@ -4160,45 +4155,28 @@ def _perfil_alumno(idal):
     color_estado = "#22C55E" if not d["bloqueado"] else "#EF4444"
     txt_estado = "ACTIVO" if not d["bloqueado"] else "BLOQUEADO"
 
-    # Header del perfil
-    st.markdown(f"""
-    <div style="background: var(--secondary-background-color); border-radius: 16px; padding: 25px; display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 6px solid {color_estado};">
-        <div style="width: 80px; height: 80px; border-radius: 50%; background: #E87B4A; color: white; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900;">
-            {inicial}
-        </div>
+    st.markdown(f"""<div style="background: var(--secondary-background-color); border-radius: 16px; padding: 25px; display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 6px solid {color_estado};">
+        <div style="width: 80px; height: 80px; border-radius: 50%; background: #E87B4A; color: white; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900;">{inicial}</div>
         <div>
             <h1 style="margin: 0; font-size: 26px; font-weight: 900; color: var(--text-color);">{nombre}</h1>
-            <p style="margin: 5px 0; opacity: 0.8;">{al['grado']} {al['seccion']} | Turno {al['turno']} | DNI: {al['dni']}</p>
+            <p style="margin: 5px 0; opacity: 0.8; color: var(--text-color);">{al['grado']} {al['seccion']} | Turno {al['turno']} | DNI: {al['dni']}</p>
             <span style="background: {color_estado}; color: white; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;">{txt_estado}</span>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
-    # Métricas del alumno
     def _metrica(title, value, color):
-        return f"""
-        <div style="background: var(--secondary-background-color); border-radius: 12px; padding: 15px; text-align: center; border: 1px solid rgba(128,128,128,0.2);">
+        return f"""<div style="background: var(--secondary-background-color); border-radius: 12px; padding: 15px; text-align: center; border: 1px solid rgba(128,128,128,0.2);">
             <div style="font-size: 24px; font-weight: 900; color: {color}; margin-bottom: 5px;">{value}</div>
             <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; opacity: 0.7;">{title}</div>
-        </div>
-        """
+        </div>"""
     
-    st.markdown(f"""
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
-        {_metrica("Puntuales", d['total_puntuales'], "#22C55E")}
-        {_metrica("Tardanzas", d['total_tardanzas'], "#F59E0B")}
-        {_metrica("Faltas", d['total_faltas'], "#EF4444")}
-        {_metrica("Reforzamiento", d['total_ref_asistio'], "#3B82F6")}
+    st.markdown(f"""<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
+        {_metrica("Puntuales", d['total_puntuales'], "#22C55E")}{_metrica("Tardanzas", d['total_tardanzas'], "#F59E0B")}{_metrica("Faltas", d['total_faltas'], "#EF4444")}{_metrica("Reforzamiento", d['total_ref_asistio'], "#3B82F6")}
     </div>
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
-        {_metrica("Tard. Injust.", d['tard_injust'], "#E87B4A")}
-        {_metrica("Tard. desbloqueo", d['n_ciclo'], "#E87B4A")}
-        {_metrica("Límite", d['limite'], "#E87B4A")}
-        {_metrica("Reincidente", "SI" if d['reincidente'] else "NO", "#EF4444" if d['reincidente'] else "#22C55E")}
-    </div>
-    """, unsafe_allow_html=True)
+        {_metrica("Tard. Injust.", d['tard_injust'], "#E87B4A")}{_metrica("Tard. desbloqueo", d['n_ciclo'], "#E87B4A")}{_metrica("Límite", d['limite'], "#E87B4A")}{_metrica("Reincidente", "SI" if d['reincidente'] else "NO", "#EF4444" if d['reincidente'] else "#22C55E")}
+    </div>""", unsafe_allow_html=True)
 
-    # Apoderado y Acciones
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
@@ -4211,8 +4189,7 @@ def _perfil_alumno(idal):
             c_b1, c_b2 = st.columns(2)
             with c_b1:
                 pdf = pdf_carnet_alumno(al["dni"])
-                if pdf:
-                    st.download_button("Carnet QR", pdf, f"carnet_{al['dni']}.pdf", "application/pdf", use_container_width=True)
+                if pdf: st.download_button("Carnet QR", pdf, f"carnet_{al['dni']}.pdf", "application/pdf", use_container_width=True)
                 st.download_button("Historial", df_a_xlsx(d["asistencias"], "Historial"), f"hist_{al['dni']}.xlsx", use_container_width=True)
             with c_b2:
                 if d["bloqueado"]:
@@ -4224,7 +4201,6 @@ def _perfil_alumno(idal):
                         crear_bloqueo(al["id"], "BLOQUEO MANUAL", usuario)
                         st.rerun()
 
-    # Tabs
     tabs = st.tabs(["Asistencias", "Tardanzas", "Bloqueos", "Permisos", "Justificaciones"])
     with tabs[0]:
         if d["asistencias"].empty: st.info("Sin asistencias registradas.")
@@ -4244,7 +4220,6 @@ def _perfil_alumno(idal):
     with tabs[4]:
         if d["justificaciones_previas"].empty: st.info("Sin justificaciones previas.")
         else: st.dataframe(d["justificaciones_previas"], use_container_width=True, hide_index=True)
-
 
 def vista_alumnos():
     st.title("Alumnos")
