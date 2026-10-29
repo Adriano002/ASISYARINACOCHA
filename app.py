@@ -6303,20 +6303,83 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
-    st.markdown("""
-    <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
-        <h1 style="font-size:44px; margin-bottom:0; border:none; letter-spacing:-1px;">asisyarina</h1>
-        <p style="opacity:0.6; margin-top:6px; font-size:15px;">Sistema de Asistencia</p>
-    </div>
-    """, unsafe_allow_html=True)
-    _, centro, _ = st.columns([1, 1, 1])
+    # ══════════════════════════════════════════════════════════════════
+    # 1. CSS LOCAL (Exclusivo para el Login)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("""<style>
+    /* Fondo de pantalla completa */
+    .login-bg {
+        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%);
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+    }
+    /* Tarjeta central */
+    .login-card {
+        background: #FFFFFF;
+        border-radius: 24px;
+        padding: 40px 30px;
+        box-shadow: 0 20px 40px rgba(232,123,74,0.15);
+        border: 1px solid #FFE4D6;
+        text-align: center;
+        margin-top: 50px;
+    }
+    .login-icon { font-size: 50px; margin-bottom: 10px; }
+    .login-title {
+        font-size: 36px; font-weight: 900; color: #E87B4A !important;
+        margin-bottom: 5px; letter-spacing: -1px;
+    }
+    .login-sub { 
+        font-size: 15px; color: #666 !important; 
+        margin-bottom: 30px; font-weight: 600; 
+    }
+    
+    /* Forzamos que los inputs y botones nativos se vean hermosos */
+    .stTextInput > div > div > input {
+        border-radius: 10px !important;
+        border: 2px solid #FFE4D6 !important;
+        padding: 10px 15px !important;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #E87B4A !important;
+        box-shadow: 0 0 0 3px rgba(232,123,74,0.2) !important;
+    }
+    .stFormSubmitButton > button {
+        background: #E87B4A !important;
+        color: white !important;
+        border-radius: 10px !important;
+        font-weight: 800 !important;
+        border: none !important;
+        padding: 12px !important;
+        width: 100% !important;
+        transition: all 0.2s;
+    }
+    .stFormSubmitButton > button:hover {
+        background: #D66535 !important;
+        transform: translateY(-2px);
+    }
+    </style>
+    <div class="login-bg"></div>""", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 2. ESTRUCTURA Y HTML
+    # ══════════════════════════════════════════════════════════════════
+    # Columnas para centrar la tarjeta en la pantalla
+    _, centro, _ = st.columns([1, 1.2, 1])
+    
     with centro:
+        # Abrimos la tarjeta
+        st.markdown("""
+        <div class="login-card">
+            <div class="login-icon">🎓</div>
+            <div class="login-title">asisyarina</div>
+            <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
+        """, unsafe_allow_html=True)
+        
+        # Formulario nativo de Streamlit
         with st.form("login"):
-            usuario = st.text_input("Usuario", placeholder="tu usuario")
-            password = st.text_input("Contraseña", type="password",
-                                     placeholder="tu contraseña")
-            enviado = st.form_submit_button("Ingresar", type="primary",
-                                            width='stretch')
+            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
+            password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
+            enviado = st.form_submit_button("Ingresar al Sistema")
+            
             if enviado:
                 datos, err = autenticar(usuario, password)
                 if datos:
@@ -6325,6 +6388,9 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
+        
+        # Cerramos la tarjeta
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def vista_cambio_password_obligatorio():
