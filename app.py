@@ -3416,9 +3416,16 @@ def vista_bloqueados():
         st.caption("Usa esta opcion si necesitas bloquear a alguien por faltas graves, acumulacion, etc.")
         
         clave_man = "bloq_man"
+        
+        # 🆕 Si acabamos de bloquear, forzamos la limpieza total y recargamos
+        if st.session_state.get("_bloqueo_manual_exitoso"):
+            st.session_state.pop("_bloqueo_manual_exitoso", None)
+            st.session_state.pop("bloq_man_sel_id", None)
+            _reset_selector(clave_man)
+            st.rerun()
+        
         al_man_id = st.session_state.get("bloq_man_sel_id")
         
-        # 🆕 Lógica idéntica a Justificaciones
         if not al_man_id:
             idsec_man = _selector_grado_seccion(clave_man, "Elige el grado del alumno a bloquear")
             if not idsec_man:
@@ -3479,9 +3486,8 @@ def vista_bloqueados():
                 st.error("El motivo es obligatorio.")
             else:
                 crear_bloqueo(al_man["id"], f"BLOQUEO MANUAL: {motivo_manual.strip()}", usuario, origen="manual")
+                st.session_state["_bloqueo_manual_exitoso"] = True # 🆕 Bandera de éxito
                 st.toast(f"Alumno {al_man['nombres']} bloqueado manualmente.")
-                st.session_state.pop("bloq_man_sel_id", None)
-                _reset_selector(clave_man)
                 st.rerun()
 
         if st.button("Cancelar", key=f"bloq_man_cancel_{al_man['id']}"):
