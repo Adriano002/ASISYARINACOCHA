@@ -5,4 +5,4 @@ Pillow
 reportlab
 openpyxl
 boto3
-streamlit-autorefresh
+
