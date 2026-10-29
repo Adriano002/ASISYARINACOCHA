@@ -6376,9 +6376,100 @@ def vista_justificaciones_permisos():
 
 # ─── BACKUP ────────────────────────────────────────────────────────────────
 def vista_backup():
-    st.title("Backup de base de datos")
-    from sync import boton_backup
-    boton_backup()
+    st.title("Backup y Respaldo")
+    usuario = st.session_state["user"]
+    
+    # ══════════════════════════════════════════════════════════════════
+    # 1. HISTORIAL DE RESPALDOS (SOLO LECTURA)
+    # ══════════════════════════════════════════════════════════════════
+    import os
+    archivo_log = "historial_backups.txt"
+    
+    st.subheader("Historial de Resguardos Automáticos")
+    st.caption("El sistema respalda automáticamente a las 09:00 AM y 03:00 PM (Hora de Perú).")
+    
+    if os.path.exists(archivo_log):
+        with open(archivo_log, "r") as f:
+            lineas = f.readlines()
+        
+        # Mostramos los últimos 10 registros, del más reciente al más antiguo
+        ultimos = lineas[-10:]
+        ultimos.reverse()
+        
+        for linea in ultimos:
+            if "✅" in linea:
+                st.success(linea.strip())
+            elif "❌" in linea:
+                st.error(linea.strip())
+            else:
+                st.info(linea.strip())
+    else:
+        st.warning("Aún no se ha registrado ningún respaldo en este servidor.")
+    
+    st.markdown("---")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 2. BOTÓN DE EMERGENCIA (PROTEGIDO CON CLAVE)
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("Forzar Respaldo Manual (Emergencia)")
+    st.warning("Usa esto solo si estás seguro de que el respaldo automático falló o necesitas guardar cambios urgentes.")
+    
+    # 🆕 CLAVE DE SEGURIDAD
+    CLAVE_MAESTRA = "Yarinacocha2026" # <-- Puedes cambiar esta clave por la que tú quieras
+    
+    clave_ingresada = st.text_input("Ingresa la clave de administrador para habilitar el botón:", 
+                                    type="password",
+                                    placeholder="Clave secreta...")
+    
+    if clave_ingresada != CLAVE_MAESTRA:
+        st.info("🔒 El botón de emergencia está bloqueado. Ingresa la clave correcta para usarlo.")
+    else:
+        st.success("🔓 Clave correcta. Botón de emergencia habilitado.")
+        
+        if st.button("Subir Base de Datos a R2 AHORA", type="primary", use_container_width=True):
+            with st.spinner("Subiendo base de datos a la nube..."):
+                try:
+                    from sync import subir_bd
+                    from db import DB_PATH
+                    
+                    # Subimos la BD
+                    subir_bd(DB_PATH)
+                    
+                    # 🆕 ANOTAMOS EL ÉXITO EN EL HISTORIAL
+                    with open(archivo_log, "a") as f:
+                        f.write(f"[{ahora().strftime('%Y-%m-%d %H:%M')}] ✅ Backup MANUAL exitoso a R2 (por {usuario['usuario']})\n")
+                    
+                    st.success("¡Backup manual subido a R2 con éxito!")
+                    time.sleep(1)
+                    st.rerun()
+                    
+                except Exception as e:
+                    # 🆕 ANOTAMOS EL FALLO EN EL HISTORIAL
+                    with open(archivo_log, "a") as f:
+                        f.write(f"[{ahora().strftime('%Y-%m-%d %H:%M')}] ❌ Error en backup MANUAL: {e}\n")
+                    
+                    st.error(f"Error al subir la base de datos: {e}")
+
+    st.markdown("---")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 3. DESCARGA LOCAL (POR SI ACASO)
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("Descargar Copia Local")
+    st.caption("Descarga una copia del archivo .db a tu computadora por si acaso.")
+    
+    try:
+        from db import DB_PATH
+        with open(DB_PATH, "rb") as f:
+            st.download_button(
+                label="📥 Descargar Base de Datos (asistencia.db)",
+                data=f,
+                file_name=f"respaldo_local_{ahora().strftime('%Y%m%d_%H%M')}.db",
+                mime="application/x-sqlite3",
+                use_container_width=True
+            )
+    except Exception as e:
+        st.error(f"No se pudo leer la base de datos local: {e}")
 
 
 # ─── ESTILOS CSS ───────────────────────────────────────────────────────────
