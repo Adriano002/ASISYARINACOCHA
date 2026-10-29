@@ -3811,24 +3811,34 @@ def vista_panel_direccion():
     m = metricas_dia_turno(fecha, turno["id"])
     
     # ==========================================
-    # FILA 1: MÉTRICAS PRINCIPALES
+    # FILA 1: MÉTRICAS PRINCIPALES (Puro Streamlit)
     # ==========================================
     st.markdown("### Resumen General")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Alumnos", m["total"])
     c2.metric("Puntuales", m["puntuales"])
-    c3.metric("Tardanzas", m["tardanzas"])
-    c4.metric("Faltas", m["faltas"])
+    c3.metric("Tardanzas", m["tardanzas"], delta_color="inverse" if m["tardanzas"] > 0 else "normal")
+    c4.metric("Faltas", m["faltas"], delta_color="inverse" if m["faltas"] > 0 else "normal")
 
     # ==========================================
-    # FILA 2: BARRAS DE PROGRESO VISUALES
+    # FILA 2: DETALLES OPERATIVOS (Puro Streamlit)
+    # ==========================================
+    st.markdown("---")
+    st.markdown("### Detalles Operativos")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Reforzamiento", m["ref_asistio"])
+    c2.metric("Bloqueados", m["bloqueados"], delta_color="inverse" if m["bloqueados"] > 0 else "normal")
+    c3.metric("Justificadas", m["justificadas"])
+    c4.metric("Permisos", m["permisos"])
+
+    # ==========================================
+    # FILA 3: BARRAS DE PROGRESO
     # ==========================================
     st.markdown("---")
     st.markdown("### Progreso de Asistencia")
     
-    total = m["total"] if m["total"] > 0 else 1 # Evitar división por cero
+    total = m["total"] if m["total"] > 0 else 1
     
-    # Barras de progreso nativas (Cero RAM extra)
     st.markdown(f"**Puntuales:** {m['puntuales']} de {m['total']} alumnos ({(m['puntuales']/total)*100:.1f}%)")
     st.progress(m['puntuales'] / total)
     
@@ -3837,28 +3847,8 @@ def vista_panel_direccion():
     
     st.markdown(f"**Faltas:** {m['faltas']} de {m['total']} alumnos ({(m['faltas']/total)*100:.1f}%)")
     st.progress(m['faltas'] / total)
-
-    # ==========================================
-    # FILA 3: DETALLES OPERATIVOS
-    # ==========================================
-    st.markdown("---")
-    st.markdown("### Detalles Operativos")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Reforzamiento", m["ref_asistio"])
-    c2.metric("Bloqueados", m["bloqueados"])
-    c3.metric("Justificadas", m["justificadas"])
-    c4.metric("Permisos", m["permisos"])
-
-    # ==========================================
-    # FILA 4: ÚLTIMOS ESCANEOS (Oculto en Expander)
-    # ==========================================
-    st.markdown("---")
-    with st.expander("Ver lista detallada de los últimos escaneos"):
-        df = ultimos_registros_turno(fecha, turno["id"], 50)
-        if df.empty:
-            st.info("Sin escaneos hoy en este turno.")
-        else:
-            st.dataframe(df, width='stretch', hide_index=True)
+    
+    # 🆕 ELIMINADA LA TABLA DE ULTIMOS ESCANEOS (Cero consumo de RAM extra)
 
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
