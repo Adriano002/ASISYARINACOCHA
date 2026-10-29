@@ -19,7 +19,6 @@ def _q(sql: str) -> str:
     return sql.replace("%s", "?")
 
 
-# 
 def obtener_conexion():
     con = getattr(_local, "con", None)
     if con is None:
@@ -33,9 +32,9 @@ def obtener_conexion():
         cur = con.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
-        cur.execute("PRAGMA busy_timeout=10000") # 10 segundos de espera
+        cur.execute("PRAGMA busy_timeout=30000")   # 🆕 30s alineado con timeout
         cur.execute("PRAGMA foreign_keys=ON")
-        cur.execute("PRAGMA cache_size=-2000") # Limita caché a 2MB para no llenar la RAM
+        cur.execute("PRAGMA cache_size=-8000")     # 🆕 8MB (antes 2MB)
         _local.con = con
     return con
 
@@ -46,6 +45,8 @@ def liberar_conexion(con):
             con.commit()
     except Exception:
         pass
+
+
 class CursorWrapper:
     """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
     def __init__(self, cursor):
@@ -102,7 +103,6 @@ def cursor(dict_rows=True):
 
 
 def escribir(sql, params=()):
-  
     with cursor() as (con, cur):
         cur.execute(sql, params)
         con.commit()
@@ -191,7 +191,6 @@ def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
     return out
 
 
-
 def ping():
     try:
         with cursor() as (con, cur):
@@ -218,28 +217,9 @@ def reset_pool():
         _local.con = None
 
 
-def descargar_bd_si_no_existe():
-    # Si el archivo local ya existe y no está vacío, NO descargues de R2
-    if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
-        return True
-    
-    # Si no existe, intenta descargarlo de R2
-    try:
-        from sync import descargar_bd
-        ok = descargar_bd(DB_PATH)
-        if ok:
-            log.info("BD descargada desde R2")
-            reset_pool()
-        return ok
-    except Exception as e:
-        log.warning(f"No se pudo descargar BD desde R2: {e}")
-        return False
-
-
-def subir_bd_a_r2():
-    try:
-        from sync import subir_bd
-        return subir_bd(DB_PATH)
-    except Exception as e:
-        log.error(f"Error subiendo BD a R2: {e}")
-        return False
+# ══════════════════════════════════════════════════════════════════
+# NOTA: La descarga/subida a R2 se maneja 100% en sync.py.
+# NO dupliques estas funciones aquí para evitar conflictos.
+# Usa:
+#   from sync import descargar_bd_si_no_existe, subir_bd
+# ══════════════════════════════════════════════════════════════════
