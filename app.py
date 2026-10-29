@@ -6304,13 +6304,12 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 # ─── LOGIN / CAMBIO PASSWORD / MI CUENTA ───────────────────────────────────
 def vista_login():
     # ══════════════════════════════════════════════════════════════════
-    # 1. CSS LOCAL (Exclusivo para el Login)
+    # 1. CSS Y FONDO (Inyectado de forma limpia)
     # ══════════════════════════════════════════════════════════════════
     st.markdown("""<style>
-    /* Fondo de pantalla completa */
-    .login-bg {
-        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%);
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+    /* Fondo de pantalla completa forzado */
+    .stApp {
+        background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 100%) !important;
     }
     /* Tarjeta central */
     .login-card {
@@ -6320,28 +6319,39 @@ def vista_login():
         box-shadow: 0 20px 40px rgba(232,123,74,0.15);
         border: 1px solid #FFE4D6;
         text-align: center;
-        margin-top: 50px;
+        margin-bottom: -15px; 
+        position: relative;
+        z-index: 1;
     }
-    .login-icon { font-size: 50px; margin-bottom: 10px; }
+    .login-logo {
+        width: 110px;
+        height: auto;
+        margin-bottom: 15px;
+    }
     .login-title {
         font-size: 36px; font-weight: 900; color: #E87B4A !important;
         margin-bottom: 5px; letter-spacing: -1px;
     }
     .login-sub { 
         font-size: 15px; color: #666 !important; 
-        margin-bottom: 30px; font-weight: 600; 
+        margin-bottom: 10px; font-weight: 600; 
     }
-    
-    /* Forzamos que los inputs y botones nativos se vean hermosos */
+    /* Contenedor del formulario */
+    div[data-testid="stForm"] {
+        background: white !important;
+        border-radius: 0 0 24px 24px !important;
+        padding: 0px 30px 30px 30px !important;
+        box-shadow: 0 20px 40px rgba(232,123,74,0.15) !important;
+        border: 1px solid #FFE4D6 !important;
+        border-top: none !important;
+    }
+    /* Inputs */
     .stTextInput > div > div > input {
         border-radius: 10px !important;
         border: 2px solid #FFE4D6 !important;
         padding: 10px 15px !important;
     }
-    .stTextInput > div > div > input:focus {
-        border-color: #E87B4A !important;
-        box-shadow: 0 0 0 3px rgba(232,123,74,0.2) !important;
-    }
+    /* Botón */
     .stFormSubmitButton > button {
         background: #E87B4A !important;
         color: white !important;
@@ -6356,25 +6366,23 @@ def vista_login():
         background: #D66535 !important;
         transform: translateY(-2px);
     }
-    </style>
-    <div class="login-bg"></div>""", unsafe_allow_html=True)
+    </style>""", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════
-    # 2. ESTRUCTURA Y HTML
+    # 2. ESTRUCTURA VISUAL (Solo la imagen, sin emojis)
     # ══════════════════════════════════════════════════════════════════
-    # Columnas para centrar la tarjeta en la pantalla
     _, centro, _ = st.columns([1, 1.2, 1])
     
     with centro:
-        # Abrimos la tarjeta
         st.markdown("""
         <div class="login-card">
-            <div class="login-icon">🎓</div>
+            <img src="app/static/escudo.png" class="login-logo" alt="Escudo">
             <div class="login-title">asisyarina</div>
             <div class="login-sub">Sistema de Asistencia I.E. Yarinacocha</div>
+        </div>
         """, unsafe_allow_html=True)
         
-        # Formulario nativo de Streamlit
+        # Formulario
         with st.form("login"):
             usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
             password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
@@ -6388,9 +6396,6 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-        
-        # Cerramos la tarjeta
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def vista_cambio_password_obligatorio():
