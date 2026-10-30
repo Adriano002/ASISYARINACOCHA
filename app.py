@@ -3812,7 +3812,6 @@ def _selector_alumno_lista(clave, idsec, on_click_key):
         return None
     return dict(al)
 
-
 def _selector_alumno_accion(clave, idsec, texto_boton, key_boton, on_click_key):
     with cursor() as (con, cur):
         cur.execute("""SELECT s.id, s.nombre AS seccion, g.nombre AS grado,
@@ -3880,7 +3879,6 @@ def _reset_selector(clave, on_click_key=None):
     if on_click_key:
         st.session_state.pop(on_click_key, None)
 
-
 #PUERTA
 def _puerta_puede_operar(fecha):
     f_d = to_date(fecha)
@@ -3900,7 +3898,6 @@ def _puerta_puede_operar(fecha):
             if cur.fetchone()["n"] == 0:
                 return False, "Hoy no es dia laboral.", None
         return True, "", None
-
 
 def _puerta_escanear(usuario, fecha):
     ok, msg, _ = _puerta_puede_operar(fecha)
@@ -3925,7 +3922,6 @@ def _puerta_escanear(usuario, fecha):
                     f"entrada {fmt_time(ev['hora_entrada'])} — "
                     f"{ev['turno']} — {ev['alcance']}")
             
-    # 🆕 FIX CÁMARA: Forzamos un ID de montaje único
     if "puerta_qr_mount" not in st.session_state:
         st.session_state["puerta_qr_mount"] = 0
         
@@ -4040,7 +4036,6 @@ def vista_puerta():
     usuario = st.session_state["user"]
     fecha = hoy_str()
     
-    # 🆕 CONTROL DE FALTAS (Solo cuando entran a la puerta)
     try:
         _control_faltas()
     except Exception as e:
@@ -4165,7 +4160,6 @@ def vista_bloqueados():
         st.rerun()
 #PANEL DIRECCION
 def vista_panel_direccion():
-    # 🆕 CONTROL DE FALTAS (Solo cuando entran al panel)
     try:
         _control_faltas()
     except Exception as e:
@@ -4202,7 +4196,7 @@ def vista_panel_direccion():
                 f"(cerro a las {ventana['hora_cierre']})")
 
     if st.button("Actualizar Datos", key="refresh_panel"):
-        procesar_faltas_parciales()  # 🆕 Llamada corregida
+        procesar_faltas_parciales()  
         st.rerun()
 
     m = metricas_dia_turno(fecha, turno["id"])
@@ -4368,9 +4362,7 @@ def _rep_pantalla_tipos(idsec):
         elif tipo == "general":
             _rep_general_por_turno_admin()
 
-
 def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
-    # 🆕 FORZAR ACTUALIZACIÓN DE FALTAS ANTES DE GENERAR REPORTE
     procesar_faltas_parciales()
 
     with cursor() as (con, cur):
@@ -4393,11 +4385,11 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
     if tipo == "diario":
         st.subheader(f"Reporte Diario - {sec['grado']} {sec['seccion']}")
         
-        # 🆕 SELECTOR DE FECHA
+  
         fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
         fecha_str = fecha_sel.strftime("%Y-%m-%d")
         
-        st.error(f"⚠️ **ATENCIÓN AUXILIAR:** Este reporte es una 'foto' de la asistencia hasta las **{ahora().strftime('%H:%M:%S')}**. Si descarga el reporte antes de que cierren las ventanas, los alumnos que lleguen después aparecerán como FALTA. Para un reporte EXACTO, descárguelo al final del turno.")
+        st.error(f" **ATENCIÓN AUXILIAR:** Este reporte es una 'foto' de la asistencia hasta las **{ahora().strftime('%H:%M:%S')}**. Si descarga el reporte antes de que cierren las ventanas, los alumnos que lleguen después aparecerán como FALTA. Para un reporte EXACTO, descárguelo al final del turno.")
 
         hojas = _generar_hojas_diario(fecha_str, [idsec])
         if not hojas:
@@ -4428,7 +4420,6 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         hoy = ahora().date()
         st.subheader(f"Cierre Mensual - {sec['grado']} {sec['seccion']}")
         
-        # 🆕 SELECTOR DE MES Y AÑO
         c1, c2 = st.columns(2)
         with c1:
             mes_sel = st.selectbox("Mes", range(1, 13), index=hoy.month - 1, format_func=lambda x: MESES_ES[x], key="rep_mes_sel")
@@ -4610,7 +4601,6 @@ def _rep_general_por_turno_admin():
             f"Reporte_general_{sel_turno}_{desde}_{hasta}.pdf",
             "application/pdf", width='stretch', key="repgen_dl_p")
 
-
 def vista_reportes():
     st.title("Reportes y Consultas")
     usuario = st.session_state["user"]
@@ -4645,7 +4635,6 @@ def vista_reportes():
         _rep_pantalla_tipos(st.session_state["rep_idsec"])
         return
     _rep_seleccionar_seccion(usuario)
-
 
 #ALUMNOS UI 
 def _frag_crear_alumno():
@@ -4785,14 +4774,13 @@ def _frag_editar_alumno():
             else:
                 st.error(msg)
 
-
 def _frag_listar_alumnos():
     # 1. Mostramos los filtros
     idg, ids, texto = filtros_grado_seccion_nombre("list_al")
     
     # 2. Botón para ejecutar la búsqueda
     st.markdown("---")
-    if st.button("🔍 Buscar Alumnos", type="primary", width='stretch'):
+    if st.button("Buscar Alumnos", type="primary", width='stretch'):
         st.session_state["_realizar_busqueda_alumnos"] = True
 
     # 3. Solo mostramos la tabla si se presionó el botón
@@ -5155,7 +5143,6 @@ def _perfil_alumno(idal):
                     st.session_state.pop("_reactivar_jp_id", None)
                     st.rerun()
 
-
 def vista_alumnos():
     st.title("Alumnos")
     pid = st.session_state.get("perfil_alumno_id")
@@ -5169,7 +5156,6 @@ def vista_alumnos():
         _frag_crear_alumno()
     with tabs[2]:
         _frag_editar_alumno()
-
 
 #GRADOS Y SECCIONES
 def vista_grados_secciones():
@@ -5188,8 +5174,6 @@ def vista_grados_secciones():
     if df.empty:
         st.info("No hay secciones creadas todavía.")
         return
-
-    # 🆕 1. TARJETAS DE RESUMEN (Slides)
     st.subheader("Resumen General")
     
     # Calculamos los totales
@@ -5208,8 +5192,6 @@ def vista_grados_secciones():
     c4.metric("Turnos", total_turnos)
 
     st.markdown("---")
-
-    # 🆕 2. TABS POR GRADO (Para que no esté todo amontonado)
     st.subheader("Detalle por Grado")
     
     grados_disponibles = df["Grado"].unique().tolist()
@@ -5244,7 +5226,6 @@ def vista_grados_secciones():
                 
                 # Un pequeño espacio entre turnos
                 st.markdown("<br>", unsafe_allow_html=True)
-
 
 #CARNETS
 def vista_carnets():
@@ -5459,7 +5440,6 @@ def puede_gestionar_usuario(usuario_actual, id_objetivo):
         return False, "No tienes permisos para gestionar a un Admin."
     return True, ""
 
-
 def _usuario_form_editar(idu):
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
@@ -5510,7 +5490,6 @@ def _usuario_form_editar(idu):
                 st.session_state.pop(f"_editando_u_{idu}", None)
                 st.rerun()
 
-
 def _frag_usuarios_botones():
     usuario = st.session_state["user"]
     soy_principal = (usuario.get("es_principal") or 0) == 1
@@ -5526,7 +5505,7 @@ def _frag_usuarios_botones():
     with c2:
         filtro_nombre = st.text_input("Buscar por nombre o usuario", key="usr_filtro_nombre", placeholder="Ej: admin")
 
-    if st.button("🔍 Buscar Usuarios", type="primary", width='stretch'):
+    if st.button("Buscar Usuarios", type="primary", width='stretch'):
         st.session_state["_buscar_usuarios_activado"] = True
 
     if st.session_state.get("_buscar_usuarios_activado"):
@@ -5584,7 +5563,6 @@ def _frag_usuarios_botones():
             st.session_state["_usuario_editando_activo"] = ops[sel]
             st.rerun()
 
-    #AQUÍ SE MUESTRA EL FORMULARIO DE EDICIÓN (Solo uno a la vez)
     usuario_editando = st.session_state.get("_usuario_editando_activo")
     if usuario_editando:
         st.markdown("---")
@@ -5598,7 +5576,6 @@ def _frag_usuarios_botones():
         if st.button("Cancelar edición", key=f"cancel_edit_activo"):
             st.session_state.pop("_usuario_editando_activo", None)
             st.rerun()
-
 
 def _frag_usuarios_crear():
     usuario = st.session_state["user"]
@@ -5734,7 +5711,7 @@ def _frag_usuarios_asignar():
         auditar(usuario["usuario"],
                 f"Asigno {len(sel_s)} secciones a usuario_id={ida}")
 
-        # 🆕 SUBIR A R2 AL INSTANTE (CRÍTICO)
+    
         try:
             from sync import subir_bd
             from db import DB_PATH
@@ -5768,7 +5745,6 @@ def _frag_usuarios_mantenimiento():
                 "tipo": "ok", "msg": "Mantenimiento activado."}
             st.rerun()
 
-
 def vista_usuarios():
     st.title("Usuarios")
     tabs = st.tabs(["Usuarios", "Crear", "Asignar secciones", "Mantenimiento"])
@@ -5780,7 +5756,6 @@ def vista_usuarios():
         _frag_usuarios_asignar()
     with tabs[3]:
         _frag_usuarios_mantenimiento()
-
 
 #AUDITORÍA
 def _frag_importar_excel():
@@ -5834,8 +5809,7 @@ def _frag_importar_excel():
                 with st.spinner("Insertando alumnos y respaldando en la nube..."):
                     ins, reac, errs = insertar_alumnos_validos(
                         st.session_state["_iv"])
-                    
-                    # 🆕 RESPALDO AUTOMÁTICO A R2
+              
                     from sync import subir_bd
                     from db import DB_PATH
                     try:
@@ -5850,7 +5824,6 @@ def _frag_importar_excel():
                     st.session_state.pop(k, None)
                 time.sleep(1)
                 st.rerun()
-
 
 def vista_auditoria():
     st.title("Auditoria y Periodos")
@@ -6168,7 +6141,6 @@ def vista_dias_especiales():
                     "tipo": "ok", "msg": "Dia especial eliminado."}
                 st.rerun()
 
-
 #JUSTIFICACIONES PREVIAS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
@@ -6182,8 +6154,6 @@ def _frag_justificacion_previa(usuario):
 
 def _render_registrar_jp(usuario):
     clave = "jp_sel"
-    
-    # 🆕 Lógica mejorada: Si ya hay alumno seleccionado, saltamos directo al formulario
     al_sel_id = st.session_state.get("jp_al_sel_id")
     
     if not al_sel_id:
@@ -6278,7 +6248,6 @@ def _render_registrar_jp(usuario):
                 st.rerun()
             else:
                 st.error(msg)
-
 
 def _render_historial_global_jp(usuario):
     st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
@@ -6383,7 +6352,6 @@ def _frag_permisos(usuario):
     with tabs[1]:
         _render_registrar_perm(usuario)
 
-
 def _render_registrar_perm(usuario):
     clave = "perm_sel"
     
@@ -6480,7 +6448,6 @@ def _render_registrar_perm(usuario):
             else:
                 st.error(msg)
 
-
 def _render_historial_global_perm(usuario):
     st.markdown("**Permisos vigentes HOY**")
     hoy_s = hoy_str()
@@ -6574,7 +6541,6 @@ def vista_justificaciones_permisos():
     with tabs[1]:
         _frag_permisos(usuario)
 
-
 #BACKUP
 def vista_backup():
     st.title("Backup y Respaldo")
@@ -6591,7 +6557,6 @@ def vista_backup():
         ultimos = lineas[-10:]
         ultimos.reverse()
         for linea in ultimos:
-            # 🆕 CORREGIDO: Se agregaron los 2 argumentos requeridos por .replace()
             texto_limpio = linea.strip().replace("✅", "EXITOSO:").replace("❌", "ERROR:")
             if "EXITOSO" in texto_limpio:
                 st.success(texto_limpio)
@@ -6660,9 +6625,9 @@ def vista_backup():
     st.markdown("---")
     
     st.subheader("Restaurar Base de Datos desde R2")
-    st.warning("⚠️ Esta acción reemplazará la base de datos actual con la versión que elijas. La app se reiniciará.")
+    st.warning("Esta acción reemplazará la base de datos actual con la versión que elijas. La app se reiniciará.")
     
-    if st.button("🔄 Buscar Backups en R2"):
+    if st.button("Buscar Backups en R2"):
         with st.spinner("Buscando backups..."):
             from sync import listar_backups_r2
             st.session_state["_backups_r2"] = listar_backups_r2()
@@ -7215,7 +7180,6 @@ def vista_login():
                 else:
                     st.error(err or "Credenciales incorrectas")
 
-
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
@@ -7239,7 +7203,6 @@ def vista_cambio_password_obligatorio():
                 st.session_state["user"]["password"] = nuevo_hash
                 auditar(usuario["usuario"], "Cambio pwd obligatorio")
                 st.rerun()
-
 
 def vista_mi_cuenta():
     st.title("Mi cuenta")
@@ -7309,7 +7272,6 @@ def vista_mi_cuenta():
         cerrar_sesion()
         st.rerun()
 
-
 #MENÚ Y RUTAS 
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
@@ -7373,7 +7335,6 @@ RUTAS = {
     "Justificaciones y Permisos": vista_justificaciones_permisos,
     "Mantenimiento Datos": vista_mantenimiento_datos, 
 }
-
 
 def menu_lateral():
     usuario = st.session_state["user"]
@@ -7442,7 +7403,7 @@ def _control_faltas():
         return
     st.session_state["_ultimo_control_faltas"] = t
     try:
-        procesar_faltas_parciales() # 🆕 Llamada corregida
+        procesar_faltas_parciales() #Llamada corregida
     except Exception as e:
         log.warning(f"No se pudieron procesar faltas al cierre: {e}")
 
@@ -7468,20 +7429,19 @@ def _verificar_backup_por_tiempo():
         
         # 2. Si pasaron más de 4 horas (14400 segundos), subimos
         if ahora_ts - mtime_r2 > (4 * 3600):
-            log.info("⏰ Pasaron más de 4 horas desde el último backup en R2. Iniciando...")
+            log.info("Pasaron más de 4 horas desde el último backup en R2. Iniciando...")
             
             def tarea_backup():
                 try:
                     subir_bd(DB_PATH)
-                    log.info("✅ Backup automático por tiempo completado.")
+                    log.info("Backup automático por tiempo completado.")
                 except Exception as e:
-                    log.error(f"❌ Fallo backup automático: {e}")
+                    log.error(f"Fallo backup automático: {e}")
                     
             threading.Thread(target=tarea_backup, daemon=True).start()
             
     except Exception as e:
         log.warning(f"Error verificando backup automático: {e}")
-
 
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
@@ -7567,7 +7527,6 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
 
 if __name__ == "__main__":
     main()
