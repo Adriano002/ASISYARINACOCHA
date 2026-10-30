@@ -6840,12 +6840,10 @@ def aplicar_estilos():
         border-right: 1px solid var(--primario-borde);
     }
 
-    /* 🆕 ELIMINAMOS EL CIRCULITO FEO DEL RADIO BUTTON */
     section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
         display: none !important; 
     }
 
-    /* Estilo general de las opciones */
     section[data-testid="stSidebar"] div[role="radiogroup"] label {
         border-radius: var(--radius-sm) !important;
         padding: 12px 16px !important;
@@ -6857,19 +6855,16 @@ def aplicar_estilos():
         transition: all .2s ease;
     }
 
-    /* Efecto Hover */
     section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
         background: var(--primario-soft) !important;
     }
 
-    /* Opción SELECCIONADA */
     section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
         background: var(--primario-soft) !important;
         border-left: 4px solid var(--primario) !important;
         color: var(--primario) !important;
     }
 
-    /*TARJETA DE USUARIO (Más angosta y con el escudo) */
     .encabezado-sidebar {
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
         padding: 15px 10px !important;
@@ -6882,24 +6877,6 @@ def aplicar_estilos():
         flex-direction: column;
         align-items: center;
         justify-content: center;
-    }
-
-    /* El círculo blanco donde va el escudo */
-    .encabezado-sidebar .escudo {
-        width: 60px; 
-        height: 60px; 
-        border-radius: 50%; 
-        background: #FFF; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        margin-bottom: 8px;
-        border: 2px solid rgba(255,255,255,0.5);
-        overflow: hidden;
-    }
-    .encabezado-sidebar .escudo img {
-        width: 80%; 
-        height: auto;
     }
 
     .encabezado-sidebar .nombre {
@@ -6999,19 +6976,6 @@ def aplicar_estilos():
     .streamlit-expanderHeader:hover{
         border-color: var(--primario) !important;
     }
-
-    .scan-header, .puerta-header{
-        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
-        padding: 24px 28px;
-        border-radius: var(--radius);
-        margin-bottom: 20px;
-        color: #FFF;
-        box-shadow: var(--sombra);
-    }
-    .scan-header .scan-titulo{ font-size: 26px; font-weight: 800; color:#FFF; }
-    .scan-header .scan-sub{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
-    .puerta-header .titulo{ font-size: 28px; font-weight: 800; color:#FFF; }
-    .puerta-header .fecha{ font-size: 15px; opacity:.9; margin-top:4px; color:#FFF; }
 
     .perfil-hero{
         background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
@@ -7165,6 +7129,7 @@ def aplicar_estilos():
         margin: 20px 0;
     }
 
+    /* 🆕 ARREGLO DE LA BARRA LATERAL EN MÓVILES (OVERLAY FLOTANTE) */
     @media (max-width: 768px){
         h1{ font-size: 1.5rem !important; }
         h2{ font-size: 1.2rem !important; }
@@ -7177,27 +7142,40 @@ def aplicar_estilos():
         .info-linea{ flex-direction: column; }
         .info-label{ min-width: auto; margin-bottom: 2px; }
 
-        /* Ajustes para móvil */
+        /* Barra Lateral Flotante (No empuja la cámara) */
         section[data-testid="stSidebar"] {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100vh !important;
+            z-index: 999999 !important;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.3) !important;
+            transition: transform 0.3s ease !important;
             min-width: 260px !important;
             max-width: 260px !important;
         }
 
-        section[data-testid="stSidebar"] div[role="radiogroup"] label {
-            padding: 14px 16px !important;
-            margin: 4px 6px !important;
-            background-color: rgba(128,128,128,0.05) !important;
-            border: 1px solid transparent !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:active {
-            transform: scale(0.98);
+        section[data-testid="stSidebar"][aria-expanded="false"] {
+            transform: translateX(-100%) !important;
         }
 
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-            background-color: rgba(232,123,74,0.12) !important;
-            border: 1px solid var(--primario) !important;
-            border-left: 4px solid var(--primario) !important;
+        section[data-testid="stSidebar"][aria-expanded="true"] {
+            transform: translateX(0) !important;
+        }
+
+        .stApp > header + div, .stApp > div[data-testid="stAppViewContainer"] {
+            margin-left: 0 !important;
+            width: 100% !important;
+            padding-left: 0 !important;
+        }
+
+        [data-testid="collapsedControl"] {
+            background: var(--primario) !important;
+            color: white !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 10px 5px !important;
+            z-index: 1000000 !important;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2) !important;
         }
     }
     </style>
@@ -7478,39 +7456,37 @@ def _control_faltas():
         return
     st.session_state["_ultimo_control_faltas"] = t
     try:
-        marcar_faltas_al_cierre()
+        procesar_faltas_parciales() # 🆕 Llamada corregida
     except Exception as e:
         log.warning(f"No se pudieron procesar faltas al cierre: {e}")
-#MAIN 
-import os  # Asegúrate de que 'os' esté importado arriba
 
 def _verificar_backup_por_tiempo():
-    """Revisa si pasaron 4 horas desde el último backup. Si es así, lo sube."""
+    """Revisa la fecha real del último backup en R2. Si pasaron más de 4 horas, lo sube."""
     try:
-        archivo_marca = "data/.ultimo_backup.txt"
+        from sync import _get_r2_client, subir_bd
+        from db import DB_PATH
+        from datetime import datetime, timezone, timedelta
+        import os
+        
+        s3 = _get_r2_client()
+        
+        # 1. Consultamos la fecha real del archivo en R2
+        try:
+            obj = s3.head_object(Bucket="asisyarina", Key="asistencia.db")
+            mtime_r2 = obj["LastModified"].timestamp()
+        except Exception:
+            # Si el archivo no existe en R2 (primera vez), forzamos backup
+            mtime_r2 = 0
+            
         ahora_ts = time.time()
         
-        # Si no existe el archivo, lo creamos con la hora actual
-        if not os.path.exists(archivo_marca):
-            os.makedirs("data", exist_ok=True)
-            with open(archivo_marca, "w") as f:
-                f.write(str(ahora_ts))
-            return
-            
-        with open(archivo_marca, "r") as f:
-            ultimo_backup = float(f.read().strip())
-            
-        # Si pasaron más de 4 horas (14400 segundos)
-        if ahora_ts - ultimo_backup > (4 * 3600):
-            log.info("⏰ Pasaron más de 4 horas. Iniciando backup automático en segundo plano...")
+        # 2. Si pasaron más de 4 horas (14400 segundos), subimos
+        if ahora_ts - mtime_r2 > (4 * 3600):
+            log.info("⏰ Pasaron más de 4 horas desde el último backup en R2. Iniciando...")
             
             def tarea_backup():
                 try:
-                    from sync import subir_bd
-                    from db import DB_PATH
                     subir_bd(DB_PATH)
-                    with open(archivo_marca, "w") as f:
-                        f.write(str(time.time()))
                     log.info("✅ Backup automático por tiempo completado.")
                 except Exception as e:
                     log.error(f"❌ Fallo backup automático: {e}")
