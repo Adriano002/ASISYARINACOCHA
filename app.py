@@ -167,11 +167,7 @@ def texto_ultima_oportunidad():
     return "si llega tarde otra vez, mañana no podrá escanear."
 
 def _columnas_responsive(n_items, max_cols=3):
-    """
-    SIEMPRE 1 columna para garantizar orden alfabético en cualquier
-    dispositivo u orientación. Streamlit reordena columnas cuando la
-    pantalla cambia de ancho, por eso no se puede confiar en N columnas.
-    """
+
     return st.columns(1)
 
 def _botones_lista(items, etiqueta_fn, key_fn, max_cols=3):
@@ -564,7 +560,6 @@ def secciones_por_grado(idg):
                     (idg,))
         return [dict(f) for f in cur.fetchall()]
 
-
 def secciones_por_turno(idt):
     with cursor() as (con, cur):
         cur.execute("""
@@ -609,7 +604,6 @@ def buscar_alumnos(texto, idg=None, idsec=None, limite=200):
     q += " ORDER BY a.apellido_paterno LIMIT ?"
     p.append(limite)
     return leer_df(q, p)
-
 
 def _buscar_alumno_por_dni(dni):
     with cursor() as (con, cur):
@@ -665,7 +659,6 @@ def crear_alumno(dni, nombres, ap, am, idsec, apo_n, apo_t, usuario):
         log.error("crear_alumno: %s", e)
         return False, "Error al crear el alumno."
 
-
 def editar_alumno(idal, apo_n, apo_t, idsec, dni, usuario):
     with cursor() as (con, cur):
         cur.execute("""
@@ -708,7 +701,6 @@ def editar_alumno(idal, apo_n, apo_t, idsec, dni, usuario):
     auditar(usuario["usuario"], accion, tb="alumnos", rid=idal)
     return True, "Alumno editado."
 
-
 def retirar_alumno(idal, dni, usuario):
     escribir("UPDATE alumnos SET activo=0,retirado_en=? WHERE id=?",
              (timestamp_str(), idal))
@@ -716,13 +708,11 @@ def retirar_alumno(idal, dni, usuario):
             tb="alumnos", rid=idal)
     return True, "Alumno desactivado."
 
-
 def reactivar_alumno(idal, dni, usuario):
     escribir("UPDATE alumnos SET activo=1,retirado_en=NULL WHERE id=?", (idal,))
     auditar(usuario["usuario"], "Reactivo alumno DNI " + dni,
             tb="alumnos", rid=idal)
     return True, "Alumno reactivado."
-
 
 # IMPORTACIÓN
 def _normalizar_grado(n):
@@ -731,7 +721,6 @@ def _normalizar_grado(n):
          "1o": "1ro", "2o": "2do", "3o": "3ro", "4o": "4to", "5o": "5to",
          "1ero": "1ro", "3ero": "3ro"}
     return r.get(n, n)
-
 
 def validar_importacion(df, mapeo):
     errs = []
@@ -804,7 +793,6 @@ def validar_importacion(df, mapeo):
         except (KeyError, ValueError, TypeError) as e:
             errs.append({"fila": nf, "motivo": f"Error: {e}"})
     return val, errs, {"total": len(df), "validas": len(val), "errores": len(errs)}
-
 
 def insertar_alumnos_validos(val):
     per = obtener_periodo_activo()
@@ -1247,7 +1235,6 @@ def crear_permiso(idal, fi, ff, motivo, usuario):
             tb="permisos", rid=idal)
     return True, f"Permiso registrado del {fi} al {ff}."
 
-
 def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
     with cursor() as (con, cur):
         cur.execute("""
@@ -1286,7 +1273,6 @@ def eliminar_permiso(id_permiso, usuario, motivo_eliminacion=""):
                if motivo_eliminacion.strip() else ""),
             tb="permisos", rid=id_permiso)
     return True, f"Permiso de {perm['alumno']} anulado."
-
 
 def anular_justificacion_previa(id_just, usuario, motivo_anulacion=""):
     with cursor() as (con, cur):
