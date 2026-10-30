@@ -4216,7 +4216,7 @@ def vista_panel_direccion():
                 f"(cerro a las {ventana['hora_cierre']})")
 
     if st.button("Actualizar Datos", key="refresh_panel"):
-        marcar_faltas_al_cierre()
+        procesar_faltas_parciales()  # 🆕 Llamada corregida
         st.rerun()
 
     m = metricas_dia_turno(fecha, turno["id"])
@@ -6605,7 +6605,8 @@ def vista_backup():
         ultimos = lineas[-10:]
         ultimos.reverse()
         for linea in ultimos:
-            texto_limpio = linea.strip().replace("EXITOSO:").replace("ERROR:")
+            # 🆕 CORREGIDO: Se agregaron los 2 argumentos requeridos por .replace()
+            texto_limpio = linea.strip().replace("✅", "EXITOSO:").replace("❌", "ERROR:")
             if "EXITOSO" in texto_limpio:
                 st.success(texto_limpio)
             elif "ERROR" in texto_limpio:
@@ -6620,7 +6621,7 @@ def vista_backup():
     st.subheader("Acciones de Administrador")
     st.warning("Por seguridad, estas acciones están bloqueadas. Ingresa la clave para continuar.")
     
-    CLAVE_MAESTRA = "Yarinacocha2026" #
+    CLAVE_MAESTRA = "Yarinacocha2026"
     
     clave_ingresada = st.text_input("Ingresa la clave de administrador:", 
                                     type="password",
