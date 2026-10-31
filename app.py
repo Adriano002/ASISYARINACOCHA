@@ -4199,18 +4199,106 @@ def vista_panel_direccion():
         procesar_faltas_parciales()  
         st.rerun()
 
+    # --- MÉTRICAS DEL TURNO ACTUAL ---
     m = metricas_dia_turno(fecha, turno["id"])
+    
     st.subheader(f"Resumen del turno {turno['nombre']}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total alumnos", m["total"])
     c2.metric("Puntuales", m["puntuales"])
     c3.metric("Tardanzas", m["tardanzas"])
     c4.metric("Faltas", m["faltas"])
+    
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Reforzamiento asistio", m["ref_asistio"])
+    c1.metric("Reforzamiento", m["ref_asistio"])
     c2.metric("Bloqueados", m["bloqueados"])
-    c3.metric("Justificadas hoy", m["justificadas"])
-    c4.metric("Permisos hoy", m["permisos"])
+    c3.metric("Justificadas", m["justificadas"])
+    c4.metric("Permisos", m["permisos"])
+
+    st.divider()
+
+    # --- 🆕 GRÁFICOS ESTADÍSTICOS ---
+    st.subheader("Análisis Visual del Día")
+    
+    col_izq, col_der = st.columns(2)
+
+    with col_izq:
+        # Gráfico 1: Distribución del día (Pie)
+        df_pie = pd.DataFrame({
+            "Estado": ["Puntuales", "Tardanzas", "Faltas"],
+            "Cantidad": [m["puntuales"], m["tardanzas"], m["faltas"]]
+        })
+        # Filtramos los que son 0 para que no ensucien el gráfico
+        df_pie = df_pie[df_pie["Cantidad"] > 0]
+        
+        if not df_pie.empty:
+            fig_pie = px.pie(df_pie, names="Estado", values="Cantidad", 
+                             color="Estado",
+                             color_discrete_map={
+                                 "Puntuales": "#43A047", 
+                                 "Tardanzas": "#F59E0B", 
+                                 "Faltas": "#E53935"
+                             },
+                             title="Distribución de Asistencia (Hoy)")
+            fig_pie.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("Sin datos de asistencia para graficar hoy.")
+
+    with col_der:
+        # Gráfico 2: Comparativa de Turnos (Barras)
+        df_turnos = []
+        for t_info in turnos_info:
+            t_id = t_info["turno"]["id"]
+            t_nombre = t_info["turno"]["nombre"]
+            metricas_t = metricas_dia_turno(fecha, t_id)
+            df_turnos.append({
+                "Turno": t_nombre,
+                "Puntuales": metricas_t["puntuales"],
+                "Tardanzas": metricas_t["tardanzas"],
+                "Faltas": metricas_t["faltas"]
+            })
+        
+        df_barras = pd.DataFrame(df_turnos)
+        if not df_barras.empty:
+            # Derretimos el DataFrame para que Plotly lo entienda fácil
+            df_melt = df_barras.melt(id_vars="Turno", var_name="Estado", value_name="Cantidad")
+            fig_bar = px.bar(df_melt, x="Turno", y="Cantidad", color="Estado", 
+                             barmode="group",
+                             color_discrete_map={
+                                 "Puntuales": "#43A047", 
+                                 "Tardanzas": "#F59E0B", 
+                                 "Faltas": "#E53935"
+                             },
+                             title="Comparativa por Turno (Hoy)")
+            fig_bar.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    # Gráfico 3: Tendencia Semanal (Líneas)
+    st.divider()
+    st.subheader("Tendencia de Tardanzas (Últimos 5 días)")
+    
+    # Consulta para traer las tardanzas de los últimos días
+    df_tendencia = leer_df("""
+        SELECT fecha, COUNT(*) as cantidad
+        FROM tardanzas
+        WHERE fecha >= CURRENT_DATE - INTERVAL '4 days'
+        GROUP BY fecha
+        ORDER BY fecha ASC
+    """)
+    
+    if not df_tendencia.empty:
+        # Convertimos la fecha a string para que Plotly no se confunda
+        df_tendencia['fecha'] = df_tendencia['fecha'].astype(str)
+        
+        fig_line = px.line(df_tendencia, x="fecha", y="cantidad", markers=True,
+                           title="Evolución Diaria de Tardanzas",
+                           labels={"fecha": "Fecha", "cantidad": "Nº Tardanzas"})
+        fig_line.update_traces(line_color="#E87B4A", line_width=3, marker_size=8)
+        fig_line.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+        st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.info("No hay suficientes datos históricos para mostrar la tendencia.")
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
