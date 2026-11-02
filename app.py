@@ -4088,15 +4088,10 @@ def vista_puerta():
 #BLOQUEADOS
 def vista_bloqueados():
     st.title("Alumnos bloqueados")
-    st.caption(
-        "Reglas automaticas: alumno nuevo → 3 tardanzas → bloqueo al dia siguiente. "
-        "Alumno reincidente → 1 tardanza → bloqueo al dia siguiente."
-    )
     usuario = st.session_state["user"]
 
     df = listar_bloqueados()
-    st.metric("Total bloqueados", len(df))
-
+    
     if df.empty:
         st.success("No hay alumnos bloqueados actualmente.")
         return
@@ -5266,6 +5261,7 @@ def vista_alumnos():
 
 #GRADOS Y SECCIONES
 def vista_grados_secciones():
+    import plotly.express as px
     st.title("Grados y Secciones")
     st.caption("Vista de referencia. Las secciones se crean automáticamente al importar el Excel de alumnos.")
 
@@ -5281,22 +5277,13 @@ def vista_grados_secciones():
     if df.empty:
         st.info("No hay secciones creadas todavía.")
         return
-    st.subheader("Resumen General")
-    
-    # Calculamos los totales
-    total_alumnos = int(df["Alumnos"].sum())
-    total_secciones = len(df)
-    
-    # Buscamos cuántos grados y turnos únicos hay
-    total_grados = df["Grado"].nunique()
-    total_turnos = df["Turno"].nunique()
 
-    # Mostramos 4 tarjetas bonitas
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Alumnos", f"{total_alumnos:,}")
-    c2.metric("Total Secciones", total_secciones)
-    c3.metric("Grados", total_grados)
-    c4.metric("Turnos", total_turnos)
+    # 🆕 GRÁFICO EN LUGAR DE KPIs
+    st.subheader("Distribución de Alumnos por Grado y Turno")
+    fig = px.bar(df, x="Alumnos", y="Grado", color="Turno", orientation='h', 
+                 barmode='group', title="Alumnos por Grado y Turno",
+                 color_discrete_sequence=["#E87B4A", "#2E86C1"])
+    st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
     st.subheader("Detalle por Grado")
@@ -5307,31 +5294,16 @@ def vista_grados_secciones():
     for i, grado in enumerate(grados_disponibles):
         with tabs[i]:
             df_grado = df[df["Grado"] == grado].copy()
-            
-            # Separamos por turno
             for turno in ["Mañana", "Tarde"]:
                 df_turno = df_grado[df_grado["Turno"] == turno]
                 if df_turno.empty:
                     continue
                     
                 st.markdown(f"**Turno {turno}**")
-                
-                # Seleccionamos solo las columnas necesarias
                 df_mostrar = df_turno[["Seccion", "Alumnos"]].copy()
                 df_mostrar.columns = ["Sección", "Cantidad de Alumnos"]
-                
-                # Ordenamos alfabéticamente por sección
                 df_mostrar = df_mostrar.sort_values("Sección")
-                
-                # Mostramos la tabla con un ancho controlado para que no se desparrame
-                st.dataframe(
-                    df_mostrar, 
-                    width='stretch', # En Streamlit nuevo, esto ajusta al contenedor
-                    hide_index=True,
-                    use_container_width=True
-                )
-                
-                # Un pequeño espacio entre turnos
+                st.dataframe(df_mostrar, width='stretch', hide_index=True, use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
 
 #CARNETS
@@ -6122,9 +6094,8 @@ def vista_dias_especiales():
             desc = st.text_input("Descripcion / Nombre del evento",
                                   key="dia_desc")
         with c2:
-            if tipo == "Evento":
-                turnos_opts = {"Ambos": None}
-                turnos_opts.update({t["nombre"]: t["id"] for t in listar_turnos()})
+           if tipo == "Evento":
+                turnos_opts = {t["nombre"]: t["id"] for t in listar_turnos()} # 🆕 Sin "Ambos"
                 t_lbl = st.selectbox("Turno", list(turnos_opts.keys()),
                                       key="dia_turno")
                 hora_t = st.time_input(
