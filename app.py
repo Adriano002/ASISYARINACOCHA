@@ -4250,12 +4250,14 @@ def vista_panel_direccion():
         procesar_faltas_parciales()  
         st.rerun()
 
-    # --- 1. GRÁFICOS DEL DÍA (Donut y Barras) ---
+    # --- 🆕 SECCIÓN 1: GRÁFICOS EN LUGAR DE KPIs ---
     st.subheader(f"Análisis Visual del Turno {turno['nombre']}")
+    
     m = metricas_dia_turno(fecha, turno["id"])
     
     col_izq, col_der = st.columns(2)
     with col_izq:
+        # Gráfico de Torta (Donut)
         df_pie = pd.DataFrame({
             "Estado": ["Puntuales", "Tardanzas", "Faltas"],
             "Cantidad": [m["puntuales"], m["tardanzas"], m["faltas"]]
@@ -4266,19 +4268,24 @@ def vista_panel_direccion():
             fig_pie = px.pie(df_pie, names="Estado", values="Cantidad", 
                              color="Estado", hole=0.4,
                              color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
-                             title="Distribución de Asistencia (Hoy)")
+                             title=f"Distribución de Asistencia (Hoy)")
             fig_pie.update_layout(margin=dict(t=40, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("Sin datos de asistencia para graficar hoy.")
 
     with col_der:
+        # Gráfico de Barras Agrupadas (Turnos)
         df_turnos = []
         for t_info in turnos_info:
             t_id = t_info["turno"]["id"]
             t_nombre = t_info["turno"]["nombre"]
             metricas_t = metricas_dia_turno(fecha, t_id)
             df_turnos.append({
-                "Turno": t_nombre, "Puntuales": metricas_t["puntuales"],
-                "Tardanzas": metricas_t["tardanzas"], "Faltas": metricas_t["faltas"]
+                "Turno": t_nombre,
+                "Puntuales": metricas_t["puntuales"],
+                "Tardanzas": metricas_t["tardanzas"],
+                "Faltas": metricas_t["faltas"]
             })
         
         df_barras = pd.DataFrame(df_turnos)
@@ -4288,107 +4295,64 @@ def vista_panel_direccion():
                              barmode="group",
                              color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
                              title="Comparativa por Turno")
-            fig_bar.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+            fig_bar.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="Turno", yaxis_title="Cantidad")
             st.plotly_chart(fig_bar, use_container_width=True)
 
     st.divider()
 
-    # --- 2. TENDENCIA SEMANAL GENERAL ---
-    st.subheader("Tendencia General de Tardanzas (Últimos 5 días)")
+    # --- 2. TENDENCIA SEMANAL ---
+    st.subheader("Tendencia de Tardanzas (Últimos 5 días)")
+    
     fecha_limite = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
     
     df_tendencia = leer_df("""
-        SELECT fecha, COUNT(*) as cantidad FROM tardanzas
-        WHERE fecha >= ? GROUP BY fecha ORDER BY fecha ASC
+        SELECT fecha, COUNT(*) as cantidad
+        FROM tardanzas
+        WHERE fecha >= ?
+        GROUP BY fecha
+        ORDER BY fecha ASC
     """, (fecha_limite,))
     
     if not df_tendencia.empty:
         df_tendencia['fecha'] = df_tendencia['fecha'].astype(str)
+        
         fig_line = px.area(df_tendencia, x="fecha", y="cantidad", 
-                           title="Evolución Diaria de Tardanzas Totales",
+                           title="Evolución Diaria de Tardanzas",
                            labels={"fecha": "Fecha", "cantidad": "Nº Tardanzas"},
                            color_discrete_sequence=["#E87B4A"])
         fig_line.update_traces(line_width=3, marker_size=8)
         fig_line.update_layout(margin=dict(t=40, b=0, l=0, r=0))
         st.plotly_chart(fig_line, use_container_width=True)
     else:
-        st.info("No hay suficientes datos históricos.")
+        st.info("No hay suficientes datos históricos para mostrar la tendencia.")
 
     st.divider()
 
-    # --- 🆕 3. COMPARATIVA DE TARDANZAS POR TURNO (Líneas Dobles) ---
-    st.subheader("Comparativa de Tardanzas: Mañana vs Tarde (Últimos 5 días)")
+    # --- 3. ALUMNOS EN RIESGO ---
+    st.subheader("Alumnos en Riesgo (Faltas Acumuladas)")
     
-    df_tard_turnos = leer_df("""
-        SELECT t.fecha, tu.nombre AS turno, COUNT(*) AS cantidad
-        FROM tardanzas t
-        JOIN alumnos a ON t.alumno_id = a.id
-        JOIN secciones s ON a.seccion_id = s.id
-        JOIN turnos tu ON s.turno_id = tu.id
-        WHERE t.fecha >= ?
-        GROUP BY t.fecha, tu.nombre
-        ORDER BY t.fecha ASC
-    """, (fecha_limite,))
-    
-    if not df_tard_turnos.empty:
-        df_tard_turnos['fecha'] = df_tard_turnos['fecha'].astype(str)
-        fig_multi = px.line(df_tard_turnos, x="fecha", y="cantidad", color="turno",
-                            markers=True, title="Comparativa de Tardanzas por Turno",
-                            labels={"fecha": "Fecha", "cantidad": "Nº Tardanzas", "turno": "Turno"},
-                            color_discrete_sequence=["#E87B4A", "#2E86C1"])
-        fig_multi.update_traces(line_width=3, marker_size=8)
-        fig_multi.update_layout(margin=dict(t=40, b=0, l=0, r=0), hovermode="x unified")
-        st.plotly_chart(fig_multi, use_container_width=True)
-    else:
-        st.info("No hay datos suficientes para comparar turnos.")
-
-    st.divider()
-
-    # --- 🆕 4. TOP 5 SECCIONES CON MÁS FALTAS (Barras Horizontales) ---
-    st.subheader("Top 5 Secciones con más Faltas (Últimos 30 días)")
     fecha_riesgo = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    
-    df_secciones_faltas = leer_df("""
-        SELECT g.nombre || ' ' || s.nombre AS Seccion, COUNT(*) AS Faltas
-        FROM asistencias ast
-        JOIN alumnos a ON ast.alumno_id = a.id
-        JOIN secciones s ON a.seccion_id = s.id
-        JOIN grados g ON s.grado_id = g.id
-        WHERE ast.estado = 'Falta' AND ast.justificada = 0 AND ast.fecha >= ?
-        GROUP BY s.id
-        ORDER BY Faltas DESC
-        LIMIT 5
-    """, (fecha_riesgo,))
-    
-    if not df_secciones_faltas.empty:
-        fig_top = px.bar(df_secciones_faltas, x="Faltas", y="Seccion", orientation='h',
-                         title="Secciones con mayor ausentismo",
-                         color="Faltas", color_continuous_scale="Reds")
-        fig_top.update_layout(margin=dict(t=40, b=0, l=0, r=0), yaxis={'categoryorder':'total ascending'})
-        st.plotly_chart(fig_top, use_container_width=True)
-    else:
-        st.success("Excelente. No hay faltas injustificadas en los últimos 30 días.")
-
-    st.divider()
-
-    # --- 5. ALUMNOS EN RIESGO (Tabla) ---
-    st.subheader("Alumnos en Riesgo de Deserción")
     
     df_riesgo = leer_df("""
         SELECT a.apellido_paterno || ' ' || COALESCE(a.apellido_materno, '') || ', ' || a.nombres AS Alumno,
-               g.nombre AS Grado, s.nombre AS Seccion, COUNT(*) AS Faltas_Injustificadas
+               g.nombre AS Grado, s.nombre AS Seccion,
+               COUNT(*) AS Faltas_Injustificadas
         FROM asistencias ast
         JOIN alumnos a ON ast.alumno_id = a.id
         JOIN secciones s ON a.seccion_id = s.id
         JOIN grados g ON s.grado_id = g.id
-        WHERE ast.estado = 'Falta' AND ast.justificada = 0 AND ast.fecha >= ?
-        GROUP BY a.id HAVING COUNT(*) >= 3 ORDER BY Faltas_Injustificadas DESC LIMIT 10
+        WHERE ast.estado = 'Falta' AND ast.justificada = 0
+          AND ast.fecha >= ?
+        GROUP BY a.id
+        HAVING COUNT(*) >= 3
+        ORDER BY Faltas_Injustificadas DESC
+        LIMIT 10
     """, (fecha_riesgo,))
     
     if not df_riesgo.empty:
         st.dataframe(df_riesgo, use_container_width=True, hide_index=True)
     else:
-        st.success("No hay alumnos con más de 3 faltas injustificadas en los últimos 30 días.")
+        st.success("Excelente. No hay alumnos con más de 3 faltas en los últimos 30 días.")
 #REPORTES 
 def _rep_seleccionar_seccion(usuario):
     rol = usuario["rol"]
