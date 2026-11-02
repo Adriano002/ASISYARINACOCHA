@@ -5523,6 +5523,79 @@ def _carnets_ver_seccion(idsec):
                             "application/pdf", width='stretch', key="dl_canasta")
 
 #VENTANAS
+import streamlit as st
+
+# 🆕 El decorador @st.fragment hace que SOLO este bloque se re-ejecute al presionar los botones
+@st.fragment
+def ventana_editor(v, ventanas_turno):
+    # Inicializar estados si no existen
+    if f"ap_{v['id']}_val" not in st.session_state:
+        st.session_state[f"ap_{v['id']}_val"] = v["hora_apertura"]
+    if f"lim_{v['id']}_val" not in st.session_state:
+        st.session_state[f"lim_{v['id']}_val"] = v["hora_limite_puntual"] or v["hora_apertura"]
+    if f"ci_{v['id']}_val" not in st.session_state:
+        st.session_state[f"ci_{v['id']}_val"] = v["hora_cierre"]
+
+    def mostrar_control(label, key_prefix):
+        c1, c2, c3 = st.columns([1, 2, 1])
+        with c1:
+            # Al estar dentro de un fragment, este botón es instantáneo
+            if st.button("− 5 min", key=f"{key_prefix}_menos", use_container_width=True):
+                h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
+                m -= 5
+                if m < 0:
+                    m = 55
+                    h = (h - 1) % 24
+                st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
+                # No hace falta st.rerun() porque el fragment se encarga
+        with c2:
+            st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; padding-top:5px;'>{st.session_state[f'{key_prefix}_val']}</div>", unsafe_allow_html=True)
+        with c3:
+            if st.button("+ 5 min", key=f"{key_prefix}_mas", use_container_width=True):
+                h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
+                m += 5
+                if m >= 60:
+                    m = 0
+                    h = (h + 1) % 24
+                st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
+
+    st.markdown("**Apertura:**")
+    mostrar_control("Apertura", f"ap_{v['id']}")
+    st.markdown("**Límite Puntual:**")
+    mostrar_control("Límite", f"lim_{v['id']}")
+    st.markdown("**Cierre:**")
+    mostrar_control("Cierre", f"ci_{v['id']}")
+
+    ap = st.session_state[f"ap_{v['id']}_val"]
+    lim = st.session_state[f"lim_{v['id']}_val"]
+    ci = st.session_state[f"ci_{v['id']}_val"]
+
+    error_choque = False
+    for otra_v in ventanas_turno:
+        if otra_v["id"] == v["id"]:
+            continue
+        if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
+            st.error(f"⚠️ Se cruza con **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}).")
+            error_choque = True
+            break
+
+    if not error_choque:
+        # El checkbox y el botón de guardar ahora viven dentro del fragment
+        if confirmar_accion(f"vent_{v['id']}", "Guardar cambios", "¿Guardar este horario?"):
+            if lim > ci:
+                st.error("El límite puntual no puede ser mayor al cierre.")
+            elif ap > lim:
+                st.error("La apertura no puede ser mayor al límite.")
+            else:
+                escribir("UPDATE ventanas SET hora_apertura=?,"
+                         "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
+                         (ap, lim, ci, v["id"]))
+                auditar(st.session_state["user"]["usuario"],
+                        f"Edito ventana id={v['id']}")
+                st.toast("Ventana actualizada correctamente.")
+                # Al guardar, sí forzamos un rerun completo para actualizar la lista
+                st.rerun()
+
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Usa los botones para ajustar los horarios. No necesitas teclado.")
@@ -5533,79 +5606,8 @@ def vista_ventanas():
         
         for v in ventanas_turno:
             with st.expander(f"{v['nombre']} ({v['tipo']})", expanded=True):
-                
-                # Inicializar estados solo la primera vez
-                if f"ap_{v['id']}_val" not in st.session_state:
-                    st.session_state[f"ap_{v['id']}_val"] = v["hora_apertura"]
-                if f"lim_{v['id']}_val" not in st.session_state:
-                    st.session_state[f"lim_{v['id']}_val"] = v["hora_limite_puntual"] or v["hora_apertura"]
-                if f"ci_{v['id']}_val" not in st.session_state:
-                    st.session_state[f"ci_{v['id']}_val"] = v["hora_cierre"]
-
-                def mostrar_control(label, key_prefix):
-                    c1, c2, c3 = st.columns([1, 2, 1])
-                    with c1:
-                        # 🆕 Usamos on_click para que sea instantáneo
-                        if st.button("− 5 min", key=f"{key_prefix}_menos", use_container_width=True):
-                            h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
-                            m -= 5
-                            if m < 0:
-                                m = 55
-                                h = (h - 1) % 24
-                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-                            # YA NO USAMOS st.rerun() AQUÍ
-                    with c2:
-                        st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; padding-top:5px;'>{st.session_state[f'{key_prefix}_val']}</div>", unsafe_allow_html=True)
-                    with c3:
-                        if st.button("+ 5 min", key=f"{key_prefix}_mas", use_container_width=True):
-                            h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
-                            m += 5
-                            if m >= 60:
-                                m = 0
-                                h = (h + 1) % 24
-                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-                            # YA NO USAMOS st.rerun() AQUÍ
-
-                st.markdown("**Apertura:**")
-                mostrar_control("Apertura", f"ap_{v['id']}")
-                st.markdown("**Límite Puntual:**")
-                mostrar_control("Límite", f"lim_{v['id']}")
-                st.markdown("**Cierre:**")
-                mostrar_control("Cierre", f"ci_{v['id']}")
-
-                # Obtener valores actuales de la memoria
-                ap = st.session_state[f"ap_{v['id']}_val"]
-                lim = st.session_state[f"lim_{v['id']}_val"]
-                ci = st.session_state[f"ci_{v['id']}_val"]
-
-                # Validación de choques
-                error_choque = False
-                for otra_v in ventanas_turno:
-                    if otra_v["id"] == v["id"]:
-                        continue
-                    
-                    if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
-                        st.error(f"⚠️ Se cruza con **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}).")
-                        error_choque = True
-                        break
-
-                if not error_choque:
-                    if confirmar_accion(
-                            f"vent_{v['id']}", "Guardar cambios", 
-                            "¿Guardar este horario?"):
-                        
-                        if lim > ci:
-                            st.error("El límite puntual no puede ser mayor al cierre.")
-                        elif ap > lim:
-                            st.error("La apertura no puede ser mayor al límite.")
-                        else:
-                            escribir("UPDATE ventanas SET hora_apertura=?,"
-                                     "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
-                                     (ap, lim, ci, v["id"]))
-                            auditar(st.session_state["user"]["usuario"],
-                                    f"Edito ventana id={v['id']}")
-                            st.toast("Ventana actualizada correctamente.")
-                            st.rerun() # Solo se reinicia al GUARDAR en la BD
+                # Llamamos al fragment pasándole los datos de la ventana
+                ventana_editor(v, ventanas_turno)
 #USUARIOS
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
