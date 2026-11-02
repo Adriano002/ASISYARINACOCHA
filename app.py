@@ -1659,12 +1659,20 @@ def _procesar_escaneo(dni):
     st.session_state.setdefault("_qr_mensajes", [])
     st.session_state["_qr_mensajes"].insert(0, {
         "dni": dni, "tipo": tipo, "mensaje": msg, "extra": extra, "ts": time.time()})
-    st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][:3] # 🆕 SOLO 3
+    
+    # 🆕 LIMPIEZA 1: Solo guardar los últimos 3 mensajes en pantalla
+    st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][:3] 
+    
     contador = st.session_state.get("_qr_sonido_contador", 0) + 1
     st.session_state["_qr_sonido_contador"] = contador
     st.session_state["_qr_sonido_pendiente"] = {
         "kind": sonido, "nonce": contador, "ts": time.time()}
 
+    # 🆕 LIMPIEZA 2: Si la pregunta de psicología quedó colgada por más de 1 minuto, se borra
+    if time.time() - st.session_state.get("_psico_timestamp", 0) > 60:
+        st.session_state.pop("_psico_preguntar", None)
+        st.session_state.pop("_psico_dni", None)
+        st.session_state.pop("_psico_afirmativo", None)
 
 def escaner_qr_continuo(key="qr_scanner"):
     #ELIMINADO EL HEADER (Más espacio y menos RAM)
@@ -1724,7 +1732,10 @@ def escaner_qr_continuo(key="qr_scanner"):
                         unsafe_allow_html=True)
             for msg in mensajes[1:3]:
                 _render_mensaje_qr(msg)
-
+              
+    ult_scan = st.session_state.get("_ultimo_qr_scan", {})
+    if ult_scan and (time.time() - ult_scan.get("ts", 0)) > 10:
+        st.session_state.pop("_ultimo_qr_scan", None)
 def _render_mensaje_qr(msg):
     tipo = msg["tipo"]
     mensaje = msg["mensaje"]
