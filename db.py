@@ -24,20 +24,19 @@ def obtener_conexion():
     if con is None:
         con = sqlite3.connect(
             str(DB_PATH),
-            timeout=30,
+            timeout=60,                 # 🆕 Subimos a 60s
             check_same_thread=False,
-            isolation_level=None,
+            isolation_level=None,       # Mantenemos autocommit
         )
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
-        cur.execute("PRAGMA busy_timeout=30000")   # 🆕 30s alineado con timeout
+        cur.execute("PRAGMA busy_timeout=60000")   # 🆕 60s
         cur.execute("PRAGMA foreign_keys=ON")
-        cur.execute("PRAGMA cache_size=-8000")     # 🆕 8MB (antes 2MB)
+        cur.execute("PRAGMA cache_size=-16000")    # 🆕 16MB de caché
         _local.con = con
     return con
-
 
 def liberar_conexion(con):
     try:
