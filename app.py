@@ -4535,7 +4535,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
         fecha_str = fecha_sel.strftime("%Y-%m-%d")
         
-        st.error(f"ATENCIÓN AUXILIAR: Este reporte es hasta las **{ahora().strftime('%H:%M:%S')}**)
+        st.info(f"ATENCIÓN AUXILIAR: Este reporte es hasta las **{ahora().strftime('%H:%M:%S')}**")
 
         hojas = _generar_hojas_diario(fecha_str, [idsec])
         if not hojas:
