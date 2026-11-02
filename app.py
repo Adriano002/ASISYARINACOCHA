@@ -4211,6 +4211,7 @@ def vista_bloqueados():
 #PANEL DIRECCION
 def vista_panel_direccion():
     import plotly.express as px
+    import plotly.graph_objects as go
     import pandas as pd
     from datetime import datetime, timedelta
 
@@ -4250,124 +4251,126 @@ def vista_panel_direccion():
         procesar_faltas_parciales()  
         st.rerun()
 
-    # --- 1. GRÁFICOS DEL DÍA (Donut y Barras) ---
-    st.subheader(f"Análisis Visual del Turno {turno['nombre']}")
+    fecha_riesgo = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    # --- 🆕 1. GRÁFICO DE CASCADA (Waterfall) ---
+    st.subheader("Flujo de Alumnos en el Día (Cascada)")
+    st.caption("Muestra cómo el total de alumnos se reduce por faltas y tardanzas hasta quedar los puntuales.")
+    
     m = metricas_dia_turno(fecha, turno["id"])
     
-    col_izq, col_der = st.columns(2)
-    with col_izq:
-        df_pie = pd.DataFrame({
-            "Estado": ["Puntuales", "Tardanzas", "Faltas"],
-            "Cantidad": [m["puntuales"], m["tardanzas"], m["faltas"]]
-        })
-        df_pie = df_pie[df_pie["Cantidad"] > 0]
-        
-        if not df_pie.empty:
-            fig_pie = px.pie(df_pie, names="Estado", values="Cantidad", 
-                             color="Estado", hole=0.4,
-                             color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
-                             title="Distribución de Asistencia (Hoy)")
-            fig_pie.update_layout(margin=dict(t=40, b=0, l=0, r=0))
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-    with col_der:
-        df_turnos = []
-        for t_info in turnos_info:
-            t_id = t_info["turno"]["id"]
-            t_nombre = t_info["turno"]["nombre"]
-            metricas_t = metricas_dia_turno(fecha, t_id)
-            df_turnos.append({
-                "Turno": t_nombre, "Puntuales": metricas_t["puntuales"],
-                "Tardanzas": metricas_t["tardanzas"], "Faltas": metricas_t["faltas"]
-            })
-        
-        df_barras = pd.DataFrame(df_turnos)
-        if not df_barras.empty:
-            df_melt = df_barras.melt(id_vars="Turno", var_name="Estado", value_name="Cantidad")
-            fig_bar = px.bar(df_melt, x="Turno", y="Cantidad", color="Estado", 
-                             barmode="group",
-                             color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
-                             title="Comparativa por Turno")
-            fig_bar.update_layout(margin=dict(t=40, b=0, l=0, r=0))
-            st.plotly_chart(fig_bar, use_container_width=True)
+    fig_waterfall = go.Figure(go.Waterfall(
+        name="Asistencia", orientation="v",
+        measure=["absolute", "relative", "relative", "total"],
+        x=["Total Alumnos", "Faltas (-)", "Tardanzas (-)", "Puntuales"],
+        textposition="outside",
+        text=[m["total"], f"-{m['faltas']}", f"-{m['tardanzas']}", m["puntuales"]],
+        y=[m["total"], -m["faltas"], -m["tardanzas"], m["puntuales"]],
+        connector={"line": {"color": "rgb(63, 63, 63)"}},
+        decreasing={"marker": {"color": "#E53935"}},
+        increasing={"marker": {"color": "#43A047"}},
+        totals={"marker": {"color": "#2E86C1"}}
+    ))
+    fig_waterfall.update_layout(title="Impacto de Faltas y Tardanzas en la Puntualidad",
+                                 margin=dict(t=40, b=0, l=0, r=0), showlegend=False)
+    st.plotly_chart(fig_waterfall, use_container_width=True)
 
     st.divider()
 
-    # --- 2. TENDENCIA SEMANAL GENERAL ---
-    st.subheader("Tendencia General de Tardanzas (Últimos 5 días)")
-    fecha_limite = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+    # --- 🆕 2. MAPA DE CALOR (Heatmap) ---
+    st.subheader("Mapa de Calor: Faltas por Día y Turno")
+    st.caption("Los colores más rojos indican los días y turnos con mayor ausentismo.")
     
-    df_tendencia = leer_df("""
-        SELECT fecha, COUNT(*) as cantidad FROM tardanzas
-        WHERE fecha >= ? GROUP BY fecha ORDER BY fecha ASC
-    """, (fecha_limite,))
-    
-    if not df_tendencia.empty:
-        df_tendencia['fecha'] = df_tendencia['fecha'].astype(str)
-        fig_line = px.area(df_tendencia, x="fecha", y="cantidad", 
-                           title="Evolución Diaria de Tardanzas Totales",
-                           labels={"fecha": "Fecha", "cantidad": "Nº Tardanzas"},
-                           color_discrete_sequence=["#E87B4A"])
-        fig_line.update_traces(line_width=3, marker_size=8)
-        fig_line.update_layout(margin=dict(t=40, b=0, l=0, r=0))
-        st.plotly_chart(fig_line, use_container_width=True)
-    else:
-        st.info("No hay suficientes datos históricos.")
-
-    st.divider()
-
-    # --- 🆕 3. COMPARATIVA DE TARDANZAS POR TURNO (Líneas Dobles) ---
-    st.subheader("Comparativa de Tardanzas: Mañana vs Tarde (Últimos 5 días)")
-    
-    df_tard_turnos = leer_df("""
-        SELECT t.fecha, tu.nombre AS turno, COUNT(*) AS cantidad
-        FROM tardanzas t
-        JOIN alumnos a ON t.alumno_id = a.id
-        JOIN secciones s ON a.seccion_id = s.id
-        JOIN turnos tu ON s.turno_id = tu.id
-        WHERE t.fecha >= ?
-        GROUP BY t.fecha, tu.nombre
-        ORDER BY t.fecha ASC
-    """, (fecha_limite,))
-    
-    if not df_tard_turnos.empty:
-        df_tard_turnos['fecha'] = df_tard_turnos['fecha'].astype(str)
-        fig_multi = px.line(df_tard_turnos, x="fecha", y="cantidad", color="turno",
-                            markers=True, title="Comparativa de Tardanzas por Turno",
-                            labels={"fecha": "Fecha", "cantidad": "Nº Tardanzas", "turno": "Turno"},
-                            color_discrete_sequence=["#E87B4A", "#2E86C1"])
-        fig_multi.update_traces(line_width=3, marker_size=8)
-        fig_multi.update_layout(margin=dict(t=40, b=0, l=0, r=0), hovermode="x unified")
-        st.plotly_chart(fig_multi, use_container_width=True)
-    else:
-        st.info("No hay datos suficientes para comparar turnos.")
-
-    st.divider()
-
-    # --- 🆕 4. TOP 5 SECCIONES CON MÁS FALTAS (Barras Horizontales) ---
-    st.subheader("Top 5 Secciones con más Faltas (Últimos 30 días)")
-    fecha_riesgo = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    
-    df_secciones_faltas = leer_df("""
-        SELECT g.nombre || ' ' || s.nombre AS Seccion, COUNT(*) AS Faltas
+    df_heatmap = leer_df("""
+        SELECT 
+            CASE strftime('%w', ast.fecha)
+                WHEN '1' THEN 'Lunes' WHEN '2' THEN 'Martes' WHEN '3' THEN 'Miércoles'
+                WHEN '4' THEN 'Jueves' WHEN '5' THEN 'Viernes' ELSE 'Otro' END AS Dia,
+            t.nombre AS Turno,
+            COUNT(*) AS Faltas
         FROM asistencias ast
         JOIN alumnos a ON ast.alumno_id = a.id
         JOIN secciones s ON a.seccion_id = s.id
-        JOIN grados g ON s.grado_id = g.id
+        JOIN turnos t ON s.turno_id = t.id
         WHERE ast.estado = 'Falta' AND ast.justificada = 0 AND ast.fecha >= ?
-        GROUP BY s.id
-        ORDER BY Faltas DESC
-        LIMIT 5
+        GROUP BY Dia, Turno
     """, (fecha_riesgo,))
     
-    if not df_secciones_faltas.empty:
-        fig_top = px.bar(df_secciones_faltas, x="Faltas", y="Seccion", orientation='h',
-                         title="Secciones con mayor ausentismo",
-                         color="Faltas", color_continuous_scale="Reds")
-        fig_top.update_layout(margin=dict(t=40, b=0, l=0, r=0), yaxis={'categoryorder':'total ascending'})
-        st.plotly_chart(fig_top, use_container_width=True)
+    if not df_heatmap.empty:
+        fig_heat = px.density_heatmap(df_heatmap, x="Dia", y="Turno", z="Faltas",
+                                       color_continuous_scale="Reds", text_auto=True,
+                                       title="Concentración de Faltas (Últimos 30 días)")
+        fig_heat.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+        st.plotly_chart(fig_heat, use_container_width=True)
     else:
-        st.success("Excelente. No hay faltas injustificadas en los últimos 30 días.")
+        st.info("Sin datos de faltas para el mapa de calor.")
+
+    st.divider()
+
+    # --- 🆕 3. GRÁFICO DE RADAR (Perfil de Puntualidad) ---
+    st.subheader("Perfil de Puntualidad por Turno (Radar)")
+    st.caption("Compara visualmente el rendimiento de Mañana y Tarde en diferentes métricas.")
+    
+    df_radar = leer_df("""
+        SELECT 
+            t.nombre AS Turno,
+            SUM(CASE WHEN ast.estado = 'Puntual' THEN 1 ELSE 0 END) AS Puntuales,
+            SUM(CASE WHEN ast.estado = 'Tardanza' THEN 1 ELSE 0 END) AS Tardanzas,
+            SUM(CASE WHEN ast.estado = 'Falta' THEN 1 ELSE 0 END) AS Faltas,
+            SUM(CASE WHEN ast.estado = 'Permiso' THEN 1 ELSE 0 END) AS Permisos
+        FROM asistencias ast
+        JOIN alumnos a ON ast.alumno_id = a.id
+        JOIN secciones s ON a.seccion_id = s.id
+        JOIN turnos t ON s.turno_id = t.id
+        WHERE ast.fecha >= ?
+        GROUP BY t.id
+    """, (fecha_riesgo,))
+    
+    if not df_radar.empty:
+        fig_radar = go.Figure()
+        colores = {"Mañana": "#E87B4A", "Tarde": "#2E86C1"}
+        
+        for _, row in df_radar.iterrows():
+            fig_radar.add_trace(go.Scatterpolar(
+                r=[row["Puntuales"], row["Tardanzas"], row["Faltas"], row["Permisos"]],
+                theta=["Puntuales", "Tardanzas", "Faltas", "Permisos"],
+                fill="toself", name=row["Turno"],
+                line_color=colores.get(row["Turno"], "#333")
+            ))
+        
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, max(df_radar["Puntuales"].max(), 10)])),
+            showlegend=True, title="Comparativa Multidimensional de Turnos",
+            margin=dict(t=40, b=40, l=40, r=40)
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
+    else:
+        st.info("Sin datos suficientes para generar el gráfico de radar.")
+
+    st.divider()
+
+    # --- 🆕 4. GRÁFICO DE DISPERSIÓN CON TENDENCIA ---
+    st.subheader("Evolución y Tendencia de Tardanzas")
+    st.caption("Cada punto es un día. La línea demuestra si las tardanzas van subiendo o bajando.")
+    
+    df_scatter = leer_df("""
+        SELECT fecha, COUNT(*) AS Tardanzas
+        FROM tardanzas
+        WHERE fecha >= ?
+        GROUP BY fecha ORDER BY fecha ASC
+    """, (fecha_riesgo,))
+    
+    if not df_scatter.empty:
+        df_scatter['fecha'] = df_scatter['fecha'].astype(str)
+        fig_scatter = px.scatter(df_scatter, x="fecha", y="Tardanzas", 
+                                  trendline="ols", trendline_color_override="#C62828",
+                                  title="Tendencia de Tardanzas Diarias (Regresión)",
+                                  color_discrete_sequence=["#E87B4A"])
+        fig_scatter.update_traces(marker=dict(size=10, line=dict(width=2, color='DarkSlateGrey')))
+        fig_scatter.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="Fecha", yaxis_title="Nº Tardanzas")
+        st.plotly_chart(fig_scatter, use_container_width=True)
+    else:
+        st.info("Sin datos suficientes para calcular tendencia.")
 
     st.divider()
 
