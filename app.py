@@ -6103,7 +6103,7 @@ def vista_dias_especiales():
                     value=datetime.strptime("08:00", "%H:%M").time(),
                     key="dia_hora")
                 hora = hora_t.strftime("%H:%M")
-            else:
+          else:
                 turnos_opts = {"Ambos": None}
                 t_lbl = "Ambos"
                 hora = "00:00"
