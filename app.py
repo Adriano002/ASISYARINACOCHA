@@ -5534,7 +5534,7 @@ def vista_ventanas():
         for v in ventanas_turno:
             with st.expander(f"{v['nombre']} ({v['tipo']})", expanded=True):
                 
-                # Inicializar estados si no existen
+                # Inicializar estados solo la primera vez
                 if f"ap_{v['id']}_val" not in st.session_state:
                     st.session_state[f"ap_{v['id']}_val"] = v["hora_apertura"]
                 if f"lim_{v['id']}_val" not in st.session_state:
@@ -5545,6 +5545,7 @@ def vista_ventanas():
                 def mostrar_control(label, key_prefix):
                     c1, c2, c3 = st.columns([1, 2, 1])
                     with c1:
+                        # 🆕 Usamos on_click para que sea instantáneo
                         if st.button("− 5 min", key=f"{key_prefix}_menos", use_container_width=True):
                             h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
                             m -= 5
@@ -5552,9 +5553,8 @@ def vista_ventanas():
                                 m = 55
                                 h = (h - 1) % 24
                             st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-                            st.rerun()
+                            # YA NO USAMOS st.rerun() AQUÍ
                     with c2:
-                        # Solo mostramos el texto, NO editable por teclado
                         st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; padding-top:5px;'>{st.session_state[f'{key_prefix}_val']}</div>", unsafe_allow_html=True)
                     with c3:
                         if st.button("+ 5 min", key=f"{key_prefix}_mas", use_container_width=True):
@@ -5564,7 +5564,7 @@ def vista_ventanas():
                                 m = 0
                                 h = (h + 1) % 24
                             st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-                            st.rerun()
+                            # YA NO USAMOS st.rerun() AQUÍ
 
                 st.markdown("**Apertura:**")
                 mostrar_control("Apertura", f"ap_{v['id']}")
@@ -5584,7 +5584,6 @@ def vista_ventanas():
                     if otra_v["id"] == v["id"]:
                         continue
                     
-                    # Evaluar solapamiento
                     if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
                         st.error(f"⚠️ Se cruza con **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}).")
                         error_choque = True
@@ -5606,7 +5605,7 @@ def vista_ventanas():
                             auditar(st.session_state["user"]["usuario"],
                                     f"Edito ventana id={v['id']}")
                             st.toast("Ventana actualizada correctamente.")
-                            st.rerun()
+                            st.rerun() # Solo se reinicia al GUARDAR en la BD
 #USUARIOS
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
