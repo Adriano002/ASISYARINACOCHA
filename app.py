@@ -1354,6 +1354,25 @@ def registrar_entrada(dni, usuario, origen="qr"):
             _nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"
         ), {"alumno": al, "motivo": bloq["motivo"]}
 
+    # 🆕 FLUJO DE PSICOLOGÍA (Solo si ya son más de las 08:00)
+    hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
+    hora_8 = datetime.strptime("08:00", "%H:%M").time()
+    
+    if hora_actual_dt >= hora_8:
+        if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
+            # Ya respondió que SÍ (o que NO, pero ya pasó la pregunta)
+            st.session_state["_psico_preguntar"] = False
+            st.session_state["_psico_dni"] = None
+            estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
+            st.session_state["_psico_afirmativo"] = False
+        else:
+            # Vamos a preguntar
+            st.session_state["_psico_preguntar"] = True
+            st.session_state["_psico_dni"] = dni
+            return False, "PREGUNTA_PSICO", "", {"alumno": al}
+    else:
+        estado_forzado = None # Flujo normal (antes de las 8)
+
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
     n_previas = contar_tardanzas_desde_ultimo_desbloqueo(al["id"])
@@ -1449,7 +1468,13 @@ def registrar_entrada(dni, usuario, origen="qr"):
                 ), {}
 
         lim = v["hora_limite_efectiva"]
-        est = PUNTUAL if ha <= lim else TARDANZA
+        
+        # 🆕 LÓGICA DE ESTADO: Si viene de psicología, es puntual. Si no, se calcula normal.
+        if estado_forzado == "Puntual":
+            est = PUNTUAL
+        else:
+            est = PUNTUAL if ha <= lim else TARDANZA
+            
         just_final = 1 if permiso else 0
 
         try:
@@ -1706,6 +1731,27 @@ def _render_mensaje_qr(msg):
     extra = msg.get("extra") or {}
     alumno = extra.get("alumno") or {}
     ev = extra.get("evento_nombre")
+
+    # 🆕 PREGUNTA DE PSICOLOGÍA
+    if tipo == "PREGUNTA_PSICO":
+        nombre = (alumno.get("apellido_paterno", "") + " " +
+                  (alumno.get("apellido_materno") or "") + ", " +
+                  alumno.get("nombres", "")).strip(", ")
+        st.warning(f"El alumno **{nombre}** está llegando después de las 8:00 AM.")
+        st.info("¿Este alumno viene de cita psicológica?")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Sí, es de psicología", type="primary", use_container_width=True):
+                st.session_state["_psico_afirmativo"] = True
+                _procesar_escaneo(alumno.get("dni"))
+                st.rerun()
+        with c2:
+            if st.button("No, marcar tardanza", use_container_width=True):
+                st.session_state["_psico_preguntar"] = False
+                st.session_state["_psico_afirmativo"] = False
+                _procesar_escaneo(alumno.get("dni"))
+                st.rerun()
+        return
 
     clase = {"PUNTUAL": "qr-puntual", "TARDANZA": "qr-tardanza",
              "REFORZAMIENTO": "qr-refuerzo", "BLOQUEADO": "qr-bloqueado",
@@ -2455,8 +2501,6 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
     from pathlib import Path
 
     buf = BytesIO()
-    
-    # 🆕 HOJA VERTICAL (A4 normal)
     def _pie_pagina(canvas, doc):
         canvas.saveState()
         canvas.setStrokeColor(colors.HexColor('#C4562A'))
@@ -2474,7 +2518,7 @@ def generar_pdf_multilhoja(hojas, titulo_base="Reporte"):
                 canvas.saveState()
                 canvas.setFillAlpha(0.05) # 5% de opacidad
                 # Centrado en hoja vertical (21 x 29.7 cm)
-                canvas.drawImage(str(escudo_path), 5.5*cm, 10*cm, width=10*cm, height=10*cm, mask='auto')
+                canvas.drawImage(str(escudo_path), 5.5*cm, 10*cm, width=4*cm, height=10*cm, mask='auto')
                 canvas.restoreState()
             except Exception:
                 pass
@@ -4491,7 +4535,7 @@ def _rep_mostrar_reporte(idsec, tipo, desde, hasta):
         fecha_sel = st.date_input("Selecciona el día del reporte", value=ahora().date(), key="rep_fecha_sel")
         fecha_str = fecha_sel.strftime("%Y-%m-%d")
         
-        st.error(f" **ATENCIÓN AUXILIAR:** Este reporte es una 'foto' de la asistencia hasta las **{ahora().strftime('%H:%M:%S')}**. Si descarga el reporte antes de que cierren las ventanas, los alumnos que lleguen después aparecerán como FALTA. Para un reporte EXACTO, descárguelo al final del turno.")
+        st.error(f"ATENCIÓN AUXILIAR: Este reporte es hasta las **{ahora().strftime('%H:%M:%S')})
 
         hojas = _generar_hojas_diario(fecha_str, [idsec])
         if not hojas:
@@ -5471,29 +5515,52 @@ def _carnets_ver_seccion(idsec):
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Configura apertura, limite puntual y cierre por turno y tipo.")
+    
     for turno in listar_turnos():
         st.subheader("Turno " + turno['nombre'])
         for v in listar_ventanas(turno["id"]):
             with st.expander(f"{v['nombre']} ({v['tipo']})"):
-                ap_t = st.time_input(
-                    "Apertura",
-                    value=datetime.strptime(v["hora_apertura"], "%H:%M").time(),
-                    key="ap_" + str(v['id']))
-                lim_val = v["hora_limite_puntual"] or v["hora_apertura"]
-                lim_t = st.time_input(
-                    "Limite puntual",
-                    value=datetime.strptime(lim_val, "%H:%M").time(),
-                    key="lim_" + str(v['id']))
-                ci_t = st.time_input(
-                    "Cierre",
-                    value=datetime.strptime(v["hora_cierre"], "%H:%M").time(),
-                    key="ci_" + str(v['id']))
+                
+                # --- FUNCIÓN AUXILIAR PARA BOTONES DE TIEMPO ---
+                def control_hora(label, valor_actual, key_prefix):
+                    h, m = map(int, valor_actual.split(":"))
+                    c1, c2, c3 = st.columns([1, 2, 1])
+                    with c1:
+                        if st.button("− 5 min", key=f"{key_prefix}_menos"):
+                            m -= 5
+                            if m < 0:
+                                m = 55
+                                h = (h - 1) % 24
+                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
+                    with c2:
+                        st.markdown(f"<h4 style='text-align:center; margin:0;'>{h:02d}:{m:02d}</h4>", unsafe_allow_html=True)
+                    with c3:
+                        if st.button("+ 5 min", key=f"{key_prefix}_mas"):
+                            m += 5
+                            if m >= 60:
+                                m = 0
+                                h = (h + 1) % 24
+                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
+                    return st.session_state.get(f"{key_prefix}_val", valor_actual)
+
+                # Inicializar estados si no existen
+                if f"ap_{v['id']}_val" not in st.session_state:
+                    st.session_state[f"ap_{v['id']}_val"] = v["hora_apertura"]
+                if f"lim_{v['id']}_val" not in st.session_state:
+                    st.session_state[f"lim_{v['id']}_val"] = v["hora_limite_puntual"] or v["hora_apertura"]
+                if f"ci_{v['id']}_val" not in st.session_state:
+                    st.session_state[f"ci_{v['id']}_val"] = v["hora_cierre"]
+
+                st.markdown("**Apertura:**")
+                ap = control_hora("Apertura", v["hora_apertura"], f"ap_{v['id']}")
+                st.markdown("**Límite Puntual:**")
+                lim = control_hora("Límite", v["hora_limite_puntual"] or v["hora_apertura"], f"lim_{v['id']}")
+                st.markdown("**Cierre:**")
+                ci = control_hora("Cierre", v["hora_cierre"], f"ci_{v['id']}")
+
                 if confirmar_accion(
-                        f"vent_{v['id']}", "Guardar",
+                        f"vent_{v['id']}", "Guardar", 
                         "¿Estas seguro de guardar los cambios de esta ventana?"):
-                    ap = ap_t.strftime("%H:%M")
-                    lim = lim_t.strftime("%H:%M")
-                    ci = ci_t.strftime("%H:%M")
                     escribir("UPDATE ventanas SET hora_apertura=?,"
                              "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
                              (ap, lim, ci, v["id"]))
@@ -5501,7 +5568,6 @@ def vista_ventanas():
                             f"Edito ventana id={v['id']}")
                     st.toast("Ventana actualizada")
                     st.rerun()
-
 #USUARIOS
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
@@ -6222,13 +6288,11 @@ def vista_dias_especiales():
 #JUSTIFICACIONES PREVIAS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
-    st.caption("Solo aplica a FALTAS. Solo hoy, mañana o pasado mañana.")
-    tabs = st.tabs(["Historial global", "Registrar"])
+    tabs = st.tabs(["Historial global", "Registrar"]) # 🆕 Quitamos el caption
     with tabs[0]:
         _render_historial_global_jp(usuario)
     with tabs[1]:
         _render_registrar_jp(usuario)
-
 
 def _render_registrar_jp(usuario):
     clave = "jp_sel"
@@ -6245,6 +6309,7 @@ def _render_registrar_jp(usuario):
             on_click_key="jp_al_sel_id")
         if not al:
             return
+    
     else:
         # Traemos los datos del alumno seleccionado
         with cursor() as (con, cur):
