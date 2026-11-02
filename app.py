@@ -5529,29 +5529,28 @@ def vista_ventanas():
     
     for turno in listar_turnos():
         st.subheader("Turno " + turno['nombre'])
-        for v in listar_ventanas(turno["id"]):
+        
+        # 🆕 Obtener todas las ventanas de este turno para validar choques
+        ventanas_turno = listar_ventanas(turno["id"])
+        
+        for v in ventanas_turno:
             with st.expander(f"{v['nombre']} ({v['tipo']})"):
                 
-                # Función auxiliar con límites (min_hora y max_hora)
-                def control_hora(label, valor_actual, min_hora, max_hora, key_prefix):
+                # Función auxiliar SIN LÍMITES de teclado
+                def control_hora(label, valor_actual, key_prefix):
                     if f"{key_prefix}_val" not in st.session_state:
                         st.session_state[f"{key_prefix}_val"] = valor_actual
 
                     c1, c2, c3 = st.columns([1, 2, 1])
                     
-                    # 🆕 LÓGICA DE BOTONES CON LÍMITES
                     with c1:
-                        # Desactivar si ya llegó al mínimo
-                        disabled_menos = st.session_state[f"{key_prefix}_val"] <= min_hora
-                        if st.button("− 5 min", key=f"{key_prefix}_menos", disabled=disabled_menos, use_container_width=True):
+                        if st.button("− 5 min", key=f"{key_prefix}_menos", use_container_width=True):
                             h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
                             m -= 5
                             if m < 0:
                                 m = 55
                                 h = (h - 1) % 24
-                            nueva = f"{h:02d}:{m:02d}"
-                            if nueva >= min_hora: # Validar que no baje del mínimo
-                                st.session_state[f"{key_prefix}_val"] = nueva
+                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
                             st.rerun()
                             
                     with c2:
@@ -5561,62 +5560,63 @@ def vista_ventanas():
                             key=f"{key_prefix}_txt",
                             label_visibility="collapsed"
                         )
-                        # Validar que lo escrito esté dentro del rango permitido
                         if re.match(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$", nueva_hora):
-                            if min_hora <= nueva_hora <= max_hora:
-                                st.session_state[f"{key_prefix}_val"] = nueva_hora
-                            else:
-                                st.error(f"Fuera de rango ({min_hora} - {max_hora})")
+                            st.session_state[f"{key_prefix}_val"] = nueva_hora
                         elif nueva_hora != st.session_state[f"{key_prefix}_val"]:
-                            st.error("Formato: HH:MM")
+                            st.error("Formato: HH:MM (ej: 07:30)")
 
                     with c3:
-                        # Desactivar si ya llegó al máximo
-                        disabled_mas = st.session_state[f"{key_prefix}_val"] >= max_hora
-                        if st.button("+ 5 min", key=f"{key_prefix}_mas", disabled=disabled_mas, use_container_width=True):
+                        if st.button("+ 5 min", key=f"{key_prefix}_mas", use_container_width=True):
                             h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
                             m += 5
                             if m >= 60:
                                 m = 0
                                 h = (h + 1) % 24
-                            nueva = f"{h:02d}:{m:02d}"
-                            if nueva <= max_hora: # Validar que no suba del máximo
-                                st.session_state[f"{key_prefix}_val"] = nueva
+                            st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
                             st.rerun()
                             
                     return st.session_state[f"{key_prefix}_val"]
 
-                # 🆕 DEFINIR LOS RANGOS (Ejemplo: 05:55 a 06:00)
-                # Puedes cambiar estos valores según tus reglas
-                MIN_HORA = "05:55"
-                MAX_HORA = "06:00"
-
                 st.markdown("**Apertura:**")
-                ap = control_hora("Apertura", v["hora_apertura"], MIN_HORA, MAX_HORA, f"ap_{v['id']}")
+                ap = control_hora("Apertura", v["hora_apertura"], f"ap_{v['id']}")
                 
                 st.markdown("**Límite Puntual:**")
-                # Para el límite puntual, le damos un rango un poco más amplio
-                lim = control_hora("Límite", v["hora_limite_puntual"] or v["hora_apertura"], "06:30", "07:30", f"lim_{v['id']}")
+                lim = control_hora("Límite", v["hora_limite_puntual"] or v["hora_apertura"], f"lim_{v['id']}")
                 
                 st.markdown("**Cierre:**")
-                ci = control_hora("Cierre", v["hora_cierre"], "11:00", "13:00", f"ci_{v['id']}")
+                ci = control_hora("Cierre", v["hora_cierre"], f"ci_{v['id']}")
 
-                if confirmar_accion(
-                        f"vent_{v['id']}", "Guardar", 
-                        "¿Estas seguro de guardar los cambios de esta ventana?"):
+                # 🆕 VALIDACIÓN DE CHOQUES ENTRE VENTANAS DEL MISMO TURNO
+                error_choque = False
+                for otra_v in ventanas_turno:
+                    if otra_v["id"] == v["id"]:
+                        continue # No compararse consigo misma
                     
-                    if lim > ci:
-                        st.error("Error: El límite puntual no puede ser mayor a la hora de cierre.")
-                    elif ap > lim:
-                        st.error("Error: La apertura no puede ser mayor al límite puntual.")
-                    else:
-                        escribir("UPDATE ventanas SET hora_apertura=?"
-                                 "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
-                                 (ap, lim, ci, v["id"]))
-                        auditar(st.session_state["user"]["usuario"],
-                                f"Edito ventana id={v['id']}")
-                        st.toast("Ventana actualizada")
-                        st.rerun()
+                    # Comprobar si los horarios se solapan
+                    # (Si la apertura de una es menor al cierre de la otra y viceversa)
+                    if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
+                        st.error(f"⚠️ **Choque de horario:** El horario {ap} - {ci} se cruza con la ventana **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}) del mismo turno. Por favor, ajusta las horas para que no se solapen.")
+                        error_choque = True
+                        break
+
+                if not error_choque:
+                    if confirmar_accion(
+                            f"vent_{v['id']}", "Guardar", 
+                            "¿Estas seguro de guardar los cambios de esta ventana?"):
+                        
+                        # Validación lógica básica
+                        if lim > ci:
+                            st.error("Error: El límite puntual no puede ser mayor a la hora de cierre.")
+                        elif ap > lim:
+                            st.error("Error: La apertura no puede ser mayor al límite puntual.")
+                        else:
+                            escribir("UPDATE ventanas SET hora_apertura=?,"
+                                     "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
+                                     (ap, lim, ci, v["id"]))
+                            auditar(st.session_state["user"]["usuario"],
+                                    f"Edito ventana id={v['id']}")
+                            st.toast("Ventana actualizada")
+                            st.rerun()
 #USUARIOS
 def puede_gestionar_usuario(usuario_actual, id_objetivo):
     with cursor() as (con, cur):
