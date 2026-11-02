@@ -5523,83 +5523,13 @@ def _carnets_ver_seccion(idsec):
                             "application/pdf", width='stretch', key="dl_canasta")
 
 #VENTANAS
-import streamlit as st
-
-# 🆕 El decorador @st.fragment hace que SOLO este bloque se re-ejecute al presionar los botones
-@st.fragment
-def ventana_editor(v, ventanas_turno):
-    # Inicializar estados si no existen
-    if f"ap_{v['id']}_val" not in st.session_state:
-        st.session_state[f"ap_{v['id']}_val"] = v["hora_apertura"]
-    if f"lim_{v['id']}_val" not in st.session_state:
-        st.session_state[f"lim_{v['id']}_val"] = v["hora_limite_puntual"] or v["hora_apertura"]
-    if f"ci_{v['id']}_val" not in st.session_state:
-        st.session_state[f"ci_{v['id']}_val"] = v["hora_cierre"]
-
-    def mostrar_control(label, key_prefix):
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c1:
-            # Al estar dentro de un fragment, este botón es instantáneo
-            if st.button("− 5 min", key=f"{key_prefix}_menos", use_container_width=True):
-                h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
-                m -= 5
-                if m < 0:
-                    m = 55
-                    h = (h - 1) % 24
-                st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-                # No hace falta st.rerun() porque el fragment se encarga
-        with c2:
-            st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; padding-top:5px;'>{st.session_state[f'{key_prefix}_val']}</div>", unsafe_allow_html=True)
-        with c3:
-            if st.button("+ 5 min", key=f"{key_prefix}_mas", use_container_width=True):
-                h, m = map(int, st.session_state[f"{key_prefix}_val"].split(":"))
-                m += 5
-                if m >= 60:
-                    m = 0
-                    h = (h + 1) % 24
-                st.session_state[f"{key_prefix}_val"] = f"{h:02d}:{m:02d}"
-
-    st.markdown("**Apertura:**")
-    mostrar_control("Apertura", f"ap_{v['id']}")
-    st.markdown("**Límite Puntual:**")
-    mostrar_control("Límite", f"lim_{v['id']}")
-    st.markdown("**Cierre:**")
-    mostrar_control("Cierre", f"ci_{v['id']}")
-
-    ap = st.session_state[f"ap_{v['id']}_val"]
-    lim = st.session_state[f"lim_{v['id']}_val"]
-    ci = st.session_state[f"ci_{v['id']}_val"]
-
-    error_choque = False
-    for otra_v in ventanas_turno:
-        if otra_v["id"] == v["id"]:
-            continue
-        if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
-            st.error(f"⚠️ Se cruza con **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}).")
-            error_choque = True
-            break
-
-    if not error_choque:
-        # El checkbox y el botón de guardar ahora viven dentro del fragment
-        if confirmar_accion(f"vent_{v['id']}", "Guardar cambios", "¿Guardar este horario?"):
-            if lim > ci:
-                st.error("El límite puntual no puede ser mayor al cierre.")
-            elif ap > lim:
-                st.error("La apertura no puede ser mayor al límite.")
-            else:
-                escribir("UPDATE ventanas SET hora_apertura=?,"
-                         "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
-                         (ap, lim, ci, v["id"]))
-                auditar(st.session_state["user"]["usuario"],
-                        f"Edito ventana id={v['id']}")
-                st.toast("Ventana actualizada correctamente.")
-                # Al guardar, sí forzamos un rerun completo para actualizar la lista
-                st.rerun()
-
 def vista_ventanas():
     st.title("Ventanas de asistencia")
     st.caption("Desliza las barras para ajustar los horarios. No necesitas teclado.")
     
+    # Creamos la lista de opciones (00:00 a 23:55 cada 5 min)
+    opciones_horas = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
+
     for turno in listar_turnos():
         st.subheader("Turno " + turno['nombre'])
         ventanas_turno = listar_ventanas(turno["id"])
@@ -5607,83 +5537,56 @@ def vista_ventanas():
         for v in ventanas_turno:
             with st.expander(f"{v['nombre']} ({v['tipo']})", expanded=True):
                 
-                # Función para convertir hora a minutos totales (para el slider)
-                def to_mins(h_str):
-                    if not h_str: return 0
-                    h, m = map(int, h_str.split(":"))
-                    return h * 60 + m
-                
-                # Función para convertir minutos a hora
-                def to_str(mins):
-                    h = (mins // 60) % 24
-                    m = mins % 60
-                    return f"{h:02d}:{m:02d}"
-
-                # Limites del día (00:00 a 23:55)
-                min_dia = 0
-                max_dia = 23 * 60 + 55
-                step = 5 # Saltos de 5 minutos
+                # Función auxiliar para dibujar el slider de horas
+                def slider_hora(label, hora_str, key_prefix):
+                    # Si la hora exacta no está en la lista, la redondeamos
+                    if hora_str not in opciones_horas:
+                        h, m = map(int, hora_str.split(":"))
+                        m = round(m / 5) * 5
+                        if m >= 60:
+                            m = 0
+                            h = (h + 1) % 24
+                        hora_str = f"{h:02d}:{m:02d}"
+                        
+                    seleccion = st.select_slider(
+                        label, 
+                        options=opciones_horas, 
+                        value=hora_str, 
+                        key=f"{key_prefix}_{v['id']}",
+                        label_visibility="collapsed"
+                    )
+                    st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; margin-top:-15px;'>{seleccion}</div>", unsafe_allow_html=True)
+                    return seleccion
 
                 st.markdown("**Apertura:**")
-                ap_mins = st.slider(
-                    "Apertura", 
-                    min_value=min_dia, 
-                    max_value=max_dia, 
-                    value=to_mins(v["hora_apertura"]), 
-                    step=step, 
-                    format="%d min", # Streamlit mostrará el número, abajo lo convertimos
-                    key=f"ap_{v['id']}",
-                    label_visibility="collapsed"
-                )
-                ap = to_str(ap_mins)
-                st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; margin-top:-15px;'>{ap}</div>", unsafe_allow_html=True)
-
+                ap = slider_hora("Apertura", v["hora_apertura"], "ap")
+                
                 st.markdown("**Límite Puntual:**")
-                lim_val = to_mins(v["hora_limite_puntual"] or v["hora_apertura"])
-                lim_mins = st.slider(
-                    "Límite Puntual", 
-                    min_value=min_dia, 
-                    max_value=max_dia, 
-                    value=lim_val, 
-                    step=step, 
-                    key=f"lim_{v['id']}",
-                    label_visibility="collapsed"
-                )
-                lim = to_str(lim_mins)
-                st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; margin-top:-15px;'>{lim}</div>", unsafe_allow_html=True)
-
+                lim = slider_hora("Límite", v["hora_limite_puntual"] or v["hora_apertura"], "lim")
+                
                 st.markdown("**Cierre:**")
-                ci_mins = st.slider(
-                    "Cierre", 
-                    min_value=min_dia, 
-                    max_value=max_dia, 
-                    value=to_mins(v["hora_cierre"]), 
-                    step=step, 
-                    key=f"ci_{v['id']}",
-                    label_visibility="collapsed"
-                )
-                ci = to_str(ci_mins)
-                st.markdown(f"<div style='text-align:center; font-size:24px; font-weight:bold; margin-top:-15px;'>{ci}</div>", unsafe_allow_html=True)
+                ci = slider_hora("Cierre", v["hora_cierre"], "ci")
 
-                # Mostrar advertencia de choque (PERO SIN OCULTAR EL BOTÓN)
+                # Validación de choques entre ventanas del mismo turno
                 hay_choque = False
                 for otra_v in ventanas_turno:
                     if otra_v["id"] == v["id"]:
                         continue
+                    # Si la apertura de esta ventana es antes del cierre de la otra, y su cierre es después de la apertura de la otra -> CHOCAN
                     if (ap < otra_v["hora_cierre"]) and (ci > otra_v["hora_apertura"]):
                         st.warning(f"⚠️ Ojo: Este horario se cruza con **{otra_v['nombre']}** ({otra_v['hora_apertura']} - {otra_v['hora_cierre']}).")
                         hay_choque = True
                         break
 
-                # 🆕 EL BOTÓN DE GUARDAR SIEMPRE ESTÁ VISIBLE
+                # 🆕 BOTÓN DE GUARDAR (Siempre visible)
                 if confirmar_accion(f"vent_{v['id']}", "Guardar cambios", "¿Guardar este horario?"):
                     
-                    if lim_mins > ci_mins:
-                        st.error("El límite puntual no puede ser mayor al cierre.")
-                    elif ap_mins > lim_mins:
-                        st.error("La apertura no puede ser mayor al límite.")
+                    if lim > ci:
+                        st.error("Error: El límite puntual no puede ser mayor al cierre.")
+                    elif ap > lim:
+                        st.error("Error: La apertura no puede ser mayor al límite.")
                     elif hay_choque:
-                        st.error("No se puede guardar porque hay un choque de horario. Ajusta los deslizadores.")
+                        st.error("Error: No se puede guardar porque hay un choque de horario. Ajusta las barras.")
                     else:
                         escribir("UPDATE ventanas SET hora_apertura=?,"
                                  "hora_limite_puntual=?,hora_cierre=? WHERE id=?",
