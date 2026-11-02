@@ -4250,29 +4250,12 @@ def vista_panel_direccion():
         procesar_faltas_parciales()  
         st.rerun()
 
-    # --- 1. MÉTRICAS DEL TURNO (KPIs) ---
+    # --- 🆕 SECCIÓN 1: GRÁFICOS EN LUGAR DE KPIs ---
+    st.subheader(f"Análisis Visual del Turno {turno['nombre']}")
+    
     m = metricas_dia_turno(fecha, turno["id"])
     
-    st.subheader(f"Resumen del Turno {turno['nombre']}")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Alumnos", m["total"])
-    c2.metric("Puntuales", m["puntuales"])
-    c3.metric("Tardanzas", m["tardanzas"])
-    c4.metric("Faltas", m["faltas"])
-    
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Reforzamiento", m["ref_asistio"])
-    c2.metric("Bloqueados", m["bloqueados"], delta_color="inverse")
-    c3.metric("Justificadas", m["justificadas"])
-    c4.metric("Permisos", m["permisos"])
-
-    st.divider()
-
-    # --- 2. GRÁFICOS ESTADÍSTICOS ---
-    st.subheader("Análisis Visual del Día")
-    
     col_izq, col_der = st.columns(2)
-
     with col_izq:
         # Gráfico de Torta (Donut)
         df_pie = pd.DataFrame({
@@ -4285,14 +4268,14 @@ def vista_panel_direccion():
             fig_pie = px.pie(df_pie, names="Estado", values="Cantidad", 
                              color="Estado", hole=0.4,
                              color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
-                             title="Distribución de Asistencia (Hoy)")
+                             title=f"Distribución de Asistencia (Hoy)")
             fig_pie.update_layout(margin=dict(t=40, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
             st.info("Sin datos de asistencia para graficar hoy.")
 
     with col_der:
-        # Gráfico de Barras Agrupadas (Corregido con melt)
+        # Gráfico de Barras Agrupadas (Turnos)
         df_turnos = []
         for t_info in turnos_info:
             t_id = t_info["turno"]["id"]
@@ -4311,12 +4294,13 @@ def vista_panel_direccion():
             fig_bar = px.bar(df_melt, x="Turno", y="Cantidad", color="Estado", 
                              barmode="group",
                              color_discrete_map={"Puntuales": "#43A047", "Tardanzas": "#F59E0B", "Faltas": "#E53935"},
-                             title="Comparativa por Turno (Hoy)")
+                             title="Comparativa por Turno")
             fig_bar.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="Turno", yaxis_title="Cantidad")
             st.plotly_chart(fig_bar, use_container_width=True)
 
-    # --- 3. TENDENCIA SEMANAL (SQLite Corregido) ---
     st.divider()
+
+    # --- 2. TENDENCIA SEMANAL ---
     st.subheader("Tendencia de Tardanzas (Últimos 5 días)")
     
     fecha_limite = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
@@ -4342,8 +4326,9 @@ def vista_panel_direccion():
     else:
         st.info("No hay suficientes datos históricos para mostrar la tendencia.")
 
-    # --- 4. ALUMNOS EN RIESGO (SQLite Corregido) ---
     st.divider()
+
+    # --- 3. ALUMNOS EN RIESGO ---
     st.subheader("Alumnos en Riesgo (Faltas Acumuladas)")
     
     fecha_riesgo = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
