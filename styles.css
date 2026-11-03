@@ -9,7 +9,8 @@ def aplicar_estilos():
     --borde: #E5E7EB;
     --texto: #111827;
     --texto-suave: #6B7280;
-    --fuente: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    
     --radio: 10px;
 }
 
