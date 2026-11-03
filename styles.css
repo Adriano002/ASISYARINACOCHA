@@ -1,207 +1,191 @@
 /* ========================================================= */
-/* 🚀 DISEÑO FUTURISTA - VERSIÓN ULTRA RÁPIDA                 */
+/* 🪟 DISEÑO ELEGANTE - ESTILO MICROSOFT / WINDOWS 11        */
 /* ========================================================= */
 
 :root {
-    /* Colores Neón Futuristas */
-    --neon-primario: #FF6B35;
-    --neon-secundario: #00F0FF;
-    --neon-oscuro: #0A0E17;
-    --neon-panel: #131A29; /* 🆕 Color sólido en vez de transparencia */
-    --neon-borde: rgba(0, 240, 255, 0.3);
-    --texto-brillante: #E2E8F0;
-    --texto-apagado: #94A3B8;
-    
-    /* Fuente nativa (Cero latencia) */
+    --bg-main: #1E1E1E;          /* Fondo principal oscuro */
+    --bg-sidebar: #252526;       /* Fondo del menú lateral */
+    --bg-card: #2D2D30;          /* Fondo de paneles y tablas */
+    --border: #3E3E42;           /* Bordes sutiles */
+    --text-main: #CCCCCC;        /* Texto principal */
+    --text-muted: #858585;       /* Texto secundario */
+    --primario: #E87B4A;         /* Tu naranja institucional */
+    --primario-hover: #D66535;
     --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --radio: 12px;
+    --radio: 8px;
 }
 
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-
-/* Fondo oscuro profundo */
-.stApp {
-    background: radial-gradient(circle at 50% 0%, #1A2235 0%, var(--neon-oscuro) 70%) !important;
+/* FORZAR MODO OSCURO EN TODA LA APP */
+.stApp, .main, [data-testid="stAppViewContainer"] {
+    background-color: var(--bg-main) !important;
+    color: var(--text-main) !important;
     font-family: var(--fuente) !important;
-    color: var(--texto-brillante) !important;
 }
 
-/* 1. SIDEBAR */
+/* Ocultar header blanco feo de Streamlit */
+header[data-testid="stHeader"] {
+    background-color: var(--bg-main) !important;
+}
+
+/* 1. SIDEBAR (Menú Lateral) */
 section[data-testid="stSidebar"] {
-    background: var(--neon-oscuro) !important;
-    border-right: 1px solid var(--neon-borde) !important;
+    background-color: var(--bg-sidebar) !important;
+    border-right: 1px solid var(--border) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    padding: 10px 16px !important;
+    margin: 2px 12px !important;
     border-radius: var(--radio) !important;
-    padding: 12px 16px !important;
-    margin: 4px 8px !important;
-    transition: all 0.2s ease !important;
-    color: var(--texto-apagado) !important;
-    border: 1px solid transparent;
+    color: var(--text-main) !important;
+    transition: none !important; /* Sin animaciones para que vuele */
+    border-left: 3px solid transparent !important;
 }
 
+/* Ocultar el circulito del menú */
 section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
     display: none !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background: rgba(0, 240, 255, 0.05) !important;
-    color: var(--neon-secundario) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background: rgba(255, 107, 53, 0.1) !important;
-    border-left: 3px solid var(--neon-primario) !important;
+    background-color: rgba(232, 123, 74, 0.15) !important;
+    border-left-color: var(--primario) !important;
     color: #FFFFFF !important;
 }
 
 /* 2. TÍTULOS */
 h1, h2, h3 {
-    font-weight: 800 !important;
-    letter-spacing: 1px !important;
-    text-transform: uppercase !important;
-    background: linear-gradient(90deg, #FFFFFF, var(--neon-secundario));
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-}
-
-h1::after {
-    content: '';
-    display: block;
-    width: 60px;
-    height: 3px;
-    background: var(--neon-primario);
-    margin-top: 8px;
-    border-radius: 2px;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.5px !important;
 }
 
 /* 3. BOTONES */
 .stButton > button, 
 .stFormSubmitButton > button, 
 .stDownloadButton > button {
-    background: rgba(0, 240, 255, 0.05) !important;
-    border: 1px solid var(--neon-borde) !important;
-    color: var(--neon-secundario) !important;
+    background-color: var(--bg-card) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-    transition: all 0.2s ease !important;
+    font-weight: 500 !important;
+    transition: none !important; /* Rápido */
 }
 
 .stButton > button:hover, 
 .stFormSubmitButton > button:hover, 
 .stDownloadButton > button:hover {
-    background: rgba(0, 240, 255, 0.15) !important;
-    border-color: var(--neon-secundario) !important;
+    border-color: var(--text-muted) !important;
     color: #FFFFFF !important;
 }
 
 /* Botones Primarios */
 .stButton > button[kind="primary"], 
 .stFormSubmitButton > button[kind="primary"] {
-    background: var(--neon-primario) !important;
-    border: none !important;
-    color: white !important;
+    background-color: var(--primario) !important;
+    color: #FFFFFF !important;
+    border: 1px solid var(--primario) !important;
 }
 
-.stButton > button[kind="primary"]:hover {
-    background: #FF4500 !important;
+.stButton > button[kind="primary"]:hover, 
+.stFormSubmitButton > button[kind="primary"]:hover {
+    background-color: var(--primario-hover) !important;
 }
 
-/* 4. INPUTS */
+/* 4. INPUTS (Cajas de texto) */
 .stTextInput input, 
 .stNumberInput input, 
 .stDateInput input, 
 .stSelectbox > div > div {
-    background: #0F1523 !important; /* Fondo sólido, sin transparencia */
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background-color: var(--bg-main) !important;
+    color: #FFFFFF !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
-    color: var(--texto-brillante) !important;
-    transition: all 0.2s ease !important;
+    box-shadow: none !important;
 }
 
 .stTextInput input:focus, 
 .stSelectbox > div > div:focus-within {
-    border-color: var(--neon-secundario) !important;
+    border-color: var(--primario) !important;
+    box-shadow: 0 0 0 1px var(--primario) !important;
 }
 
-/* 5. PANELES (Sin desenfoque) */
+/* 5. PANELES Y FORMULARIOS */
 div[data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stForm"] {
-    background: var(--neon-panel) !important; /* Color sólido en vez de blur */
-    border: 1px solid var(--neon-borde) !important;
-    border-radius: 16px !important;
-    padding: 24px !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radio) !important;
+    padding: 20px !important;
+    box-shadow: none !important; /* Sin sombras pesadas */
 }
 
 /* 6. MÉTRICAS */
 div[data-testid="stMetric"] {
-    background: var(--neon-panel) !important;
-    border: 1px solid var(--neon-borde) !important;
-    border-top: 3px solid var(--neon-primario) !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
-    padding: 20px !important;
+    padding: 16px !important;
 }
 
 div[data-testid="stMetric"] label {
-    color: var(--texto-apagado) !important;
-    font-family: monospace !important;
-    text-transform: uppercase !important;
+    color: var(--text-muted) !important;
+    font-size: 13px !important;
 }
 
 div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     color: #FFFFFF !important;
-    font-weight: 900 !important;
+    font-weight: 600 !important;
 }
 
 /* 7. TABS */
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border-radius: var(--radio) !important;
-    padding: 6px !important;
-    gap: 8px !important;
+    background-color: transparent !important;
+    gap: 10px !important;
+    border-bottom: 1px solid var(--border) !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px !important;
-    color: var(--texto-apagado) !important;
-    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--text-muted) !important;
+    padding: 8px 16px !important;
+    border-radius: var(--radio) var(--radio) 0 0 !important;
 }
 
 .stTabs [aria-selected="true"] {
-    background: rgba(0, 240, 255, 0.1) !important;
-    color: var(--neon-secundario) !important;
-    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    background-color: var(--bg-card) !important;
+    border-bottom: 2px solid var(--primario) !important;
 }
 
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* 8. TARJETAS QR */
+/* 8. TARJETAS QR (Escáner) */
 .qr-msg {
-    background: var(--neon-panel) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-left: 4px solid var(--texto-apagado) !important;
-    border-radius: 8px !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-left: 4px solid var(--text-muted) !important;
+    border-radius: var(--radio) !important;
     padding: 16px !important;
 }
 
-.qr-puntual { border-left-color: #00FF88 !important; }
-.qr-tardanza { border-left-color: #FFB800 !important; }
-.qr-bloqueado { border-left-color: #FF3366 !important; }
+.qr-puntual { border-left-color: #4CAF50 !important; }
+.qr-tardanza { border-left-color: #FFC107 !important; }
+.qr-bloqueado { border-left-color: #F44336 !important; }
 
-.qr-nombre { color: #FFFFFF; font-weight: 700; }
-.qr-texto { color: var(--texto-apagado); font-family: monospace; }
-.qr-evento { color: var(--neon-secundario); font-family: monospace; font-size: 11px; }
+.qr-nombre { color: #FFFFFF; font-weight: 600; font-size: 16px; }
+.qr-texto { color: var(--text-main); font-size: 14px; }
+.qr-evento { color: var(--text-muted); font-size: 12px; }
 
 /* 9. PERFIL DEL ALUMNO */
 .perfil-hero {
-    background: var(--neon-panel) !important;
-    border: 1px solid var(--neon-borde) !important;
-    border-radius: 16px !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radio) !important;
     padding: 24px !important;
     display: flex;
     align-items: center;
@@ -209,27 +193,34 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
 }
 
 .hero-avatar {
-    background: var(--neon-primario) !important;
+    background-color: var(--primario) !important;
     color: #FFFFFF !important;
-    width: 70px !important; height: 70px !important;
+    width: 60px !important; height: 60px !important;
     border-radius: 50% !important;
     display: flex !important; align-items: center !important; justify-content: center !important;
-    font-size: 28px !important; font-weight: 900 !important;
+    font-size: 24px !important; font-weight: bold !important;
 }
 
-.hero-nombre { font-size: 22px !important; font-weight: 800 !important; color: #FFFFFF !important; }
-.hero-meta { font-size: 13px !important; color: var(--neon-secundario) !important; font-family: monospace; }
+.hero-nombre { font-size: 20px !important; font-weight: 600 !important; color: #FFFFFF !important; }
+.hero-meta { font-size: 13px !important; color: var(--text-muted) !important; }
 .hero-badge {
-    background: rgba(0, 240, 255, 0.1) !important;
-    border: 1px solid var(--neon-secundario) !important;
-    color: var(--neon-secundario) !important;
-    padding: 4px 12px !important;
-    border-radius: 20px !important;
-    font-size: 11px !important; font-weight: 700 !important;
+    background-color: rgba(232, 123, 74, 0.15) !important;
+    color: var(--primario) !important;
+    padding: 4px 10px !important;
+    border-radius: 12px !important;
+    font-size: 11px !important; font-weight: 600 !important;
     display: inline-block !important; margin-top: 8px !important;
 }
 
-/* 10. SCROLLBAR */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--neon-oscuro); }
-::-webkit-scrollbar-thumb { background: var(--neon-primario); border-radius: 3px; }
+/* 10. DATAFRAMES (Tablas) */
+.stDataFrame {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radio) !important;
+}
+
+/* 11. ALERTAS */
+.stAlert {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radio) !important;
+}
