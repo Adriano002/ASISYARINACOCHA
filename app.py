@@ -7183,6 +7183,24 @@ def obtener_opciones_por_rol(usuario):
         
     return ["Mi cuenta"]
 
+RUTAS = {
+    "Puerta": vista_puerta,
+    "Bloqueados": vista_bloqueados,
+    "Panel Direccion": vista_panel_direccion,
+    "Reportes": vista_reportes,
+    "Alumnos": vista_alumnos,
+    "Grados y Secciones": vista_grados_secciones,
+    "Carnets": vista_carnets,
+    "Dias especiales": vista_dias_especiales,
+    "Ventanas": vista_ventanas,
+    "Usuarios": vista_usuarios,
+    "Backup": vista_backup,
+    "Auditoria": vista_auditoria,
+    "Mi cuenta": vista_mi_cuenta,
+    "Justificaciones y Permisos": vista_justificaciones_permisos,
+    "Mantenimiento Datos": vista_mantenimiento_datos, 
+}
+
 
 def vista_inicio(usuario):
     st.title(f"¡Hola, {usuario['nombres']}!")
