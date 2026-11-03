@@ -1,33 +1,32 @@
 /* ========================================================= */
-/* 🪟 DISEÑO ELEGANTE - ESTILO MICROSOFT / WINDOWS 11        */
+/* 🪟 DISEÑO ELEGANTE PARA EL INTERIOR (RÁPIDO Y LIMPIO)     */
 /* ========================================================= */
 
 :root {
-    --bg-main: #1E1E1E;          /* Fondo principal oscuro */
-    --bg-sidebar: #252526;       /* Fondo del menú lateral */
-    --bg-card: #2D2D30;          /* Fondo de paneles y tablas */
-    --border: #3E3E42;           /* Bordes sutiles */
-    --text-main: #CCCCCC;        /* Texto principal */
-    --text-muted: #858585;       /* Texto secundario */
-    --primario: #E87B4A;         /* Tu naranja institucional */
+    --bg-main: #1E1E1E;          
+    --bg-sidebar: #252526;       
+    --bg-card: #2D2D30;          
+    --border: #3E3E42;           
+    --text-main: #CCCCCC;        
+    --text-muted: #858585;       
+    --primario: #E87B4A;         
     --primario-hover: #D66535;
     --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --radio: 8px;
 }
 
-/* FORZAR MODO OSCURO EN TODA LA APP */
+/* Fondo general de la app (solo cuando ya estás adentro) */
 .stApp, .main, [data-testid="stAppViewContainer"] {
     background-color: var(--bg-main) !important;
     color: var(--text-main) !important;
     font-family: var(--fuente) !important;
 }
 
-/* Ocultar header blanco feo de Streamlit */
 header[data-testid="stHeader"] {
     background-color: var(--bg-main) !important;
 }
 
-/* 1. SIDEBAR (Menú Lateral) */
+/* SIDEBAR */
 section[data-testid="stSidebar"] {
     background-color: var(--bg-sidebar) !important;
     border-right: 1px solid var(--border) !important;
@@ -38,11 +37,9 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label {
     margin: 2px 12px !important;
     border-radius: var(--radio) !important;
     color: var(--text-main) !important;
-    transition: none !important; /* Sin animaciones para que vuele */
     border-left: 3px solid transparent !important;
 }
 
-/* Ocultar el circulito del menú */
 section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
     display: none !important;
 }
@@ -57,14 +54,13 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)
     color: #FFFFFF !important;
 }
 
-/* 2. TÍTULOS */
+/* TÍTULOS */
 h1, h2, h3 {
     color: #FFFFFF !important;
     font-weight: 600 !important;
-    letter-spacing: -0.5px !important;
 }
 
-/* 3. BOTONES */
+/* BOTONES */
 .stButton > button, 
 .stFormSubmitButton > button, 
 .stDownloadButton > button {
@@ -73,17 +69,15 @@ h1, h2, h3 {
     border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
     font-weight: 500 !important;
-    transition: none !important; /* Rápido */
 }
 
 .stButton > button:hover, 
-.stFormSubmitButton > button:hover, 
-.stDownloadButton > button:hover {
+.stFormSubmitButton > button:hover {
     border-color: var(--text-muted) !important;
     color: #FFFFFF !important;
 }
 
-/* Botones Primarios */
+/* Botón Naranja (Primary) */
 .stButton > button[kind="primary"], 
 .stFormSubmitButton > button[kind="primary"] {
     background-color: var(--primario) !important;
@@ -91,12 +85,11 @@ h1, h2, h3 {
     border: 1px solid var(--primario) !important;
 }
 
-.stButton > button[kind="primary"]:hover, 
-.stFormSubmitButton > button[kind="primary"]:hover {
+.stButton > button[kind="primary"]:hover {
     background-color: var(--primario-hover) !important;
 }
 
-/* 4. INPUTS (Cajas de texto) */
+/* INPUTS */
 .stTextInput input, 
 .stNumberInput input, 
 .stDateInput input, 
@@ -105,26 +98,22 @@ h1, h2, h3 {
     color: #FFFFFF !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
-    box-shadow: none !important;
 }
 
-.stTextInput input:focus, 
-.stSelectbox > div > div:focus-within {
+.stTextInput input:focus {
     border-color: var(--primario) !important;
-    box-shadow: 0 0 0 1px var(--primario) !important;
 }
 
-/* 5. PANELES Y FORMULARIOS */
+/* FORMULARIOS Y CONTENEDORES */
 div[data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stForm"] {
     background-color: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radio) !important;
     padding: 20px !important;
-    box-shadow: none !important; /* Sin sombras pesadas */
 }
 
-/* 6. MÉTRICAS */
+/* MÉTRICAS */
 div[data-testid="stMetric"] {
     background-color: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
@@ -134,93 +123,24 @@ div[data-testid="stMetric"] {
 
 div[data-testid="stMetric"] label {
     color: var(--text-muted) !important;
-    font-size: 13px !important;
 }
 
 div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     color: #FFFFFF !important;
-    font-weight: 600 !important;
 }
 
-/* 7. TABS */
+/* TABS */
 .stTabs [data-baseweb="tab-list"] {
     background-color: transparent !important;
-    gap: 10px !important;
     border-bottom: 1px solid var(--border) !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    background-color: transparent !important;
     color: var(--text-muted) !important;
-    padding: 8px 16px !important;
-    border-radius: var(--radio) var(--radio) 0 0 !important;
 }
 
 .stTabs [aria-selected="true"] {
     color: #FFFFFF !important;
     background-color: var(--bg-card) !important;
     border-bottom: 2px solid var(--primario) !important;
-}
-
-.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
-
-/* 8. TARJETAS QR (Escáner) */
-.qr-msg {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-left: 4px solid var(--text-muted) !important;
-    border-radius: var(--radio) !important;
-    padding: 16px !important;
-}
-
-.qr-puntual { border-left-color: #4CAF50 !important; }
-.qr-tardanza { border-left-color: #FFC107 !important; }
-.qr-bloqueado { border-left-color: #F44336 !important; }
-
-.qr-nombre { color: #FFFFFF; font-weight: 600; font-size: 16px; }
-.qr-texto { color: var(--text-main); font-size: 14px; }
-.qr-evento { color: var(--text-muted); font-size: 12px; }
-
-/* 9. PERFIL DEL ALUMNO */
-.perfil-hero {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radio) !important;
-    padding: 24px !important;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.hero-avatar {
-    background-color: var(--primario) !important;
-    color: #FFFFFF !important;
-    width: 60px !important; height: 60px !important;
-    border-radius: 50% !important;
-    display: flex !important; align-items: center !important; justify-content: center !important;
-    font-size: 24px !important; font-weight: bold !important;
-}
-
-.hero-nombre { font-size: 20px !important; font-weight: 600 !important; color: #FFFFFF !important; }
-.hero-meta { font-size: 13px !important; color: var(--text-muted) !important; }
-.hero-badge {
-    background-color: rgba(232, 123, 74, 0.15) !important;
-    color: var(--primario) !important;
-    padding: 4px 10px !important;
-    border-radius: 12px !important;
-    font-size: 11px !important; font-weight: 600 !important;
-    display: inline-block !important; margin-top: 8px !important;
-}
-
-/* 10. DATAFRAMES (Tablas) */
-.stDataFrame {
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radio) !important;
-}
-
-/* 11. ALERTAS */
-.stAlert {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radio) !important;
 }
