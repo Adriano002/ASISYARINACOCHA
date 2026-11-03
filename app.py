@@ -6862,7 +6862,7 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    # --- CSS LIQUID GLASS OPTIMIZADO (A PRUEBA DE MODO OSCURO) ---
+    # --- CSS LIQUID GLASS OPTIMIZADO (CENTRADO Y SIN CORONA) ---
     st.markdown(
         """
         <style>
@@ -6873,15 +6873,39 @@ def vista_login():
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
         
-        /* MATAR LA CORONA DE STREAMLIT */
-        #MainMenu { visibility: hidden !important; }
-        footer { visibility: hidden !important; }
+        /* 🆕 MATAR LA CORONA DE STREAMLIT (TODAS LAS VERSIONES) */
+        #MainMenu { visibility: hidden !important; display: none !important; }
+        footer { visibility: hidden !important; display: none !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
         div[class^="viewerBadge"] { display: none !important; }
         div[class*="viewerBadge"] { display: none !important; }
         a[href*="streamlit.io"] { display: none !important; }
+        iframe[title="streamlit_app"] { display: none !important; } /* Ocultar cualquier iframe de streamlit */
 
-        /* 2. FONDO CON LUCES (Forzado) */
+        /* 🆕 ARREGLAR LOS ICONOS NATIVOS (flechas, ojos) */
+        span[data-testid="stIconMaterial"],
+        span[data-testid="stIconMaterial"] *,
+        .material-symbols-rounded,
+        .material-symbols-rounded *,
+        [class*="material-symbols"],
+        [class*="material-icons"],
+        [class*="MaterialIcon"] {
+            font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+            font-weight: normal !important;
+            font-style: normal !important;
+            font-size: 24px !important;
+            line-height: 1 !important;
+            letter-spacing: normal !important;
+            text-transform: none !important;
+            display: inline-block !important;
+            white-space: nowrap !important;
+            word-wrap: normal !important;
+            direction: ltr !important;
+            -webkit-font-feature-settings: 'liga' !important;
+            -webkit-font-smoothing: antialiased !important;
+        }
+
+        /* 2. FONDO CON LUCES */
         .stApp {
             background-color: #0f172a !important;
             background-image: 
@@ -6899,7 +6923,7 @@ def vista_login():
             }
         }
 
-        /* 3. CENTRADO PERFECTO EN CELULAR Y PC */
+        /* 3. CENTRADO PERFECTO EN CELULAR (USANDO PADDING MÁGICO) */
         .block-container {
             padding: 0 !important;
             display: flex !important;
@@ -6912,14 +6936,12 @@ def vista_login():
         @media (max-width: 768px) {
             .block-container {
                 justify-content: center !important;
-                padding-top: 0 !important;
+                padding-top: 15vh !important; /* 🆕 Esto lo baja al centro exacto */
                 padding-bottom: 0 !important;
-                margin-top: -5vh !important; 
             }
         }
 
         /* 4. EFECTO LIQUID GLASS (BLINDADO CONTRA MODO OSCURO) */
-        /* 🆕 Usamos !important en el fondo para que Streamlit no lo cambie a negro sólido */
         div[data-testid="stForm"] { 
             background: rgba(255, 255, 255, 0.05) !important;
             background-color: rgba(255, 255, 255, 0.05) !important; 
@@ -7033,7 +7055,6 @@ def vista_login():
                 </div>
                 <div class="glass-subtitle">Ingresa tus credenciales</div>
                 <style>
-                    /* Si el celular está en modo oscuro, el texto "asis" se vuelve blanco */
                     @media (prefers-color-scheme: dark) {
                         .txt-asis { color: #FFFFFF !important; }
                     }
