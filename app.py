@@ -1543,8 +1543,8 @@ def registrar_entrada(dni, usuario, origen="qr"):
 # MARCAR FALTAS AL CIERRE 
 def procesar_faltas_parciales():
     """
-    Marca faltas a los alumnos que NO escanearon.
-    Corregido para no poner Falta si el alumno ya tiene CUALQUIER registro hoy.
+    Revisa los alumnos al cierre de ventana. Si no escanearon, les pone Falta, 
+    PERO aplica al instante permisos y justificaciones para que salgan en el reporte.
     """
     from db import cursor
     from datetime import datetime
@@ -1569,9 +1569,8 @@ def procesar_faltas_parciales():
                     continue 
 
                 tipo = "clases" if v["tipo"] == VENT_CLASES else "reforzamiento"
-                est = "Falta" if v["tipo"] == VENT_CLASES else "No asistio"
-
-                # Buscar alumnos de ese turno
+                
+                # Buscar TODOS los alumnos de ese turno
                 cur.execute("""
                     SELECT a.id FROM alumnos a
                     JOIN secciones s ON a.seccion_id=s.id
@@ -1579,32 +1578,28 @@ def procesar_faltas_parciales():
                 """, (t["id"],))
 
                 for al in cur.fetchall():
-                    # 🆕 EL ARREGLO ESTÁ AQUÍ:
-                    # Buscamos si el alumno tiene CUALQUIER registro hoy (sin importar el tipo)
+                    # 1. ¿Ya tiene registro (Puntual/Tardanza)? No hacemos nada.
                     cur.execute("SELECT id, estado FROM asistencias WHERE alumno_id=? AND fecha=?", (al["id"], fecha_d))
-                    registro_hoy = cur.fetchone()
-                    
-                    if registro_hoy:
-                        # Si ya escaneó (Puntual, Tardanza o Reforzamiento), NO le ponemos Falta.
+                    if cur.fetchone():
                         continue 
 
-                    # Si no tiene NADA, verificar si tiene permiso o justificación previa
+                    # 2. ¿Tiene un permiso activo para hoy? -> Se guarda como PERMISO
                     if hay_permiso_activo(al["id"], fecha_str):
                         cur.execute("""
                             INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
                             VALUES(?,?,?,?,?,?,1,?,?,?)
-                        """, (al["id"], fecha_d, v["id"], tipo, h, PERMISO, "Permiso otorgado", "auto", pid))
+                        """, (al["id"], fecha_d, v["id"], tipo, h, PERMISO, "Permiso vigente", "auto", pid))
                         continue
                         
-                    # Aplicar justificación previa si existe
+                    # 3. ¿Tiene una justificación previa? -> Se guarda como Falta pero con justificada=1 (Sale 'J')
                     jp = (_aplicar_just_prev(cur, al["id"], fecha_str, "Falta") if v["tipo"] == VENT_CLASES else False)
                     
-                    # Marcar Falta (solo si realmente no tiene nada)
+                    # 4. No escaneó, no tiene nada -> Se guarda como FALTA
+                    est = "Falta" if v["tipo"] == VENT_CLASES else "No asistio"
                     cur.execute("""
                         INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id)
                         VALUES(?,?,?,?,?,?,?,?,?)
                     """, (al["id"], fecha_d, v["id"], tipo, h, est, 1 if jp else 0, "auto", pid))
-
 #JUSTIFICAR ASISTENCIA
 def justificar_asistencia(ida, obs, usuario):
     with cursor() as (con, cur):
@@ -1616,16 +1611,20 @@ def justificar_asistencia(ida, obs, usuario):
             return False, "Solo se pueden justificar FALTAS."
         if reg["justificada"]:
             return False, "Esta asistencia ya esta justificada."
+            
         fecha_str = fmt_date(reg["fecha"])
-        ok, msg = _puede_justificar(fecha_str, tipo_asistencia=FALTA,
-                                     ventana_id=reg["ventana_id"])
+        ok, msg = _puede_justificar(fecha_str, tipo_asistencia=FALTA, ventana_id=reg["ventana_id"])
         if not ok:
             return False, msg
+            
         if not obs or not obs.strip():
             return False, "La observacion es obligatoria."
+            
+        # Actualizamos la asistencia para que el reporte lea justificada=1 (y muestre la 'J')
         cur.execute("UPDATE asistencias SET justificada=1,observacion=?,"
                     "justificado_por=?,justificado_en=? WHERE id=?",
                     (obs.strip(), usuario["usuario"], timestamp_str(), ida))
+                    
     auditar(usuario["usuario"], f"Justifico falta id={ida} motivo: {obs}",
             tb="asistencias", rid=ida)
     return True, "Falta justificada."
@@ -3618,7 +3617,7 @@ def _generar_hojas_diario(fecha, ids_secs):
         if not sec:
             continue
         
-        # Preparamos los datos (MANTENIENDO LA COLUMNA "N")
+        # 🆕 CORRECCIÓN AQUÍ: Se agregó el WHEN para 'Permiso'
         df_clases = leer_df("""
             SELECT a.apellido_paterno||' '||COALESCE(a.apellido_materno,'') AS Apellidos,
             a.nombres AS Nombres,
@@ -3626,9 +3625,9 @@ def _generar_hojas_diario(fecha, ids_secs):
               WHEN ast.estado IS NULL THEN '-'
               WHEN ast.estado='Puntual' THEN 'P'
               WHEN ast.estado='Tardanza' THEN 'T'
+              WHEN ast.estado='Permiso' THEN 'PERMISO'
               WHEN ast.estado='Falta' AND ast.justificada=1 THEN 'J'
               WHEN ast.estado='Falta' THEN 'F'
-              WHEN ast.estado='Permiso' THEN 'PERMISO'
               ELSE ast.estado END AS Estado
             FROM alumnos a
             LEFT JOIN asistencias ast ON ast.alumno_id=a.id AND ast.fecha=?
@@ -3661,7 +3660,6 @@ def _generar_hojas_diario(fecha, ids_secs):
     bloques_faltaron = _hoja_faltaron_dia(fecha, ids_secs)
     hojas = {"ALUMNOS QUE FALTARON": bloques_faltaron, **hojas}
     return hojas
-
 
 def _generar_hojas_mensual(mes, año, ids_secs):
     hojas = {}
