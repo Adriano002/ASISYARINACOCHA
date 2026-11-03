@@ -7183,7 +7183,7 @@ def obtener_opciones_por_rol(usuario):
         
     return ["Mi cuenta"]
     
-  RUTAS = {
+RUTAS = {
     "Puerta": vista_puerta,
     "Bloqueados": vista_bloqueados,
     "Panel Direccion": vista_panel_direccion,
