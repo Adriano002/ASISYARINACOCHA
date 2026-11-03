@@ -1,17 +1,14 @@
-def aplicar_estilos():
-  
 /* ========================================================= */
-/* 🚀 DISEÑO FUTURISTA - INTERIOR DE LA APP                   */
-/* (Login intacto, fuentes nativas, carga instantánea)       */
+/* 🚀 DISEÑO FUTURISTA - VERSIÓN ULTRA RÁPIDA                 */
 /* ========================================================= */
 
 :root {
     /* Colores Neón Futuristas */
     --neon-primario: #FF6B35;
-    --neon-secundario: #00F0FF; /* Cyan brillante */
+    --neon-secundario: #00F0FF;
     --neon-oscuro: #0A0E17;
-    --neon-panel: rgba(16, 22, 35, 0.7);
-    --neon-borde: rgba(0, 240, 255, 0.2);
+    --neon-panel: #131A29; /* 🆕 Color sólido en vez de transparencia */
+    --neon-borde: rgba(0, 240, 255, 0.3);
     --texto-brillante: #E2E8F0;
     --texto-apagado: #94A3B8;
     
@@ -20,51 +17,47 @@ def aplicar_estilos():
     --radio: 12px;
 }
 
-/* Ocultar barra superior y footer por defecto de Streamlit */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 
-/* Fondo oscuro profundo para el área de trabajo (no afecta login) */
+/* Fondo oscuro profundo */
 .stApp {
     background: radial-gradient(circle at 50% 0%, #1A2235 0%, var(--neon-oscuro) 70%) !important;
     font-family: var(--fuente) !important;
     color: var(--texto-brillante) !important;
 }
 
-/* 1. SIDEBAR (Menú Lateral Estilo Nave Espacial) */
+/* 1. SIDEBAR */
 section[data-testid="stSidebar"] {
-    background: rgba(10, 14, 23, 0.95) !important;
+    background: var(--neon-oscuro) !important;
     border-right: 1px solid var(--neon-borde) !important;
-    box-shadow: 4px 0 20px rgba(0, 240, 255, 0.05) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
     border-radius: var(--radio) !important;
     padding: 12px 16px !important;
     margin: 4px 8px !important;
-    transition: all 0.3s ease !important;
+    transition: all 0.2s ease !important;
     color: var(--texto-apagado) !important;
     border: 1px solid transparent;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-    display: none !important; /* Ocultar circulito */
+    display: none !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
     background: rgba(0, 240, 255, 0.05) !important;
     color: var(--neon-secundario) !important;
-    border-color: rgba(0, 240, 255, 0.1);
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background: linear-gradient(90deg, rgba(255, 107, 53, 0.15) 0%, transparent 100%) !important;
+    background: rgba(255, 107, 53, 0.1) !important;
     border-left: 3px solid var(--neon-primario) !important;
     color: #FFFFFF !important;
-    box-shadow: inset 0 0 15px rgba(255, 107, 53, 0.1);
 }
 
-/* 2. TÍTULOS FUTURISTAS */
+/* 2. TÍTULOS */
 h1, h2, h3 {
     font-weight: 800 !important;
     letter-spacing: 1px !important;
@@ -72,7 +65,6 @@ h1, h2, h3 {
     background: linear-gradient(90deg, #FFFFFF, var(--neon-secundario));
     -webkit-background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
-    text-shadow: 0 0 20px rgba(0, 240, 255, 0.3) !important;
 }
 
 h1::after {
@@ -82,24 +74,21 @@ h1::after {
     height: 3px;
     background: var(--neon-primario);
     margin-top: 8px;
-    box-shadow: 0 0 10px var(--neon-primario);
     border-radius: 2px;
 }
 
-/* 3. BOTONES (Estilo Cristal / Neón) */
+/* 3. BOTONES */
 .stButton > button, 
 .stFormSubmitButton > button, 
 .stDownloadButton > button {
     background: rgba(0, 240, 255, 0.05) !important;
-    border: 1px solid rgba(0, 240, 255, 0.3) !important;
+    border: 1px solid var(--neon-borde) !important;
     color: var(--neon-secundario) !important;
     border-radius: var(--radio) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 1px !important;
-    padding: 10px 20px !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 0 0 10px transparent !important;
+    transition: all 0.2s ease !important;
 }
 
 .stButton > button:hover, 
@@ -107,181 +96,128 @@ h1::after {
 .stDownloadButton > button:hover {
     background: rgba(0, 240, 255, 0.15) !important;
     border-color: var(--neon-secundario) !important;
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4) !important;
-    transform: translateY(-2px);
     color: #FFFFFF !important;
 }
 
-/* Botones Primarios (Naranja Neón) */
+/* Botones Primarios */
 .stButton > button[kind="primary"], 
 .stFormSubmitButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #FF6B35 0%, #FF4500 100%) !important;
+    background: var(--neon-primario) !important;
     border: none !important;
     color: white !important;
-    box-shadow: 0 0 15px rgba(255, 107, 53, 0.4) !important;
 }
 
 .stButton > button[kind="primary"]:hover {
-    box-shadow: 0 0 25px rgba(255, 107, 53, 0.8) !important;
-    color: white !important;
+    background: #FF4500 !important;
 }
 
-/* 4. INPUTS (Campo de energía) */
+/* 4. INPUTS */
 .stTextInput input, 
 .stNumberInput input, 
 .stDateInput input, 
 .stSelectbox > div > div {
-    background: rgba(255, 255, 255, 0.03) !important;
+    background: #0F1523 !important; /* Fondo sólido, sin transparencia */
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: var(--radio) !important;
     color: var(--texto-brillante) !important;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-    transition: all 0.3s ease !important;
+    transition: all 0.2s ease !important;
 }
 
 .stTextInput input:focus, 
 .stSelectbox > div > div:focus-within {
     border-color: var(--neon-secundario) !important;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-    background: rgba(0, 240, 255, 0.02) !important;
 }
 
-/* 5. PANELES DE CRISTAL (Contenedores y Forms) */
+/* 5. PANELES (Sin desenfoque) */
 div[data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stForm"] {
-    background: var(--neon-panel) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
+    background: var(--neon-panel) !important; /* Color sólido en vez de blur */
     border: 1px solid var(--neon-borde) !important;
     border-radius: 16px !important;
     padding: 24px !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Brillo sutil en el borde superior */
-div[data-testid="stVerticalBlockBorderWrapper"]::before,
-div[data-testid="stForm"]::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.5), transparent);
-}
-
-/* 6. MÉTRICAS (HUD Sci-Fi) */
+/* 6. MÉTRICAS */
 div[data-testid="stMetric"] {
-    background: linear-gradient(180deg, rgba(16, 22, 35, 0.9) 0%, rgba(10, 14, 23, 0.9) 100%) !important;
+    background: var(--neon-panel) !important;
     border: 1px solid var(--neon-borde) !important;
     border-top: 3px solid var(--neon-primario) !important;
     border-radius: var(--radio) !important;
     padding: 20px !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-    transition: transform 0.3s ease !important;
-}
-
-div[data-testid="stMetric"]:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15) !important;
 }
 
 div[data-testid="stMetric"] label {
     color: var(--texto-apagado) !important;
     font-family: monospace !important;
     text-transform: uppercase !important;
-    letter-spacing: 1px !important;
 }
 
 div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     color: #FFFFFF !important;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3) !important;
     font-weight: 900 !important;
 }
 
-/* 7. TABS (Consola de Navegación) */
+/* 7. TABS */
 .stTabs [data-baseweb="tab-list"] {
     background: rgba(0, 0, 0, 0.3) !important;
     border-radius: var(--radio) !important;
     padding: 6px !important;
     gap: 8px !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
 .stTabs [data-baseweb="tab"] {
     border-radius: 8px !important;
-    padding: 10px 20px !important;
     color: var(--texto-apagado) !important;
     background: transparent !important;
-    transition: all 0.2s ease !important;
 }
 
 .stTabs [aria-selected="true"] {
     background: rgba(0, 240, 255, 0.1) !important;
     color: var(--neon-secundario) !important;
     font-weight: 700 !important;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.1) !important;
 }
 
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* 8. TARJETAS QR (Escáner) */
+/* 8. TARJETAS QR */
 .qr-msg {
-    background: rgba(16, 22, 35, 0.8) !important;
-    backdrop-filter: blur(8px);
+    background: var(--neon-panel) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-left: 4px solid var(--texto-apagado) !important;
     border-radius: 8px !important;
     padding: 16px !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
 }
 
-.qr-puntual { border-left-color: #00FF88 !important; box-shadow: 0 0 15px rgba(0, 255, 136, 0.1) !important; }
-.qr-tardanza { border-left-color: #FFB800 !important; box-shadow: 0 0 15px rgba(255, 184, 0, 0.1) !important; }
-.qr-bloqueado { border-left-color: #FF3366 !important; box-shadow: 0 0 15px rgba(255, 51, 102, 0.2) !important; }
+.qr-puntual { border-left-color: #00FF88 !important; }
+.qr-tardanza { border-left-color: #FFB800 !important; }
+.qr-bloqueado { border-left-color: #FF3366 !important; }
 
-.qr-nombre { color: #FFFFFF; font-weight: 700; letter-spacing: 0.5px; }
+.qr-nombre { color: #FFFFFF; font-weight: 700; }
 .qr-texto { color: var(--texto-apagado); font-family: monospace; }
 .qr-evento { color: var(--neon-secundario); font-family: monospace; font-size: 11px; }
 
-/* 9. TABLAS (Dataframes) */
-.stDataFrame {
-    border: 1px solid var(--neon-borde) !important;
-    border-radius: var(--radio) !important;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
-    background: var(--neon-panel) !important;
-}
-
-/* 10. ALERTAS */
-.stAlert {
-    background: rgba(16, 22, 35, 0.8) !important;
-    border: 1px solid var(--neon-borde) !important;
-    border-radius: var(--radio) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* 11. PERFIL DEL ALUMNO (Holograma) */
+/* 9. PERFIL DEL ALUMNO */
 .perfil-hero {
-    background: linear-gradient(135deg, rgba(16, 22, 35, 0.8) 0%, rgba(0, 240, 255, 0.05) 100%) !important;
+    background: var(--neon-panel) !important;
     border: 1px solid var(--neon-borde) !important;
     border-radius: 16px !important;
     padding: 24px !important;
     display: flex;
     align-items: center;
     gap: 20px;
-    box-shadow: 0 0 30px rgba(0, 240, 255, 0.05) !important;
 }
 
 .hero-avatar {
-    background: linear-gradient(135deg, var(--neon-primario) 0%, #FF4500 100%) !important;
+    background: var(--neon-primario) !important;
     color: #FFFFFF !important;
     width: 70px !important; height: 70px !important;
     border-radius: 50% !important;
     display: flex !important; align-items: center !important; justify-content: center !important;
     font-size: 28px !important; font-weight: 900 !important;
-    box-shadow: 0 0 20px rgba(255, 107, 53, 0.4) !important;
 }
 
-.hero-nombre { font-size: 22px !important; font-weight: 800 !important; color: #FFFFFF !important; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+.hero-nombre { font-size: 22px !important; font-weight: 800 !important; color: #FFFFFF !important; }
 .hero-meta { font-size: 13px !important; color: var(--neon-secundario) !important; font-family: monospace; }
 .hero-badge {
     background: rgba(0, 240, 255, 0.1) !important;
@@ -293,11 +229,7 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     display: inline-block !important; margin-top: 8px !important;
 }
 
-/* 12. SCROLLBAR (Barra de energía) */
+/* 10. SCROLLBAR */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--neon-oscuro); }
-::-webkit-scrollbar-thumb {
-    background: var(--neon-primario);
-    border-radius: 3px;
-    box-shadow: 0 0 10px var(--neon-primario);
-}
+::-webkit-scrollbar-thumb { background: var(--neon-primario); border-radius: 3px; }
