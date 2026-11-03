@@ -6780,23 +6780,23 @@ def vista_backup():
 
     st.markdown("---")
     
-    st.subheader("Restaurar Base de Datos desde R2")
-    st.warning("Esta acción reemplazará la base de datos actual con la versión que elijas. La app se reiniciará.")
+    st.subheader("Restaurar")
+    st.warning(" La app se reiniciará.")
     
-    if st.button("Buscar Backups en R2"):
-        with st.spinner("Buscando backups..."):
+    if st.button("Buscar"):
+        with st.spinner("Buscando..."):
             from sync import listar_backups_r2
             st.session_state["_backups_r2"] = listar_backups_r2()
             
     if st.session_state.get("_backups_r2") is not None:
         backups = st.session_state["_backups_r2"]
         if not backups:
-            st.info("No se encontraron backups en R2.")
+            st.info("No se encontraron backups")
         else:
             ops = {f"{b['fecha'].strftime('%Y-%m-%d %H:%M')}": b['key'] for b in backups}
-            sel = st.selectbox("Selecciona el backup a restaurar:", list(ops.keys()))
+            sel = st.selectbox("Selecciona:", list(ops.keys()))
             
-            if confirmar_accion("restaurar_bd", "Restaurar este Backup", "¿Estás seguro? Esto borrará la BD actual."):
+            if confirmar_accion("restaurar_bd", "Restaurar Backup", "¿Estás seguro?"):
                 with st.spinner("Descargando y restaurando..."):
                     from sync import descargar_bd_especifica
                     from db import DB_PATH
