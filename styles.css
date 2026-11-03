@@ -1,292 +1,303 @@
 def aplicar_estilos():
-   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  
+/* ========================================================= */
+/* 🚀 DISEÑO FUTURISTA - INTERIOR DE LA APP                   */
+/* (Login intacto, fuentes nativas, carga instantánea)       */
+/* ========================================================= */
 
 :root {
-    --primario: #E87B4A;
-    --primario-hover: #D66535;
-    --fondo: #FFFFFF;
-    --fondo-secundario: #F9FAFB;
-    --borde: #E5E7EB;
-    --texto: #111827;
-    --texto-suave: #6B7280;
-    --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* Colores Neón Futuristas */
+    --neon-primario: #FF6B35;
+    --neon-secundario: #00F0FF; /* Cyan brillante */
+    --neon-oscuro: #0A0E17;
+    --neon-panel: rgba(16, 22, 35, 0.7);
+    --neon-borde: rgba(0, 240, 255, 0.2);
+    --texto-brillante: #E2E8F0;
+    --texto-apagado: #94A3B8;
     
-    --radio: 10px;
+    /* Fuente nativa (Cero latencia) */
+    --fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --radio: 12px;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --fondo: #0E1117;
-        --fondo-secundario: #1A1D24;
-        --borde: #2D333B;
-        --texto: #E5E7EB;
-        --texto-suave: #9CA3AF;
-        --primario: #F08A5C;
-    }
-}
+/* Ocultar barra superior y footer por defecto de Streamlit */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
 
-/* 1. Tipografía Global */
-html, body, [class*="css"], .stApp {
+/* Fondo oscuro profundo para el área de trabajo (no afecta login) */
+.stApp {
+    background: radial-gradient(circle at 50% 0%, #1A2235 0%, var(--neon-oscuro) 70%) !important;
     font-family: var(--fuente) !important;
-    color: var(--texto) !important;
+    color: var(--texto-brillante) !important;
 }
 
-h1, h2, h3, h4 {
-    font-family: var(--fuente) !important;
-    font-weight: 600 !important;
-    color: var(--texto) !important;
-    letter-spacing: -0.5px !important;
-}
-
-h1 { font-size: 28px !important; margin-bottom: 20px !important; }
-h2 { font-size: 22px !important; margin-bottom: 15px !important; }
-h3 { font-size: 18px !important; }
-
-/* 2. Sidebar Limpio */
+/* 1. SIDEBAR (Menú Lateral Estilo Nave Espacial) */
 section[data-testid="stSidebar"] {
-    background-color: var(--fondo-secundario) !important;
-    border-right: 1px solid var(--borde) !important;
-}
-
-/* Ocultar el circulito del radio del menú */
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-    display: none !important;
+    background: rgba(10, 14, 23, 0.95) !important;
+    border-right: 1px solid var(--neon-borde) !important;
+    box-shadow: 4px 0 20px rgba(0, 240, 255, 0.05) !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    padding: 8px 12px !important;
-    margin: 2px 0 !important;
     border-radius: var(--radio) !important;
-    transition: all 0.2s ease !important;
-    font-weight: 500 !important;
-    color: var(--texto-suave) !important;
+    padding: 12px 16px !important;
+    margin: 4px 8px !important;
+    transition: all 0.3s ease !important;
+    color: var(--texto-apagado) !important;
+    border: 1px solid transparent;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+    display: none !important; /* Ocultar circulito */
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background-color: var(--borde) !important;
-    color: var(--texto) !important;
+    background: rgba(0, 240, 255, 0.05) !important;
+    color: var(--neon-secundario) !important;
+    border-color: rgba(0, 240, 255, 0.1);
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background-color: var(--primario) !important;
+    background: linear-gradient(90deg, rgba(255, 107, 53, 0.15) 0%, transparent 100%) !important;
+    border-left: 3px solid var(--neon-primario) !important;
     color: #FFFFFF !important;
-    font-weight: 600 !important;
+    box-shadow: inset 0 0 15px rgba(255, 107, 53, 0.1);
 }
 
-/* 3. Botones Minimalistas */
+/* 2. TÍTULOS FUTURISTAS */
+h1, h2, h3 {
+    font-weight: 800 !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+    background: linear-gradient(90deg, #FFFFFF, var(--neon-secundario));
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.3) !important;
+}
+
+h1::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 3px;
+    background: var(--neon-primario);
+    margin-top: 8px;
+    box-shadow: 0 0 10px var(--neon-primario);
+    border-radius: 2px;
+}
+
+/* 3. BOTONES (Estilo Cristal / Neón) */
 .stButton > button, 
 .stFormSubmitButton > button, 
 .stDownloadButton > button {
-    background-color: transparent !important;
-    border: 1px solid var(--borde) !important;
-    color: var(--texto) !important;
+    background: rgba(0, 240, 255, 0.05) !important;
+    border: 1px solid rgba(0, 240, 255, 0.3) !important;
+    color: var(--neon-secundario) !important;
     border-radius: var(--radio) !important;
-    padding: 8px 16px !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    box-shadow: none !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    padding: 10px 20px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 0 10px transparent !important;
 }
 
 .stButton > button:hover, 
 .stFormSubmitButton > button:hover, 
 .stDownloadButton > button:hover {
-    background-color: var(--fondo-secundario) !important;
-    border-color: var(--texto-suave) !important;
-}
-
-/* Botones primarios (los importantes) */
-.stButton > button[kind="primary"], 
-.stFormSubmitButton > button[kind="primary"] {
-    background-color: var(--primario) !important;
-    border-color: var(--primario) !important;
+    background: rgba(0, 240, 255, 0.15) !important;
+    border-color: var(--neon-secundario) !important;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4) !important;
+    transform: translateY(-2px);
     color: #FFFFFF !important;
 }
 
-.stButton > button[kind="primary"]:hover, 
-.stFormSubmitButton > button[kind="primary"]:hover {
-    background-color: var(--primario-hover) !important;
-    border-color: var(--primario-hover) !important;
+/* Botones Primarios (Naranja Neón) */
+.stButton > button[kind="primary"], 
+.stFormSubmitButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #FF6B35 0%, #FF4500 100%) !important;
+    border: none !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(255, 107, 53, 0.4) !important;
 }
 
-/* 4. Inputs Limpios */
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 0 25px rgba(255, 107, 53, 0.8) !important;
+    color: white !important;
+}
+
+/* 4. INPUTS (Campo de energía) */
 .stTextInput input, 
 .stNumberInput input, 
 .stDateInput input, 
-.stTimeInput input, 
-.stTextArea textarea, 
 .stSelectbox > div > div {
-    background-color: var(--fondo) !important;
-    border: 1px solid var(--borde) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: var(--radio) !important;
-    color: var(--texto) !important;
-    box-shadow: none !important;
-    transition: border-color 0.2s ease !important;
-    min-height: 40px !important;
+    color: var(--texto-brillante) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s ease !important;
 }
 
 .stTextInput input:focus, 
-.stTextArea textarea:focus, 
 .stSelectbox > div > div:focus-within {
-    border-color: var(--primario) !important;
-    box-shadow: 0 0 0 2px rgba(232, 123, 74, 0.2) !important;
+    border-color: var(--neon-secundario) !important;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    background: rgba(0, 240, 255, 0.02) !important;
 }
 
-/* 5. Contenedores y Formularios */
+/* 5. PANELES DE CRISTAL (Contenedores y Forms) */
+div[data-testid="stVerticalBlockBorderWrapper"],
 div[data-testid="stForm"] {
-    background-color: var(--fondo) !important;
-    border: 1px solid var(--borde) !important;
+    background: var(--neon-panel) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--neon-borde) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Brillo sutil en el borde superior */
+div[data-testid="stVerticalBlockBorderWrapper"]::before,
+div[data-testid="stForm"]::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.5), transparent);
+}
+
+/* 6. MÉTRICAS (HUD Sci-Fi) */
+div[data-testid="stMetric"] {
+    background: linear-gradient(180deg, rgba(16, 22, 35, 0.9) 0%, rgba(10, 14, 23, 0.9) 100%) !important;
+    border: 1px solid var(--neon-borde) !important;
+    border-top: 3px solid var(--neon-primario) !important;
     border-radius: var(--radio) !important;
     padding: 20px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    transition: transform 0.3s ease !important;
 }
 
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: var(--fondo) !important;
-    border: 1px solid var(--borde) !important;
-    border-radius: var(--radio) !important;
-    padding: 16px !important;
-    box-shadow: none !important;
-}
-
-/* 6. Métricas Simples */
-div[data-testid="stMetric"] {
-    background-color: var(--fondo-secundario) !important;
-    border: 1px solid var(--borde) !important;
-    border-radius: var(--radio) !important;
-    padding: 16px !important;
-    box-shadow: none !important;
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15) !important;
 }
 
 div[data-testid="stMetric"] label {
-    color: var(--texto-suave) !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
+    color: var(--texto-apagado) !important;
+    font-family: monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
 }
 
 div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-    color: var(--texto) !important;
-    font-size: 26px !important;
-    font-weight: 600 !important;
+    color: #FFFFFF !important;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3) !important;
+    font-weight: 900 !important;
 }
 
-/* 7. Tabs Minimalistas */
+/* 7. TABS (Consola de Navegación) */
 .stTabs [data-baseweb="tab-list"] {
-    background-color: transparent !important;
-    gap: 20px !important;
-    border-bottom: 1px solid var(--borde) !important;
-    padding: 0 !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    border-radius: var(--radio) !important;
+    padding: 6px !important;
+    gap: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    background-color: transparent !important;
-    padding: 10px 0 !important;
-    color: var(--texto-suave) !important;
-    font-weight: 500 !important;
-    border-bottom: 2px solid transparent !important;
-    border-radius: 0 !important;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--texto) !important;
+    border-radius: 8px !important;
+    padding: 10px 20px !important;
+    color: var(--texto-apagado) !important;
+    background: transparent !important;
+    transition: all 0.2s ease !important;
 }
 
 .stTabs [aria-selected="true"] {
-    color: var(--primario) !important;
-    border-bottom: 2px solid var(--primario) !important;
+    background: rgba(0, 240, 255, 0.1) !important;
+    color: var(--neon-secundario) !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.1) !important;
 }
 
-.stTabs [data-baseweb="tab-highlight"] {
-    display: none !important;
-}
+.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* 8. Alertas */
-.stAlert, div[data-testid="stAlert"] {
-    border-radius: var(--radio) !important;
-    border: 1px solid var(--borde) !important;
-    box-shadow: none !important;
-    padding: 12px 16px !important;
-}
-
-/* 9. Tarjetas QR del escáner (Simplificadas) */
+/* 8. TARJETAS QR (Escáner) */
 .qr-msg {
-    background-color: var(--fondo) !important;
-    border: 1px solid var(--borde) !important;
-    border-left: 4px solid var(--borde) !important;
-    border-radius: var(--radio) !important;
+    background: rgba(16, 22, 35, 0.8) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-left: 4px solid var(--texto-apagado) !important;
+    border-radius: 8px !important;
     padding: 16px !important;
-    margin: 10px 0 !important;
-    box-shadow: none !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
 }
 
-.qr-puntual { border-left-color: #10B981 !important; }
-.qr-tardanza { border-left-color: #F59E0B !important; }
-.qr-bloqueado { border-left-color: #EF4444 !important; }
-.qr-retenido { border-left-color: #EF4444 !important; }
-.qr-refuerzo { border-left-color: #3B82F6 !important; }
+.qr-puntual { border-left-color: #00FF88 !important; box-shadow: 0 0 15px rgba(0, 255, 136, 0.1) !important; }
+.qr-tardanza { border-left-color: #FFB800 !important; box-shadow: 0 0 15px rgba(255, 184, 0, 0.1) !important; }
+.qr-bloqueado { border-left-color: #FF3366 !important; box-shadow: 0 0 15px rgba(255, 51, 102, 0.2) !important; }
 
-.qr-nombre { font-size: 16px; font-weight: 600; color: var(--texto); }
-.qr-texto { font-size: 14px; color: var(--texto-suave); }
-.qr-evento { font-size: 11px; font-weight: 600; color: var(--primario); text-transform: uppercase; }
+.qr-nombre { color: #FFFFFF; font-weight: 700; letter-spacing: 0.5px; }
+.qr-texto { color: var(--texto-apagado); font-family: monospace; }
+.qr-evento { color: var(--neon-secundario); font-family: monospace; font-size: 11px; }
 
-/* 10. Dataframes */
+/* 9. TABLAS (Dataframes) */
 .stDataFrame {
-    border: 1px solid var(--borde) !important;
+    border: 1px solid var(--neon-borde) !important;
     border-radius: var(--radio) !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
+    background: var(--neon-panel) !important;
 }
 
-/* 11. Personalización del perfil de alumno */
-.perfil-hero {
-    background-color: var(--fondo-secundario) !important;
-    border: 1px solid var(--borde) !important;
-    color: var(--texto) !important;
+/* 10. ALERTAS */
+.stAlert {
+    background: rgba(16, 22, 35, 0.8) !important;
+    border: 1px solid var(--neon-borde) !important;
     border-radius: var(--radio) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 11. PERFIL DEL ALUMNO (Holograma) */
+.perfil-hero {
+    background: linear-gradient(135deg, rgba(16, 22, 35, 0.8) 0%, rgba(0, 240, 255, 0.05) 100%) !important;
+    border: 1px solid var(--neon-borde) !important;
+    border-radius: 16px !important;
     padding: 24px !important;
     display: flex;
     align-items: center;
     gap: 20px;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.05) !important;
 }
 
 .hero-avatar {
-    background-color: var(--primario) !important;
-    color: #FFF !important;
-    width: 60px !important; 
-    height: 60px !important;
+    background: linear-gradient(135deg, var(--neon-primario) 0%, #FF4500 100%) !important;
+    color: #FFFFFF !important;
+    width: 70px !important; height: 70px !important;
     border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 24px !important;
-    font-weight: 600 !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    font-size: 28px !important; font-weight: 900 !important;
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.4) !important;
 }
 
-.hero-nombre { font-size: 20px !important; font-weight: 600 !important; color: var(--texto) !important; }
-.hero-meta { font-size: 13px !important; color: var(--texto-suave) !important; }
+.hero-nombre { font-size: 22px !important; font-weight: 800 !important; color: #FFFFFF !important; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+.hero-meta { font-size: 13px !important; color: var(--neon-secundario) !important; font-family: monospace; }
 .hero-badge {
-    background-color: var(--borde) !important;
-    color: var(--texto) !important;
-    padding: 2px 10px !important;
+    background: rgba(0, 240, 255, 0.1) !important;
+    border: 1px solid var(--neon-secundario) !important;
+    color: var(--neon-secundario) !important;
+    padding: 4px 12px !important;
     border-radius: 20px !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    display: inline-block !important;
-    margin-top: 8px !important;
+    font-size: 11px !important; font-weight: 700 !important;
+    display: inline-block !important; margin-top: 8px !important;
 }
 
-.perfil-bloque {
-    background-color: var(--fondo) !important;
-    border: 1px solid var(--borde) !important;
-    border-radius: var(--radio) !important;
-    padding: 20px !important;
-    margin-bottom: 20px !important;
-}
-
-.titulo-seccion {
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    color: var(--texto-suave) !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    margin-bottom: 12px !important;
-    border-bottom: 1px solid var(--borde) !important;
-    padding-bottom: 8px !important;
+/* 12. SCROLLBAR (Barra de energía) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--neon-oscuro); }
+::-webkit-scrollbar-thumb {
+    background: var(--neon-primario);
+    border-radius: 3px;
+    box-shadow: 0 0 10px var(--neon-primario);
 }
