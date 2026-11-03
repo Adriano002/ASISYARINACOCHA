@@ -7307,33 +7307,318 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
+    # ============================================================
+    # LOGIN PREMIUM - I.E. YARINACOCHA
+    # ============================================================
+    from pathlib import Path
+    
+    # Detectar modo oscuro/claro del sistema para adaptar colores
+    escudo_path = Path("escudo.png")
+    escudo_b64 = ""
+    if escudo_path.exists():
+        import base64
+        with open(escudo_path, "rb") as f:
+            escudo_b64 = base64.b64encode(f.read()).decode()
+    
+    # CSS específico del login (complementa tus estilos globales)
     st.markdown("""
-    <div style="text-align:center; margin-top:100px; margin-bottom:40px;">
-        <h1 style="font-size:44px; margin-bottom:0; border:none; letter-spacing:-1px;">asisyarina</h1>
-        <p style="opacity:0.6; margin-top:6px; font-size:15px;">Sistema de Asistencia</p>
-    </div>
+    <style>
+    /* ============ FONDO GENERAL DEL LOGIN ============ */
+    .stApp {
+        background: radial-gradient(ellipse at top left, rgba(232,123,74,0.12) 0%, transparent 50%),
+                    radial-gradient(ellipse at bottom right, rgba(196,86,42,0.10) 0%, transparent 50%),
+                    linear-gradient(135deg, #FFF8F3 0%, #FFFFFF 40%, #FFF5EE 100%) !important;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        .stApp {
+            background: radial-gradient(ellipse at top left, rgba(232,123,74,0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at bottom right, rgba(196,86,42,0.12) 0%, transparent 50%),
+                        linear-gradient(135deg, #1A1210 0%, #0F0B0A 40%, #1A1210 100%) !important;
+        }
+    }
+    
+    /* Ocultar el header/barra superior y el bloque de menú nativo en el login */
+    header[data-testid="stHeader"] { background: transparent !important; }
+    
+    /* ============ TARJETA DE LOGIN ============ */
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 85vh;
+        padding: 20px;
+    }
+    
+    .login-card {
+        background: #FFFFFF;
+        border-radius: 24px;
+        box-shadow: 
+            0 25px 60px -15px rgba(196, 86, 42, 0.25),
+            0 0 0 1px rgba(232, 123, 74, 0.12),
+            inset 0 1px 0 rgba(255,255,255,0.9);
+        padding: 48px 44px 36px 44px;
+        max-width: 420px;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+        animation: loginFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    @keyframes loginFadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        .login-card {
+            background: #1E1613;
+            box-shadow: 
+                0 25px 60px -15px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(232, 123, 74, 0.20);
+        }
+    }
+    
+    /* Barra superior decorativa de la tarjeta */
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, #E87B4A 0%, #C4562A 50%, #E87B4A 100%);
+    }
+    
+    /* ============ LOGO ============ */
+    .login-logo {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    .login-logo img {
+        width: 84px;
+        height: 84px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 12px rgba(232,123,74,0.3));
+    }
+    .login-logo .logo-fallback {
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 36px;
+        font-weight: 900;
+        box-shadow: 0 8px 20px rgba(232,123,74,0.35);
+    }
+    
+    /* ============ TÍTULOS ============ */
+    .login-title {
+        text-align: center;
+        font-size: 28px;
+        font-weight: 800;
+        color: #C4562A;
+        letter-spacing: -0.5px;
+        margin-bottom: 4px;
+    }
+    .login-subtitle {
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: #8A7568;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 28px;
+    }
+    @media (prefers-color-scheme: dark) {
+        .login-title { color: #F5A582; }
+        .login-subtitle { color: #A89890; }
+    }
+    
+    /* ============ BOTÓN DE INGRESO ============ */
+    .login-card .stFormSubmitButton > button {
+        background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        letter-spacing: 0.06em !important;
+        text-transform: uppercase !important;
+        padding: 14px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 20px rgba(196, 86, 42, 0.30) !important;
+        transition: all 0.25s ease !important;
+        margin-top: 8px;
+    }
+    .login-card .stFormSubmitButton > button:hover {
+        background: linear-gradient(135deg, #F08A5C 0%, #D66535 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 12px 28px rgba(196, 86, 42, 0.40) !important;
+    }
+    
+    /* ============ INPUTS ============ */
+    .login-card .stTextInput input {
+        border-radius: 12px !important;
+        border: 1.5px solid rgba(232, 123, 74, 0.25) !important;
+        padding: 12px 16px !important;
+        font-size: 15px !important;
+        background: rgba(255, 248, 243, 0.6) !important;
+        transition: all 0.2s ease !important;
+    }
+    .login-card .stTextInput input:focus {
+        border-color: #E87B4A !important;
+        background: #FFFFFF !important;
+        box-shadow: 0 0 0 4px rgba(232, 123, 74, 0.15) !important;
+    }
+    @media (prefers-color-scheme: dark) {
+        .login-card .stTextInput input {
+            background: rgba(232, 123, 74, 0.08) !important;
+        }
+        .login-card .stTextInput input:focus {
+            background: rgba(232, 123, 74, 0.15) !important;
+        }
+    }
+    
+    /* ============ FOOTER ============ */
+    .login-footer {
+        text-align: center;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(232, 123, 74, 0.15);
+        font-size: 11px;
+        color: #A89890;
+        letter-spacing: 0.05em;
+    }
+    .login-footer .powered {
+        font-weight: 700;
+        color: #C4562A;
+    }
+    
+    /* ============ SEGURIDAD ============ */
+    .login-security {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 10.5px;
+        color: #A89890;
+        margin-top: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+    .login-security .dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #43A047;
+        box-shadow: 0 0 0 3px rgba(67, 160, 71, 0.15);
+    }
+    
+    /* ============ ETIQUETAS DE CAMPOS ============ */
+    .login-card label {
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        color: #8A7568 !important;
+    }
+    @media (prefers-color-scheme: dark) {
+        .login-card label { color: #A89890 !important; }
+    }
+    </style>
     """, unsafe_allow_html=True)
-    _, centro, _ = st.columns([1, 1, 1])
+    
+    # ============ RENDER ============
+    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
+    
+    _, centro, _ = st.columns([1, 1.2, 1])
     with centro:
-        with st.form("login"):
-            usuario = st.text_input("Usuario", placeholder="tu usuario")
-            password = st.text_input("Contraseña", type="password",
-                                     placeholder="tu contraseña")
-            enviado = st.form_submit_button("Ingresar", type="primary",
+        # Cabecera visual (logo + títulos) dentro de la tarjeta
+        logo_html = (
+            f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" /></div>'
+            if escudo_b64
+            else '<div class="login-logo"><div class="logo-fallback">Y</div></div>'
+        )
+        
+        st.markdown(f"""
+        <div style="
+            background: #FFFFFF;
+            border-radius: 24px 24px 0 0;
+            padding: 44px 44px 8px 44px;
+            box-shadow: 0 25px 60px -15px rgba(196, 86, 42, 0.25),
+                        0 0 0 1px rgba(232, 123, 74, 0.12);
+            border-bottom: none;
+            position: relative;
+            overflow: hidden;
+            max-width: 420px;
+            margin: 0 auto;
+        ">
+            {logo_html}
+            <div class="login-title">asisyarina</div>
+            <div class="login-subtitle">Sistema de Asistencia Escolar</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Formulario con estilo de tarjeta continuación
+        st.markdown("""
+        <style>
+        /* Continuación visual de la tarjeta para el formulario */
+        div[data-testid="stForm"] {
+            background: #FFFFFF !important;
+            border-radius: 0 0 24px 24px !important;
+            padding: 8px 44px 36px 44px !important;
+            box-shadow: 0 25px 60px -15px rgba(196, 86, 42, 0.25),
+                        0 0 0 1px rgba(232, 123, 74, 0.12) !important;
+            border: none !important;
+            max-width: 420px !important;
+            margin: 0 auto !important;
+            border-top: none !important;
+        }
+        @media (prefers-color-scheme: dark) {
+            div[data-testid="stForm"] {
+                background: #1E1613 !important;
+                box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6),
+                            0 0 0 1px rgba(232, 123, 74, 0.20) !important;
+            }
+            /* El bloque de cabecera en modo oscuro */
+            div[data-testid="stMarkdownContainer"] > div[style*="background: #FFFFFF"] {
+                background: #1E1613 !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        with st.form("login", clear_on_submit=False):
+            usuario = st.text_input("👤  Usuario", placeholder="Ingresa tu usuario")
+            password = st.text_input("🔒  Contraseña", type="password",
+                                     placeholder="Ingresa tu contraseña")
+            enviado = st.form_submit_button("Ingresar al sistema",
+                                            type="primary",
                                             width='stretch')
             if enviado:
                 datos, err = autenticar(usuario, password)
                 if datos:
                     st.session_state["user"] = datos
                     auditar(datos["usuario"], "Login")
-                    
-                    #GUARDAMOS EL TOKEN Y LA HORA DE ENTRADA
                     st.query_params["sesion"] = datos["usuario"]
                     st.query_params["ts"] = str(int(time.time()))
-                    
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
+        
+        # Footer con marca de seguridad
+        st.markdown("""
+        <div class="login-footer">
+            <div class="login-security">
+                <span class="dot"></span>
+                <span>Conexión segura</span>
+            </div>
+            <div style="margin-top:10px;">
+                © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
