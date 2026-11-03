@@ -1500,6 +1500,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
 # MARCAR FALTAS AL CIERRE 
 # MARCAR FALTAS AL CIERRE 
+# MARCAR FALTAS AL CIERRE 
 def procesar_faltas_parciales():
     """
     Revisa los alumnos al cierre de ventana. Si no escanearon, les pone Falta, 
@@ -1509,7 +1510,6 @@ def procesar_faltas_parciales():
     from datetime import datetime
     
     # 🧹 LIMPIEZA: Si ya pasó la ventana de clases de Mañana, matamos el estado psico
-    # para que no quede colgado en sesión.
     try:
         turnos_m = [t for t in listar_turnos() if t["nombre"] == "Mañana"]
         if turnos_m:
@@ -1553,15 +1553,21 @@ def procesar_faltas_parciales():
                 """, (t["id"],))
 
                 for al in cur.fetchall():
-                    # 1. ¿Ya tiene registro (Puntual/Tardanza)? No hacemos nada.
-                    cur.execute("SELECT id, estado FROM asistencias WHERE alumno_id=? AND fecha=?", (al["id"], fecha_d))
+                    # 1. ¿Ya tiene registro de clases (Puntual/Tardanza/Permiso)? 
+                    # 🛡️ BLINDAJE: Buscamos en CUALQUIER tipo (clases o evento) para no duplicar
+                    cur.execute("""
+                        SELECT id, estado FROM asistencias 
+                        WHERE alumno_id=? AND fecha=? 
+                          AND tipo IN ('clases', 'evento', 'reforzamiento')
+                    """, (al["id"], fecha_d))
+                    
                     if cur.fetchone():
-                        continue 
-
+                        continue # Si ya escaneó, lo dejamos en paz.
+                        
                     # 2. ¿Tiene un permiso activo para hoy? -> Se guarda como PERMISO
                     if hay_permiso_activo(al["id"], fecha_str):
                         cur.execute("""
-                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
+                            INSERT OR IGNORE INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
                             VALUES(?,?,?,?,?,?,1,?,?,?)
                         """, (al["id"], fecha_d, v["id"], tipo, h, PERMISO, "Permiso vigente", "auto", pid))
                         continue
@@ -1571,8 +1577,10 @@ def procesar_faltas_parciales():
                     
                     # 4. No escaneó, no tiene nada -> Se guarda como FALTA
                     est = "Falta" if v["tipo"] == VENT_CLASES else "No asistio"
+                    
+                    # 🛡️ BLINDAJE FINAL: INSERT OR IGNORE evita errores si dos usuarios lo procesan a la vez
                     cur.execute("""
-                        INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id)
+                        INSERT OR IGNORE INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id)
                         VALUES(?,?,?,?,?,?,?,?,?)
                     """, (al["id"], fecha_d, v["id"], tipo, h, est, 1 if jp else 0, "auto", pid))
 #JUSTIFICAR ASISTENCIA
@@ -6854,29 +6862,24 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    from pathlib import Path
-    import base64
-
-    # --- Cargar escudo ---
-    escudo_path = Path("escudo.png")
-    escudo_b64 = ""
-    if escudo_path.exists():
-        try:
-            with open(escudo_path, "rb") as f:
-                escudo_b64 = base64.b64encode(f.read()).decode()
-        except Exception:
-            escudo_b64 = ""
-
-    # --- CSS LIQUID GLASS ---
+    # --- CSS LIQUID GLASS OPTIMIZADO PARA CELULAR ---
     st.markdown(
         """
         <style>
-        /* 1. LIMPIEZA TOTAL DE STREAMLIT */
+        /* 1. LIMPIEZA TOTAL DE STREAMLIT (Ocultar corona, menús y header) */
         header[data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
+        
+        /* 🆕 MATAR LA CORONA DE STREAMLIT */
+        #MainMenu { visibility: hidden !important; }
+        footer { visibility: hidden !important; }
+        [data-testid="stStatusWidget"] { display: none !important; }
+        div[class^="viewerBadge"] { display: none !important; }
+        div[class*="viewerBadge"] { display: none !important; }
+        a[href*="streamlit.io"] { display: none !important; }
 
         /* 2. FONDO CON LUCES */
         .stApp {
@@ -6896,26 +6899,23 @@ def vista_login():
             }
         }
 
-        /* 3. 🚨 FIX PARA CENTRAR EN CELULAR Y PC 🚨 */
+        /* 3. CENTRADO PERFECTO EN CELULAR Y PC */
         .block-container {
             padding: 0 !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
             min-height: 100vh !important; 
-            min-height: 100dvh !important; /* El truco mágico para celulares modernos */
+            min-height: 100dvh !important; /* El truco mágico para celulares */
         }
 
-        /* Ajuste fino para celular */
+        /* 🆕 Ajuste fino para obligar a centrar en celular */
         @media (max-width: 768px) {
             .block-container {
                 justify-content: center !important;
                 padding-top: 0 !important;
                 padding-bottom: 0 !important;
-            }
-            /* Damos un pequeño respiro al teclado */
-            div[data-testid="stForm"] {
-                margin-bottom: 5vh !important; 
+                margin-top: -5vh !important; /* Lo empuja un poquito para arriba para que el teclado no lo tape */
             }
         }
 
@@ -6941,9 +6941,8 @@ def vista_login():
         /* 5. TEXTOS */
         .glass-title {
             text-align: center;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
-            color: #FFFFFF;
             margin-bottom: 5px;
             letter-spacing: -0.5px;
         }
@@ -6955,7 +6954,6 @@ def vista_login():
         }
         
         @media (prefers-color-scheme: light) {
-            .glass-title { color: #111; }
             .glass-subtitle { color: #555; }
         }
 
@@ -7014,44 +7012,32 @@ def vista_login():
             transform: translateY(-2px) !important; 
             box-shadow: 0 12px 25px rgba(232, 123, 74, 0.6) !important; 
         }
-
-        /* 8. LOGO */
-        .glass-logo {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 15px;
-        }
-        .glass-logo img {
-            width: 70px;
-            height: 70px;
-            object-fit: contain;
-            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
-        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # --- RENDERIZADO ---
+    # --- RENDERIZADO DEL FORMULARIO ---
     _, col_centro, _ = st.columns([1, 1.2, 1])
     
     with col_centro:
         with st.form("login_form", clear_on_submit=False):
             
-            logo_html = f'<div class="glass-logo"><img src="data:image/png;base64,{escudo_b64}"></div>' if escudo_b64 else ''
+            # 🆕 Título con colores (asis negro, yarina naranja)
             st.markdown(
-                f"""
-                {logo_html}
-                <div class="glass-title">asisyarina</div>
+                """
+                <div class="glass-title">
+                    <span style="color: var(--text-color);">asis</span><span style="color: #E87B4A;">yarina</span>
+                </div>
                 <div class="glass-subtitle">Ingresa tus credenciales</div>
                 """,
                 unsafe_allow_html=True
             )
             
-            usuario = st.text_input("Usuario", placeholder="Ej: admin")
-            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            usuario = st.text_input("Usuario", placeholder=" ********")
+            password = st.text_input("Contraseña", type="password", placeholder="********")
             
-            enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
+            enviado = st.form_submit_button("Ingresar al sistema", use_container_width=True)
             
             if enviado:
                 datos, err = autenticar(usuario, password)
@@ -7063,15 +7049,6 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-
-        st.markdown(
-            """
-            <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 15px;">
-                © 2026 I.E. Yarinacocha
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
