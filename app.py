@@ -7169,96 +7169,70 @@ def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     
     if rol == "Admin":
-        return [
-            "Puerta", 
-            "Bloqueados", 
-            "Panel Direccion", 
-            "Reportes", 
-            "Alumnos",
-            "Grados y Secciones", 
-            "Carnets", 
-            "Dias especiales", 
-            "Ventanas",
-            "Justificaciones y Permisos", 
-            "Mantenimiento Datos",  #Exclusivo del Admin
-            "Usuarios", 
-            "Backup", 
-            "Auditoria",
-            "Mi cuenta"
-        ]
+        return ["Inicio", "Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
+                "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
+                "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
+                "Backup", "Auditoria", "Mi cuenta"]
         
     if rol == "Direccion":
-        return [
-            "Panel Direccion", 
-            "Bloqueados", 
-            "Reportes", 
-            "Alumnos", 
-            "Carnets",
-            "Dias especiales", 
-            "Justificaciones y Permisos", 
-            "Mi cuenta"
-        ]
+        return ["Inicio", "Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
+                "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
         
     if rol == "Auxiliar":
-        return [
-            "Puerta", 
-            "Bloqueados", 
-            "Justificaciones y Permisos", 
-            "Reportes",
-            "Mi cuenta"
-        ]
+        return ["Inicio", "Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
         
-    return []
+    return ["Inicio", "Mi cuenta"]
 
-RUTAS = {
-    "Puerta": vista_puerta,
-    "Bloqueados": vista_bloqueados,
-    "Panel Direccion": vista_panel_direccion,
-    "Reportes": vista_reportes,
-    "Alumnos": vista_alumnos,
-    "Grados y Secciones": vista_grados_secciones,
-    "Carnets": vista_carnets,
-    "Dias especiales": vista_dias_especiales,
-    "Ventanas": vista_ventanas,
-    "Usuarios": vista_usuarios,
-    "Backup": vista_backup,
-    "Auditoria": vista_auditoria,
-    "Mi cuenta": vista_mi_cuenta,
-    "Justificaciones y Permisos": vista_justificaciones_permisos,
-    "Mantenimiento Datos": vista_mantenimiento_datos, 
-}
-
+def vista_inicio(usuario):
+    st.title(f"¡Hola, {usuario['nombres']}!")
+    st.markdown("### ¿A dónde quieres ir hoy?")
+    
+    opciones = [op for op in obtener_opciones_por_rol(usuario) if op != "Inicio" and op != "Mi cuenta"]
+    
+    # Creamos las tarjetas gigantes en columnas
+    st.markdown('<div class="tarjeta-menu">', unsafe_allow_html=True)
+    cols = st.columns(min(len(opciones), 3)) # Máximo 3 por fila
+    
+    for i, op in enumerate(opciones):
+        with cols[i % 3]:
+            if st.button(op, key=f"btn_inicio_{op}", use_container_width=True):
+                st.session_state["menu"] = op
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    
 def menu_lateral():
     usuario = st.session_state["user"]
     rol = usuario["rol"]
     opciones = obtener_opciones_por_rol(usuario)
     
+    opciones_menu = ["Inicio"] + opciones
+    
     with st.sidebar:
-        # TARJETA DE USUARIO (Con la letra inicial, sin imágenes)
         inicial = (usuario["nombres"] or "?")[0].upper()
         st.markdown(
             f'<div class="encabezado-sidebar">'
-            f'  <div class="avatar">{inicial}</div>'
-            f'  <div class="nombre">{usuario["nombres"]}</div>'
+            f'  <div class="nombre">{inicial}. {usuario["nombres"]}</div>'
             f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
         
-        # Lógica del menú
-        if "menu" not in st.session_state or \
-                st.session_state["menu"] not in opciones:
-            st.session_state["menu"] = opciones[0]
+        if "menu" not in st.session_state or st.session_state["menu"] not in opciones_menu:
+            st.session_state["menu"] = "Inicio"
             
-        op = st.radio("Menu", opciones, key="menu",
-                      label_visibility="collapsed")
+        op = st.radio("Menu", opciones_menu, key="menu", label_visibility="collapsed")
         
         st.markdown("---")
-        
-        if st.button("Cerrar sesion", width='stretch'):
+        if st.button("Cerrar sesion", use_container_width=True):
             cerrar_sesion()
             st.rerun()
             
     return op
+    
 def _enrutar(op, usuario):
+    # 🆕 Si elige Inicio, mostramos las tarjetas
+    if op == "Inicio":
+        vista_inicio(usuario)
+        return
+
     v = RUTAS.get(op)
     if not v:
         st.warning("Vista no disponible.")
@@ -7271,11 +7245,9 @@ def _enrutar(op, usuario):
     if op != "Reportes":
         st.session_state.pop("_rep_iniciado", None)
         
-    # DESTRUIR CÁMARA AL SALIR DE PUERTA
     if op != "Puerta":
         st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
 
-    # LIMPIAR MEMORIA AL CAMBIAR DE PESTAÑA (Soluciona bug de Carnets y Perfil)
     op_anterior = st.session_state.get("_menu_anterior")
     if op_anterior and op_anterior != op:
         st.session_state.pop("perfil_alumno_id", None)
