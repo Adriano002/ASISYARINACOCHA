@@ -7182,24 +7182,7 @@ def obtener_opciones_por_rol(usuario):
         return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
         
     return ["Mi cuenta"]
-    
-RUTAS = {
-    "Puerta": vista_puerta,
-    "Bloqueados": vista_bloqueados,
-    "Panel Direccion": vista_panel_direccion,
-    "Reportes": vista_reportes,
-    "Alumnos": vista_alumnos,
-    "Grados y Secciones": vista_grados_secciones,
-    "Carnets": vista_carnets,
-    "Dias especiales": vista_dias_especiales,
-    "Ventanas": vista_ventanas,
-    "Usuarios": vista_usuarios,
-    "Backup": vista_backup,
-    "Auditoria": vista_auditoria,
-    "Mi cuenta": vista_mi_cuenta,
-    "Justificaciones y Permisos": vista_justificaciones_permisos,
-    "Mantenimiento Datos": vista_mantenimiento_datos, 
-}
+
 
 def vista_inicio(usuario):
     st.title(f"¡Hola, {usuario['nombres']}!")
@@ -7223,9 +7206,6 @@ def menu_lateral():
     rol = usuario["rol"]
     opciones = obtener_opciones_por_rol(usuario)
     
-    # 🆕 Agregamos "Inicio" al principio de todo
-    opciones_menu = ["Inicio"] + opciones
-    
     with st.sidebar:
         inicial = (usuario["nombres"] or "?")[0].upper()
         st.markdown(
@@ -7234,10 +7214,10 @@ def menu_lateral():
             f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
         
-        if "menu" not in st.session_state or st.session_state["menu"] not in opciones_menu:
-            st.session_state["menu"] = "Inicio"
+        if "menu" not in st.session_state or st.session_state["menu"] not in opciones:
+            st.session_state["menu"] = opciones[0]
             
-        op = st.radio("Menu", opciones_menu, key="menu", label_visibility="collapsed")
+        op = st.radio("Menu", opciones, key="menu", label_visibility="collapsed")
         
         st.markdown("---")
         if st.button("Cerrar sesion", use_container_width=True):
@@ -7246,16 +7226,10 @@ def menu_lateral():
             
     return op
 def _enrutar(op, usuario):
-    # 🆕 Si elige Inicio, mostramos las tarjetas gigantes
-    if op == "Inicio":
-        vista_inicio(usuario)
-        return
-
     v = RUTAS.get(op)
     if not v:
         st.warning("Vista no disponible.")
         return
-      
     if op not in obtener_opciones_por_rol(usuario):
         st.error("Sin permisos.")
         auditar(usuario["usuario"], "Intento acceso no autorizado a " + op)
@@ -7264,6 +7238,7 @@ def _enrutar(op, usuario):
     if op != "Reportes":
         st.session_state.pop("_rep_iniciado", None)
         
+    # DESTRUIR CÁMARA AL SALIR DE PUERTA
     if op != "Puerta":
         st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
 
