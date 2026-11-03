@@ -7169,19 +7169,37 @@ def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
     
     if rol == "Admin":
-        return ["Inicio", "Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
+        return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
                 "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
                 "Backup", "Auditoria", "Mi cuenta"]
         
     if rol == "Direccion":
-        return ["Inicio", "Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
+        return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
                 "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
         
     if rol == "Auxiliar":
-        return ["Inicio", "Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
+        return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
         
-    return ["Inicio", "Mi cuenta"]
+    return ["Mi cuenta"]
+    
+  RUTAS = {
+    "Puerta": vista_puerta,
+    "Bloqueados": vista_bloqueados,
+    "Panel Direccion": vista_panel_direccion,
+    "Reportes": vista_reportes,
+    "Alumnos": vista_alumnos,
+    "Grados y Secciones": vista_grados_secciones,
+    "Carnets": vista_carnets,
+    "Dias especiales": vista_dias_especiales,
+    "Ventanas": vista_ventanas,
+    "Usuarios": vista_usuarios,
+    "Backup": vista_backup,
+    "Auditoria": vista_auditoria,
+    "Mi cuenta": vista_mi_cuenta,
+    "Justificaciones y Permisos": vista_justificaciones_permisos,
+    "Mantenimiento Datos": vista_mantenimiento_datos, 
+}
 
 def vista_inicio(usuario):
     st.title(f"¡Hola, {usuario['nombres']}!")
@@ -7205,6 +7223,7 @@ def menu_lateral():
     rol = usuario["rol"]
     opciones = obtener_opciones_por_rol(usuario)
     
+    # 🆕 Agregamos "Inicio" al principio de todo
     opciones_menu = ["Inicio"] + opciones
     
     with st.sidebar:
@@ -7226,9 +7245,8 @@ def menu_lateral():
             st.rerun()
             
     return op
-    
 def _enrutar(op, usuario):
-    # 🆕 Si elige Inicio, mostramos las tarjetas
+    # 🆕 Si elige Inicio, mostramos las tarjetas gigantes
     if op == "Inicio":
         vista_inicio(usuario)
         return
@@ -7237,6 +7255,7 @@ def _enrutar(op, usuario):
     if not v:
         st.warning("Vista no disponible.")
         return
+      
     if op not in obtener_opciones_por_rol(usuario):
         st.error("Sin permisos.")
         auditar(usuario["usuario"], "Intento acceso no autorizado a " + op)
