@@ -7320,7 +7320,7 @@ def vista_login():
         except Exception:
             escudo_b64 = ""
 
-    # --- CSS PREMIUM (Toque de Agencia) ---
+    # --- CSS PARA EL LOGIN DE DOS COLUMNAS ---
     st.markdown(
         """
         <style>
@@ -7331,18 +7331,12 @@ def vista_login():
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
 
-        /* Fondo con gradiente sutil */
+        /* Fondo general */
         .stApp {
-            background: radial-gradient(circle at 10% 20%, rgba(232,123,74,0.08), transparent 30%),
-                        radial-gradient(circle at 90% 80%, rgba(196,86,42,0.08), transparent 30%),
-                        #F8F9FA !important;
+            background: #F4F6F9 !important;
         }
         @media (prefers-color-scheme: dark) {
-            .stApp {
-                background: radial-gradient(circle at 10% 20%, rgba(232,123,74,0.12), transparent 30%),
-                            radial-gradient(circle at 90% 80%, rgba(196,86,42,0.12), transparent 30%),
-                            #0E1117 !important;
-            }
+            .stApp { background: #0E1117 !important; }
         }
 
         /* 2. CENTRADO VERTICAL PERFECTO */
@@ -7355,72 +7349,7 @@ def vista_login():
             min-height: 100vh !important;
         }
 
-        /* 3. TARJETA PREMIUM */
-        .login-card-wrapper {
-            background: #FFFFFF;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.02);
-            padding: 50px 40px 40px 40px;
-            width: 100%;
-            max-width: 420px;
-            margin: 0 auto;
-            text-align: center;
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
-        }
-        @media (prefers-color-scheme: dark) {
-            .login-card-wrapper {
-                background: #1E1E1E;
-                box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
-            }
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 4. LOGO Y TEXTOS (Más Grandes y Centrados) */
-        .login-logo {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .login-logo img {
-            width: 100px; 
-            height: 100px; 
-            object-fit: contain;
-            filter: drop-shadow(0 8px 12px rgba(232,123,74,0.2));
-        }
-        .login-logo-fallback {
-            width: 100px; height: 100px; border-radius: 50%;
-            background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
-            color: white; font-size: 48px; font-weight: 900;
-            display: flex; align-items: center; justify-content: center;
-            margin: 0 auto; box-shadow: 0 10px 20px rgba(232,123,74,0.3);
-        }
-        
-        .login-title { 
-            font-size: 32px; /* Más grande */
-            font-weight: 900; 
-            color: #C4562A; 
-            margin: 0 0 8px 0; 
-            letter-spacing: -1px; 
-        }
-        .login-subtitle { 
-            font-size: 13px; 
-            font-weight: 700; 
-            color: #888888; 
-            margin: 0 0 35px 0; 
-            text-transform: uppercase; 
-            letter-spacing: 0.15em; 
-        }
-        @media (prefers-color-scheme: dark) {
-            .login-title { color: #F5A582; }
-            .login-subtitle { color: #A0A0A0; }
-        }
-
-        /* 5. ELIMINAR EL CUADRADO FEO DEL FORMULARIO */
+        /* 3. CAJA DE LOGIN (Se oculta la caja fea de Streamlit) */
         div[data-testid="stForm"] { 
             border: none !important; 
             padding: 0 !important; 
@@ -7428,99 +7357,116 @@ def vista_login():
             box-shadow: none !important; 
         }
         
-        /* Inputs elegantes */
+        /* Inputs */
         .stTextInput input {
-            border-radius: 12px !important; 
+            border-radius: 8px !important; 
             border: 1.5px solid rgba(128, 128, 128, 0.2) !important;
-            padding: 14px 16px !important; 
-            font-size: 16px !important; 
-            background: transparent !important;
-            transition: all 0.3s ease !important;
+            padding: 12px 16px !important; 
+            font-size: 15px !important; 
+            background: #FFFFFF !important;
+        }
+        @media (prefers-color-scheme: dark) {
+            .stTextInput input { background: #1E1E1E !important; color: white !important; }
         }
         .stTextInput input:focus { 
             border-color: #E87B4A !important; 
-            box-shadow: 0 0 0 4px rgba(232, 123, 74, 0.1) !important; 
-        }
-        div[data-testid="stForm"] label { 
-            font-size: 12px !important; 
-            font-weight: 800 !important; 
-            text-transform: uppercase !important; 
-            letter-spacing: 0.1em !important; 
-            color: #666666 !important; 
-            margin-bottom: 8px !important;
-        }
-
-        /* Botón Premium */
-        div[data-testid="stForm"] .stFormSubmitButton > button {
-            background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
-            color: #FFFFFF !important; 
-            font-weight: 800 !important; 
-            font-size: 16px !important;
-            padding: 14px !important; 
-            border-radius: 12px !important; 
-            border: none !important;
-            margin-top: 20px !important; 
-            box-shadow: 0 8px 20px rgba(232, 123, 74, 0.3) !important;
-            transition: all 0.2s ease !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
-        }
-        div[data-testid="stForm"] .stFormSubmitButton > button:hover { 
-            transform: translateY(-2px) !important; 
-            box-shadow: 0 12px 25px rgba(232, 123, 74, 0.4) !important; 
-        }
-
-        /* Footer sutil */
-        .login-footer { 
-            margin-top: 35px; 
-            font-size: 11px; 
-            color: #AAAAAA; 
-            text-align: center;
-        }
-        .login-footer .powered { 
-            font-weight: 800; 
-            color: #C4562A; 
+            box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.15) !important; 
         }
         
-        /* Ajuste para móviles */
+        /* Botón */
+        div[data-testid="stForm"] .stFormSubmitButton > button {
+            background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%) !important;
+            color: #FFFFFF !important; font-weight: 800 !important; 
+            font-size: 15px !important; padding: 12px !important; 
+            border-radius: 8px !important; border: none !important;
+            margin-top: 10px !important; 
+            box-shadow: 0 4px 12px rgba(232, 123, 74, 0.3) !important;
+        }
+
+        /* 4. DISEÑO DE LAS COLUMNAS (Para que parezcan una sola tarjeta) */
+        /* Estilo para la columna izquierda (Branding) */
+        .brand-panel {
+            background: linear-gradient(135deg, #1A1210 0%, #2D1D16 100%);
+            border-radius: 20px 0 0 20px;
+            padding: 60px 40px;
+            height: 480px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            color: white;
+            box-shadow: -10px 20px 40px -10px rgba(0,0,0,0.2);
+        }
+        
+        /* Estilo para la columna derecha (Formulario) */
+        .form-panel {
+            background: #FFFFFF;
+            border-radius: 0 20px 20px 0;
+            padding: 60px 50px;
+            height: 480px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 10px 20px 40px -10px rgba(0,0,0,0.1);
+        }
+        @media (prefers-color-scheme: dark) {
+            .brand-panel { background: #1A1210; }
+            .form-panel { background: #1E1E1E; box-shadow: 10px 20px 40px -10px rgba(0,0,0,0.4); }
+        }
+
+        .brand-title { font-size: 36px; font-weight: 900; margin-bottom: 15px; color: #FFFFFF; line-height: 1.1; }
+        .brand-text { font-size: 15px; color: #A89890; line-height: 1.6; }
+        
+        .form-title { font-size: 28px; font-weight: 800; color: #2D1D16; margin-bottom: 5px; }
+        .form-subtitle { font-size: 14px; color: #888888; margin-bottom: 30px; }
+        @media (prefers-color-scheme: dark) {
+            .form-title { color: #F5A582; }
+        }
+
+        /* 📱 En celulares, ocultamos la columna izquierda y pegamos el form */
         @media (max-width: 768px) {
-            .login-card-wrapper { 
-                padding: 40px 25px; 
-                box-shadow: 0 15px 30px -10px rgba(0,0,0,0.1);
-                border-radius: 20px;
-            }
-            .login-title { font-size: 28px; }
+            .brand-panel { display: none !important; }
+            .form-panel { border-radius: 20px; padding: 40px 25px; height: auto; }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # --- RENDERIZADO ---
-    _, col_centro, _ = st.columns([1, 1.2, 1])
+    # --- RENDERIZADO EN 2 COLUMNAS ---
+    st.markdown('<div style="max-width: 900px; margin: 0 auto; padding: 20px;">', unsafe_allow_html=True)
     
-    with col_centro:
-        # 1. La Tarjeta Visual (Logo y Título)
-        if escudo_b64:
-            logo_html = f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" alt="Logo"></div>'
-        else:
-            logo_html = '<div class="login-logo"><div class="login-logo-fallback">Y</div></div>'
+    col_izq, col_der = st.columns([1, 1], gap="small")
 
+    # COLUMNA IZQUIERDA: Branding Premium
+    with col_izq:
+        logo_img = f'<img src="data:image/png;base64,{escudo_b64}" style="width: 80px; margin-bottom: 20px;">' if escudo_b64 else ''
         st.markdown(
             f"""
-            <div class="login-card-wrapper">
-                {logo_html}
-                <h1 class="login-title">asisyarina</h1>
-                <p class="login-subtitle">Sistema de Asistencia</p>
+            <div class="brand-panel">
+                {logo_img}
+                <div class="brand-title">I.E.<br>Yarinacocha</div>
+                <div class="brand-text">Plataforma integral de gestión de asistencia y monitoreo estudiantil.</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # 2. Formulario (Los inputs van PEGADOS visualmente a la tarjeta)
+    # COLUMNA DERECHA: Formulario de Login
+    with col_der:
+        st.markdown(
+            """
+            <div class="form-panel" style="padding-bottom: 0; margin-bottom: -20px;">
+                <div class="form-title">Bienvenido</div>
+                <div class="form-subtitle">Ingresa tus credenciales para continuar.</div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        
+        # Aquí va el formulario nativo
         with st.form("login_form", clear_on_submit=False):
-            usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
+            usuario = st.text_input("Usuario", placeholder="Ej: admin")
+            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
             
             enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
             
@@ -7534,16 +7480,16 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-
-        # 3. Footer
+                    
         st.markdown(
             """
-            <div class="login-footer">
-                © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
+            <div style="text-align: center; font-size: 11px; color: #888; margin-top: 15px;">
+                © 2026 I.E. Yarinacocha
             </div>
-            """,
-            unsafe_allow_html=True,
+            """, unsafe_allow_html=True
         )
+
+    st.markdown('</div>', unsafe_allow_html=True)
         
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
