@@ -1346,6 +1346,7 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
     return True, f"Justificacion de {just['alumno']} reactivada (pendiente)."
 
 #REGISTRAR ENTRADA
+#REGISTRAR ENTRADA
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
@@ -1362,13 +1363,14 @@ def registrar_entrada(dni, usuario, origen="qr"):
             _nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"
         ), {"alumno": al, "motivo": bloq["motivo"]}
 
-    # 🆕 FLUJO DE PSICOLOGÍA (Solo si ya son más de las 08:00)
+    # 🆕 FLUJO DE PSICOLOGÍA (SOLO turno Mañana y SOLO después de las 08:00)
+    es_turno_manana = (al["turno"] == "Mañana")
     hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
     hora_8 = datetime.strptime("08:00", "%H:%M").time()
-    
-    if hora_actual_dt >= hora_8:
+
+    if es_turno_manana and hora_actual_dt >= hora_8:
         if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
-            # Ya respondió que SÍ (o que NO, pero ya pasó la pregunta)
+            # Ya respondió (SÍ o NO)
             st.session_state["_psico_preguntar"] = False
             st.session_state["_psico_dni"] = None
             estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
@@ -1379,7 +1381,12 @@ def registrar_entrada(dni, usuario, origen="qr"):
             st.session_state["_psico_dni"] = dni
             return False, "PREGUNTA_PSICO", "", {"alumno": al}
     else:
-        estado_forzado = None # Flujo normal (antes de las 8)
+        # Turno Tarde o antes de las 08:00 → flujo normal
+        estado_forzado = None
+        # 🧹 Limpieza defensiva por si quedó basura de una pregunta anterior
+        st.session_state.pop("_psico_preguntar", None)
+        st.session_state.pop("_psico_dni", None)
+        st.session_state.pop("_psico_afirmativo", None)
 
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
@@ -1541,6 +1548,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
 
 # MARCAR FALTAS AL CIERRE 
+# MARCAR FALTAS AL CIERRE 
 def procesar_faltas_parciales():
     """
     Revisa los alumnos al cierre de ventana. Si no escanearon, les pone Falta, 
@@ -1548,6 +1556,22 @@ def procesar_faltas_parciales():
     """
     from db import cursor
     from datetime import datetime
+    
+    # 🧹 LIMPIEZA: Si ya pasó la ventana de clases de Mañana, matamos el estado psico
+    # para que no quede colgado en sesión.
+    try:
+        turnos_m = [t for t in listar_turnos() if t["nombre"] == "Mañana"]
+        if turnos_m:
+            v_clases_m = next(
+                (v for v in listar_ventanas(turnos_m[0]["id"]) if v["tipo"] == "clases"),
+                None
+            )
+            if v_clases_m and hora_corta() > v_clases_m["hora_cierre"]:
+                st.session_state.pop("_psico_preguntar", None)
+                st.session_state.pop("_psico_dni", None)
+                st.session_state.pop("_psico_afirmativo", None)
+    except Exception:
+        pass
     
     fecha_d = hoy_date()
     fecha_str = hoy_str()
