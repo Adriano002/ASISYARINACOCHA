@@ -14,7 +14,7 @@
     --radio: 8px;
 }
 
-/* Modo Oscuro Adaptable (Se adapta si el usuario pone su PC en oscuro) */
+/* Modo Oscuro Adaptable */
 @media (prefers-color-scheme: dark) {
     :root {
         --fondo-panel: #1E1E1E;
@@ -54,7 +54,7 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label {
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-    display: none !important; /* Ocultar circulito */
+    display: none !important;
 }
 
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
@@ -67,6 +67,40 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)
     border-left: 4px solid var(--primario) !important;
     color: var(--primario) !important;
     font-weight: 700 !important;
+}
+
+/* Tarjeta de usuario en el Sidebar */
+section[data-testid="stSidebar"] .encabezado-sidebar {
+    background: linear-gradient(135deg, var(--primario) 0%, var(--primario-hover) 100%) !important;
+    padding: 15px 10px !important;
+    margin: 10px 12px 20px 12px !important;
+    border-radius: var(--radio) !important;
+    text-align: center;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 10px rgba(232,123,74,0.2) !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+section[data-testid="stSidebar"] .encabezado-sidebar .nombre {
+    font-size: 15px !important; 
+    font-weight: 800 !important; 
+    color: #FFFFFF !important;
+    margin-bottom: 4px;
+}
+
+section[data-testid="stSidebar"] .encabezado-sidebar .rol {
+    display: inline-block; 
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.25); 
+    border-radius: 12px;
+    font-size: 10px !important; 
+    font-weight: 800 !important; 
+    text-transform: uppercase;
+    letter-spacing: 0.08em; 
+    color: #FFFFFF !important;
 }
 
 /* 2. BOTONES */
@@ -189,4 +223,32 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     border: 1px solid var(--borde) !important;
     border-radius: var(--radio) !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+/* 🆕 9. MENÚ DE TARJETAS GIGANTES (Inicio) */
+.tarjeta-menu .stButton > button {
+    background-color: var(--fondo-panel) !important;
+    border: 2px solid var(--borde) !important;
+    border-radius: 16px !important;
+    height: 140px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
+    transition: all 0.2s ease !important;
+}
+
+.tarjeta-menu .stButton > button:hover {
+    border-color: var(--primario) !important;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(232,123,74,0.2) !important;
+}
+
+.tarjeta-menu .stButton > button p {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: var(--texto) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
 }
