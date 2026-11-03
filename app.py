@@ -7307,7 +7307,20 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    # --- CSS MINIMALISTA (Estilo Apple/Stripe) ---
+    from pathlib import Path
+    import base64
+
+    # --- Cargar escudo ---
+    escudo_path = Path("escudo.png")
+    escudo_b64 = ""
+    if escudo_path.exists():
+        try:
+            with open(escudo_path, "rb") as f:
+                escudo_b64 = base64.b64encode(f.read()).decode()
+        except Exception:
+            escudo_b64 = ""
+
+    # --- CSS LIQUID GLASS ---
     st.markdown(
         """
         <style>
@@ -7318,12 +7331,23 @@ def vista_login():
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
 
-        /* 2. FONDO LIMPIO Y CLARO (Sin distracciones) */
+        /* 2. FONDO CON LUCES (Para que el cristal resalte) */
         .stApp {
-            background-color: #FAFAFA !important;
+            background-color: #0f172a !important; /* Azul muy oscuro casi negro */
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(232,123,74,0.15), transparent 40%),
+                radial-gradient(circle at 85% 30%, rgba(196,86,42,0.15), transparent 40%),
+                radial-gradient(circle at 50% 90%, rgba(232,123,74,0.10), transparent 40%) !important;
         }
-        @media (prefers-color-scheme: dark) {
-            .stApp { background-color: #121212 !important; }
+        
+        /* Si el usuario tiene modo claro, un fondo gris suave con luces naranjas */
+        @media (prefers-color-scheme: light) {
+            .stApp {
+                background-color: #F4F6F9 !important;
+                background-image: 
+                    radial-gradient(circle at 15% 50%, rgba(232,123,74,0.10), transparent 40%),
+                    radial-gradient(circle at 85% 30%, rgba(196,86,42,0.10), transparent 40%) !important;
+            }
         }
 
         /* 3. CENTRADO PERFECTO EN LA PANTALLA */
@@ -7335,106 +7359,143 @@ def vista_login():
             min-height: 100vh !important;
         }
 
-        /* 4. ELIMINAR EL CUADRADO NEGRO DEL FORMULARIO */
+        /* 4. EFECTO LIQUID GLASS (Para los contenedores nativos de Streamlit) */
         div[data-testid="stForm"] { 
-            border: none !important; 
-            padding: 0 !important; 
-            background: transparent !important; 
-            box-shadow: none !important; 
+            background: rgba(255, 255, 255, 0.05) !important;
+            backdrop-filter: blur(20px) !important; /* El desenfoque del cristal */
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 24px !important;
+            padding: 40px !important;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
         }
         
-        /* 5. INPUTS MINIMALISTAS (Limpios, sin colores raros) */
-        .stTextInput input {
-            border-radius: 8px !important; 
-            border: 1px solid #E0E0E0 !important;
-            padding: 14px 16px !important; 
-            font-size: 16px !important; 
-            background: #FFFFFF !important;
-            color: #333 !important;
-            transition: all 0.2s ease !important;
-        }
-        @media (prefers-color-scheme: dark) {
-            .stTextInput input { 
-                background: #1E1E1E !important; 
-                border-color: #333 !important; 
-                color: #FFF !important; 
+        @media (prefers-color-scheme: light) {
+            div[data-testid="stForm"] { 
+                background: rgba(255, 255, 255, 0.6) !important;
+                border: 1px solid rgba(255, 255, 255, 0.8) !important;
+                box-shadow: 0 30px 60px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
             }
         }
-        .stTextInput input:focus { 
-            border-color: #E87B4A !important; 
-            box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.1) !important; 
+
+        /* 5. TEXTOS DENTRO DEL CRISTAL */
+        .glass-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            color: #FFFFFF;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+        .glass-subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 30px;
         }
         
-        /* 6. ETIQUETAS DE LOS INPUTS */
-        div[data-testid="stForm"] label { 
-            font-size: 13px !important; 
-            font-weight: 600 !important; 
-            color: #555 !important; 
-            margin-bottom: 5px !important;
-        }
-        @media (prefers-color-scheme: dark) {
-            div[data-testid="stForm"] label { color: #AAA !important; }
+        @media (prefers-color-scheme: light) {
+            .glass-title { color: #111; }
+            .glass-subtitle { color: #555; }
         }
 
-        /* 7. BOTÓN MINIMALISTA (Sólido y limpio) */
+        /* 6. INPUTS DE CRISTAL */
+        .stTextInput input {
+            border-radius: 12px !important; 
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            padding: 14px 16px !important; 
+            font-size: 15px !important; 
+            background: rgba(0, 0, 0, 0.2) !important;
+            color: #FFFFFF !important;
+            transition: all 0.3s ease !important;
+        }
+        .stTextInput input::placeholder { color: rgba(255,255,255,0.3) !important; }
+        
+        @media (prefers-color-scheme: light) {
+            .stTextInput input {
+                background: rgba(255, 255, 255, 0.8) !important;
+                border: 1px solid rgba(0, 0, 0, 0.1) !important;
+                color: #111 !important;
+            }
+            .stTextInput input::placeholder { color: #999 !important; }
+        }
+        
+        .stTextInput input:focus { 
+            border-color: #E87B4A !important; 
+            box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.3) !important; 
+        }
+        
+        div[data-testid="stForm"] label { 
+            font-size: 12px !important; 
+            font-weight: 700 !important; 
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            color: rgba(255, 255, 255, 0.8) !important; 
+            margin-bottom: 5px !important;
+        }
+        @media (prefers-color-scheme: light) {
+            div[data-testid="stForm"] label { color: #333 !important; }
+        }
+
+        /* 7. BOTÓN BRILLANTE */
         div[data-testid="stForm"] .stFormSubmitButton > button {
-            background: #E87B4A !important; /* Naranja Yarinacocha */
+            background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
             color: #FFFFFF !important; 
-            font-weight: 600 !important; 
-            font-size: 16px !important;
+            font-weight: 800 !important; 
+            font-size: 15px !important;
             padding: 14px !important; 
-            border-radius: 8px !important; 
+            border-radius: 12px !important; 
             border: none !important;
-            margin-top: 10px !important; 
+            margin-top: 15px !important; 
+            box-shadow: 0 8px 20px rgba(232, 123, 74, 0.4) !important;
             transition: all 0.2s ease !important;
         }
         div[data-testid="stForm"] .stFormSubmitButton > button:hover { 
-            background: #D66535 !important;
+            transform: translateY(-2px) !important; 
+            box-shadow: 0 12px 25px rgba(232, 123, 74, 0.6) !important; 
         }
-        
-        /* 8. TEXTOS SUPERIORES (Título) */
-        .minimal-title {
-            text-align: center;
-            font-size: 28px;
-            font-weight: 800;
-            color: #222;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
+
+        /* 8. LOGO PEQUEÑO EN EL CRISTAL */
+        .glass-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
         }
-        .minimal-subtitle {
-            text-align: center;
-            font-size: 15px;
-            color: #777;
-            margin-bottom: 30px;
-        }
-        @media (prefers-color-scheme: dark) {
-            .minimal-title { color: #FFF; }
-            .minimal-subtitle { color: #999; }
+        .glass-logo img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # --- RENDERIZADO (Diseño Limpio) ---
+    # --- RENDERIZADO ---
     _, col_centro, _ = st.columns([1, 1.2, 1])
     
     with col_centro:
-        # Título limpio (Sin cajas)
-        st.markdown(
-            """
-            <div class="minimal-title">asisyarina</div>
-            <div class="minimal-subtitle">Ingresa a tu cuenta</div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        # Formulario flotante y transparente
+        # Usamos el formulario directamente (el CSS lo convierte en Cristal)
         with st.form("login_form", clear_on_submit=False):
+            
+            # Cabecera con logo y textos
+            logo_html = f'<div class="glass-logo"><img src="data:image/png;base64,{escudo_b64}"></div>' if escudo_b64 else ''
+            st.markdown(
+                f"""
+                {logo_html}
+                <div class="glass-title">asisyarina</div>
+                <div class="glass-subtitle">Ingresa tus credenciales</div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            # Inputs
             usuario = st.text_input("Usuario", placeholder="Ej: admin")
             password = st.text_input("Contraseña", type="password", placeholder="••••••••")
             
-            enviado = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+            # Botón
+            enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
             
             if enviado:
                 datos, err = autenticar(usuario, password)
@@ -7450,7 +7511,7 @@ def vista_login():
         # Footer sutil
         st.markdown(
             """
-            <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
+            <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 15px;">
                 © 2026 I.E. Yarinacocha
             </div>
             """,
