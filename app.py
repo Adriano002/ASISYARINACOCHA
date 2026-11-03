@@ -7801,18 +7801,11 @@ def main():
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
-        # 🛡️ CRÍTICO: Descargar de R2 SOLO UNA VEZ por sesión
-        if not st.session_state.get("_bd_descargada"):
-            from sync import descargar_bd_si_no_existe
-            from db import DB_PATH
-            descargar_bd_si_no_existe(str(DB_PATH))
-            st.session_state["_bd_descargada"] = True
-            log.info("✅ BD descargada de R2 (1 sola vez en esta sesión).")
-
+        # 🛡️ LLAMADA GLOBAL: La magia ocurre aquí. Se descarga solo 1 vez.
         inicializar_bd()
         aplicar_estilos()
 
-        # 🛡️ BACKUP POR TIEMPO (Reemplaza al hilo viejo)
+        # 🛡️ BACKUP POR TIEMPO
         _verificar_backup_por_tiempo()
 
         # RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
@@ -7880,6 +7873,6 @@ def main():
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-
+        
 if __name__ == "__main__":
     main()
