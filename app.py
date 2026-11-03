@@ -1543,8 +1543,8 @@ def registrar_entrada(dni, usuario, origen="qr"):
 # MARCAR FALTAS AL CIERRE 
 def procesar_faltas_parciales():
     """
-    Marca faltas a los alumnos cuya ventana de escaneo YA CERRÓ (por ejemplo, la ventana de clases cerró a las 7:10 AM),
-    pero sin esperar a que cierre todo el día. Esto permite generar reportes exactos a cualquier hora.
+    Marca faltas a los alumnos que NO escanearon.
+    Corregido para no poner Falta si el alumno ya tiene CUALQUIER registro hoy.
     """
     from db import cursor
     from datetime import datetime
@@ -1564,7 +1564,7 @@ def procesar_faltas_parciales():
         # 2. Recorrer todas las ventanas
         for t in listar_turnos():
             for v in listar_ventanas(t["id"]):
-                # 🛑 CLAVE: Solo procesar si la ventana YA CERRÓ
+                # 🛑 Solo procesar si la ventana YA CERRÓ
                 if h < v["hora_cierre"]:
                     continue 
 
@@ -1579,12 +1579,16 @@ def procesar_faltas_parciales():
                 """, (t["id"],))
 
                 for al in cur.fetchall():
-                    # ¿Ya tiene registro de asistencia?
-                    cur.execute("SELECT id FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo=?", (al["id"], fecha_d, tipo))
-                    if cur.fetchone():
-                        continue # Ya escaneó, no hacer nada
+                    # 🆕 EL ARREGLO ESTÁ AQUÍ:
+                    # Buscamos si el alumno tiene CUALQUIER registro hoy (sin importar el tipo)
+                    cur.execute("SELECT id, estado FROM asistencias WHERE alumno_id=? AND fecha=?", (al["id"], fecha_d))
+                    registro_hoy = cur.fetchone()
+                    
+                    if registro_hoy:
+                        # Si ya escaneó (Puntual, Tardanza o Reforzamiento), NO le ponemos Falta.
+                        continue 
 
-                    # Si no tiene registro, verificar si tiene permiso o justificación previa
+                    # Si no tiene NADA, verificar si tiene permiso o justificación previa
                     if hay_permiso_activo(al["id"], fecha_str):
                         cur.execute("""
                             INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
@@ -1595,12 +1599,11 @@ def procesar_faltas_parciales():
                     # Aplicar justificación previa si existe
                     jp = (_aplicar_just_prev(cur, al["id"], fecha_str, "Falta") if v["tipo"] == VENT_CLASES else False)
                     
-                    # Marcar Falta
+                    # Marcar Falta (solo si realmente no tiene nada)
                     cur.execute("""
                         INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id)
                         VALUES(?,?,?,?,?,?,?,?,?)
                     """, (al["id"], fecha_d, v["id"], tipo, h, est, 1 if jp else 0, "auto", pid))
-
 
 #JUSTIFICAR ASISTENCIA
 def justificar_asistencia(ida, obs, usuario):
