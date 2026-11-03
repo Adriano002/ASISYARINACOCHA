@@ -279,9 +279,17 @@ def _verificar_admin_activo():
 
 @st.cache_resource
 def inicializar_bd():
+    from sync import descargar_bd_si_no_existe
+    from db import DB_PATH
+    from pathlib import Path
+ 
+    if not Path(DB_PATH).exists():
+        log.info("Descargando BD de R2 por primera vez (Caché Global)...")
+        descargar_bd_si_no_existe(str(DB_PATH))
+        
     aplicar_schema()
     _seed()
-    log.info("base de datos respondiendo correctamente")
+    log.info("✅ Base de datos inicializada y lista para todos los usuarios.")
     return True
 
 def _seed():
