@@ -7331,16 +7331,15 @@ def vista_login():
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
 
-        /* 2. FONDO CON LUCES (Para que el cristal resalte) */
+        /* 2. FONDO CON LUCES */
         .stApp {
-            background-color: #0f172a !important; /* Azul muy oscuro casi negro */
+            background-color: #0f172a !important;
             background-image: 
                 radial-gradient(circle at 15% 50%, rgba(232,123,74,0.15), transparent 40%),
                 radial-gradient(circle at 85% 30%, rgba(196,86,42,0.15), transparent 40%),
                 radial-gradient(circle at 50% 90%, rgba(232,123,74,0.10), transparent 40%) !important;
         }
         
-        /* Si el usuario tiene modo claro, un fondo gris suave con luces naranjas */
         @media (prefers-color-scheme: light) {
             .stApp {
                 background-color: #F4F6F9 !important;
@@ -7350,19 +7349,33 @@ def vista_login():
             }
         }
 
-        /* 3. CENTRADO PERFECTO EN LA PANTALLA */
+        /* 3. 🚨 FIX PARA CENTRAR EN CELULAR Y PC 🚨 */
         .block-container {
             padding: 0 !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
-            min-height: 100vh !important;
+            min-height: 100vh !important; 
+            min-height: 100dvh !important; /* El truco mágico para celulares modernos */
         }
 
-        /* 4. EFECTO LIQUID GLASS (Para los contenedores nativos de Streamlit) */
+        /* Ajuste fino para celular */
+        @media (max-width: 768px) {
+            .block-container {
+                justify-content: center !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
+            /* Damos un pequeño respiro al teclado */
+            div[data-testid="stForm"] {
+                margin-bottom: 5vh !important; 
+            }
+        }
+
+        /* 4. EFECTO LIQUID GLASS */
         div[data-testid="stForm"] { 
             background: rgba(255, 255, 255, 0.05) !important;
-            backdrop-filter: blur(20px) !important; /* El desenfoque del cristal */
+            backdrop-filter: blur(20px) !important;
             -webkit-backdrop-filter: blur(20px) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
             border-radius: 24px !important;
@@ -7378,7 +7391,7 @@ def vista_login():
             }
         }
 
-        /* 5. TEXTOS DENTRO DEL CRISTAL */
+        /* 5. TEXTOS */
         .glass-title {
             text-align: center;
             font-size: 28px;
@@ -7399,7 +7412,7 @@ def vista_login():
             .glass-subtitle { color: #555; }
         }
 
-        /* 6. INPUTS DE CRISTAL */
+        /* 6. INPUTS */
         .stTextInput input {
             border-radius: 12px !important; 
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -7437,7 +7450,7 @@ def vista_login():
             div[data-testid="stForm"] label { color: #333 !important; }
         }
 
-        /* 7. BOTÓN BRILLANTE */
+        /* 7. BOTÓN */
         div[data-testid="stForm"] .stFormSubmitButton > button {
             background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
             color: #FFFFFF !important; 
@@ -7455,7 +7468,7 @@ def vista_login():
             box-shadow: 0 12px 25px rgba(232, 123, 74, 0.6) !important; 
         }
 
-        /* 8. LOGO PEQUEÑO EN EL CRISTAL */
+        /* 8. LOGO */
         .glass-logo {
             display: flex;
             justify-content: center;
@@ -7476,10 +7489,8 @@ def vista_login():
     _, col_centro, _ = st.columns([1, 1.2, 1])
     
     with col_centro:
-        # Usamos el formulario directamente (el CSS lo convierte en Cristal)
         with st.form("login_form", clear_on_submit=False):
             
-            # Cabecera con logo y textos
             logo_html = f'<div class="glass-logo"><img src="data:image/png;base64,{escudo_b64}"></div>' if escudo_b64 else ''
             st.markdown(
                 f"""
@@ -7490,11 +7501,9 @@ def vista_login():
                 unsafe_allow_html=True
             )
             
-            # Inputs
             usuario = st.text_input("Usuario", placeholder="Ej: admin")
             password = st.text_input("Contraseña", type="password", placeholder="••••••••")
             
-            # Botón
             enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
             
             if enviado:
@@ -7508,7 +7517,6 @@ def vista_login():
                 else:
                     st.error(err or "Credenciales incorrectas")
 
-        # Footer sutil
         st.markdown(
             """
             <div style="text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 15px;">
