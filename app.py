@@ -6862,18 +6862,18 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    # --- CSS LIQUID GLASS OPTIMIZADO PARA CELULAR ---
+    # --- CSS LIQUID GLASS OPTIMIZADO (A PRUEBA DE MODO OSCURO) ---
     st.markdown(
         """
         <style>
-        /* 1. LIMPIEZA TOTAL DE STREAMLIT (Ocultar corona, menús y header) */
+        /* 1. LIMPIEZA TOTAL DE STREAMLIT */
         header[data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
         
-        /* 🆕 MATAR LA CORONA DE STREAMLIT */
+        /* MATAR LA CORONA DE STREAMLIT */
         #MainMenu { visibility: hidden !important; }
         footer { visibility: hidden !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
@@ -6881,7 +6881,7 @@ def vista_login():
         div[class*="viewerBadge"] { display: none !important; }
         a[href*="streamlit.io"] { display: none !important; }
 
-        /* 2. FONDO CON LUCES */
+        /* 2. FONDO CON LUCES (Forzado) */
         .stApp {
             background-color: #0f172a !important;
             background-image: 
@@ -6906,22 +6906,23 @@ def vista_login():
             flex-direction: column !important;
             justify-content: center !important;
             min-height: 100vh !important; 
-            min-height: 100dvh !important; /* El truco mágico para celulares */
+            min-height: 100dvh !important; 
         }
 
-        /* 🆕 Ajuste fino para obligar a centrar en celular */
         @media (max-width: 768px) {
             .block-container {
                 justify-content: center !important;
                 padding-top: 0 !important;
                 padding-bottom: 0 !important;
-                margin-top: -5vh !important; /* Lo empuja un poquito para arriba para que el teclado no lo tape */
+                margin-top: -5vh !important; 
             }
         }
 
-        /* 4. EFECTO LIQUID GLASS */
+        /* 4. EFECTO LIQUID GLASS (BLINDADO CONTRA MODO OSCURO) */
+        /* 🆕 Usamos !important en el fondo para que Streamlit no lo cambie a negro sólido */
         div[data-testid="stForm"] { 
             background: rgba(255, 255, 255, 0.05) !important;
+            background-color: rgba(255, 255, 255, 0.05) !important; 
             backdrop-filter: blur(20px) !important;
             -webkit-backdrop-filter: blur(20px) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -6933,6 +6934,7 @@ def vista_login():
         @media (prefers-color-scheme: light) {
             div[data-testid="stForm"] { 
                 background: rgba(255, 255, 255, 0.6) !important;
+                background-color: rgba(255, 255, 255, 0.6) !important;
                 border: 1px solid rgba(255, 255, 255, 0.8) !important;
                 box-shadow: 0 30px 60px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
             }
@@ -7023,19 +7025,25 @@ def vista_login():
     with col_centro:
         with st.form("login_form", clear_on_submit=False):
             
-            # 🆕 Título con colores (asis negro, yarina naranja)
+            # 🆕 Ajuste de color para el texto en modo oscuro/claro
             st.markdown(
                 """
                 <div class="glass-title">
-                    <span style="color: var(--text-color);">asis</span><span style="color: #E87B4A;">yarina</span>
+                    <span style="color: #111111;" class="txt-asis">asis</span><span style="color: #E87B4A;">yarina</span>
                 </div>
                 <div class="glass-subtitle">Ingresa tus credenciales</div>
+                <style>
+                    /* Si el celular está en modo oscuro, el texto "asis" se vuelve blanco */
+                    @media (prefers-color-scheme: dark) {
+                        .txt-asis { color: #FFFFFF !important; }
+                    }
+                </style>
                 """,
                 unsafe_allow_html=True
             )
             
-            usuario = st.text_input("Usuario", placeholder=" ********")
-            password = st.text_input("Contraseña", type="password", placeholder="********")
+            usuario = st.text_input("Usuario", placeholder="Ej: admin")
+            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
             
             enviado = st.form_submit_button("Ingresar al sistema", use_container_width=True)
             
