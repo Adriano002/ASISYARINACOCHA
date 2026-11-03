@@ -7307,269 +7307,176 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    from pathlib import Path
-    import base64
-
-    # --- Cargar escudo ---
-    escudo_path = Path("escudo.png")
-    escudo_b64 = ""
-    if escudo_path.exists():
-        try:
-            with open(escudo_path, "rb") as f:
-                escudo_b64 = base64.b64encode(f.read()).decode()
-        except Exception:
-            escudo_b64 = ""
-
-    # --- CSS PREMIUM UNIFICADO (PC Y CELULAR) ---
+    # --- CSS PREMIUM (Estilo Tarjeta Freepik) ---
     st.markdown(
         """
         <style>
-        /* 1. LIMPIEZA DE STREAMLIT */
+        /* 1. LIMPIEZA TOTAL DE STREAMLIT */
         header[data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
 
-        /* 2. FONDO */
+        /* 2. FONDO GENERAL (Degradado sutil) */
         .stApp {
-            background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.08), transparent 25%),
-                        radial-gradient(circle at 85% 30%, rgba(196,86,42,0.08), transparent 25%),
-                        #F4F6F9 !important;
-        }
-        @media (prefers-color-scheme: dark) {
-            .stApp {
-                background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.12), transparent 25%),
-                            radial-gradient(circle at 85% 30%, rgba(196,86,42,0.12), transparent 25%),
-                            #0E1117 !important;
-            }
+            background: radial-gradient(circle at 50% 0%, rgba(232,123,74,0.15), transparent 50%),
+                        #121212 !important;
         }
 
-        /* 3. CENTRADO VERTICAL MATEMÁTICO */
+        /* 3. CENTRADO VERTICAL PERFECTO */
         .block-container {
             padding: 0 !important;
-            margin: 0 !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
             min-height: 100vh !important;
         }
 
-        /* 4. LA TARJETA FLOTANTE (Se ve bien en PC y Celu) */
-        .login-card-wrapper {
-            background: #FFFFFF;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.02);
-            padding: 50px 40px 40px 40px;
-            width: 100%;
-            max-width: 420px;
-            margin: 0 auto;
+        /* 4. EL TRUCO MÁGICO: ESTILIZAR EL CONTENEDOR NATIVO DE STREAMLIT */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            background: #FFFFFF !important;
+            border-radius: 20px !important;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important;
+            overflow: hidden !important;
+            max-width: 400px !important;
+            margin: 0 auto !important;
+            border: none !important;
+        }
+
+        /* 5. CABECERA NARANJA (Reemplaza al escudo) */
+        .login-header {
+            background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%);
+            padding: 40px 30px;
             text-align: center;
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
-            overflow: hidden;
+            color: white;
+            margin: -16px -16px 20px -16px; /* Estira el color a los bordes */
         }
-        
-        /* Línea naranja decorativa superior (Toque Premium) */
-        .login-card-wrapper::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 6px;
-            background: linear-gradient(90deg, #E87B4A 0%, #C4562A 50%, #E87B4A 100%);
+        .login-header h1 {
+            font-size: 32px;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -1px;
+            color: #FFFFFF !important;
         }
-
-        @media (prefers-color-scheme: dark) {
-            .login-card-wrapper {
-                background: #1E1E1E;
-                box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
-            }
+        .login-header p {
+            font-size: 13px;
+            margin: 8px 0 0 0;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 5. LOGO Y TÍTULOS */
-        .login-logo {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .login-logo img {
-            width: 90px; 
-            height: 90px; 
-            object-fit: contain;
-            filter: drop-shadow(0 8px 12px rgba(232,123,74,0.2));
-        }
-        .login-logo-fallback {
-            width: 90px; height: 90px; border-radius: 50%;
-            background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
-            color: white; font-size: 40px; font-weight: 900;
-            display: flex; align-items: center; justify-content: center;
-            margin: 0 auto; box-shadow: 0 10px 20px rgba(232,123,74,0.3);
-        }
-        
-        .login-title { 
-            font-size: 32px; 
-            font-weight: 900; 
-            color: #C4562A; 
-            margin: 0 0 8px 0; 
-            letter-spacing: -1px; 
-        }
-        .login-subtitle { 
-            font-size: 13px; 
-            font-weight: 700; 
-            color: #888888; 
-            margin: 0 0 30px 0; 
-            text-transform: uppercase; 
-            letter-spacing: 0.15em; 
-        }
-        @media (prefers-color-scheme: dark) {
-            .login-title { color: #F5A582; }
-            .login-subtitle { color: #A0A0A0; }
-        }
-
-        /* 6. QUITAR EL CUADRADO FEO DEL FORMULARIO */
+        /* 6. FORMULARIO E INPUTS */
         div[data-testid="stForm"] { 
             border: none !important; 
-            padding: 0 !important; 
+            padding: 0 20px 20px 20px !important; 
             background: transparent !important; 
-            box-shadow: none !important; 
         }
         
-        /* Inputs */
         .stTextInput input {
-            border-radius: 12px !important; 
-            border: 1.5px solid rgba(128, 128, 128, 0.2) !important;
-            padding: 14px 16px !important; 
-            font-size: 16px !important; 
-            background: #FAFAFA !important;
-            transition: all 0.3s ease !important;
-        }
-        @media (prefers-color-scheme: dark) {
-            .stTextInput input { background: #2A2A2A !important; color: white !important; }
+            border-radius: 10px !important; 
+            border: 1.5px solid rgba(0, 0, 0, 0.1) !important;
+            padding: 12px 16px !important; 
+            font-size: 15px !important; 
+            background: #F8F9FA !important;
+            color: #333 !important;
         }
         .stTextInput input:focus { 
             border-color: #E87B4A !important; 
             background: #FFFFFF !important;
             box-shadow: 0 0 0 4px rgba(232, 123, 74, 0.15) !important; 
         }
+        
         div[data-testid="stForm"] label { 
-            font-size: 12px !important; 
+            font-size: 11px !important; 
             font-weight: 800 !important; 
             text-transform: uppercase !important; 
-            letter-spacing: 0.1em !important; 
-            color: #666666 !important; 
-            margin-bottom: 8px !important;
+            color: #666 !important; 
         }
 
-        /* Botón */
+        /* 7. BOTÓN (Estilo pastilla) */
         div[data-testid="stForm"] .stFormSubmitButton > button {
-            background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%) !important;
+            background: #D66535 !important;
             color: #FFFFFF !important; 
             font-weight: 800 !important; 
-            font-size: 16px !important;
-            padding: 14px !important; 
-            border-radius: 12px !important; 
+            font-size: 14px !important;
+            padding: 12px !important; 
+            border-radius: 8px !important; 
             border: none !important;
-            margin-top: 20px !important; 
-            box-shadow: 0 8px 20px rgba(232, 123, 74, 0.3) !important;
-            transition: all 0.2s ease !important;
+            margin-top: 15px !important; 
             text-transform: uppercase !important;
             letter-spacing: 0.05em !important;
         }
         div[data-testid="stForm"] .stFormSubmitButton > button:hover { 
-            transform: translateY(-2px) !important; 
-            box-shadow: 0 12px 25px rgba(232, 123, 74, 0.4) !important; 
+            background: #E87B4A !important;
         }
 
-        /* Footer */
+        /* 8. FOOTER */
         .login-footer { 
-            margin-top: 30px; 
+            text-align: center; 
             font-size: 11px; 
-            color: #AAAAAA; 
-            text-align: center;
+            color: #888; 
+            margin-top: 10px; 
         }
-        .login-footer .powered { font-weight: 800; color: #C4562A; }
         
-        /* 7. AJUSTE EXCLUSIVO PARA CELULARES */
         @media (max-width: 768px) {
-            /* Le damos un poco de aire arriba y abajo para que no toque los bordes */
-            .block-container {
-                padding: 20px 15px !important;
-                min-height: 95vh !important;
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                max-width: 90% !important;
             }
-            .login-card-wrapper { 
-                padding: 35px 20px; 
-                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
-                border-radius: 18px;
-            }
-            .login-title { font-size: 28px; }
-            .login-logo img, .login-logo-fallback { width: 75px; height: 75px; }
-            div[data-testid="stForm"] .stFormSubmitButton > button {
-                padding: 12px !important;
-                font-size: 15px !important;
-            }
-            .stTextInput input {
-                padding: 12px 14px !important; 
-                font-size: 15px !important;
-            }
+            .login-header { padding: 30px 20px; }
+            .login-header h1 { font-size: 28px; }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # --- RENDERIZADO ---
+    # --- RENDERIZADO (Todo dentro de un st.container nativo) ---
     _, col_centro, _ = st.columns([1, 1.2, 1])
     
     with col_centro:
-        # 1. Tarjeta Visual (Logo y Título)
-        if escudo_b64:
-            logo_html = f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" alt="Logo"></div>'
-        else:
-            logo_html = '<div class="login-logo"><div class="login-logo-fallback">Y</div></div>'
-
-        st.markdown(
-            f"""
-            <div class="login-card-wrapper">
-                {logo_html}
-                <h1 class="login-title">asisyarina</h1>
-                <p class="login-subtitle">Sistema de Asistencia</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # 2. Formulario (Visualmente integrado a la tarjeta)
-        with st.form("login_form", clear_on_submit=False):
-            usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
+        # Usamos el contenedor nativo de Streamlit
+        with st.container(border=True):
             
-            enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
+            # Cabecera Naranja
+            st.markdown(
+                """
+                <div class="login-header">
+                    <h1>asisyarina</h1>
+                    <p>Sistema de Asistencia</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             
-            if enviado:
-                datos, err = autenticar(usuario, password)
-                if datos:
-                    st.session_state["user"] = datos
-                    auditar(datos["usuario"], "Login")
-                    st.query_params["sesion"] = datos["usuario"]
-                    st.query_params["ts"] = str(int(time.time()))
-                    st.rerun()
-                else:
-                    st.error(err or "Credenciales incorrectas")
+            # Formulario
+            with st.form("login_form", clear_on_submit=False):
+                usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
+                password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
+                
+                enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
+                
+                if enviado:
+                    datos, err = autenticar(usuario, password)
+                    if datos:
+                        st.session_state["user"] = datos
+                        auditar(datos["usuario"], "Login")
+                        st.query_params["sesion"] = datos["usuario"]
+                        st.query_params["ts"] = str(int(time.time()))
+                        st.rerun()
+                    else:
+                        st.error(err or "Credenciales incorrectas")
 
-        # 3. Footer
-        st.markdown(
-            """
-            <div class="login-footer">
-                © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            # Footer dentro de la tarjeta
+            st.markdown(
+                """
+                <div class="login-footer">
+                    © 2026 I.E. Yarinacocha
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
