@@ -7307,12 +7307,10 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
 
 #LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    # ============================================================
-    # LOGIN PREMIUM - I.E. YARINACOCHA
-    # ============================================================
     from pathlib import Path
     import base64
 
+    # --- Cargar escudo para el logo ---
     escudo_path = Path("escudo.png")
     escudo_b64 = ""
     if escudo_path.exists():
@@ -7322,370 +7320,216 @@ def vista_login():
         except Exception:
             escudo_b64 = ""
 
-    st.markdown("""
-    <style>
-    /* ============ FONDO GENERAL ============ */
-    .stApp {
-        background: radial-gradient(ellipse at top left, rgba(232,123,74,0.12) 0%, transparent 50%),
-                    radial-gradient(ellipse at bottom right, rgba(196,86,42,0.10) 0%, transparent 50%),
-                    linear-gradient(135deg, #FFF8F3 0%, #FFFFFF 40%, #FFF5EE 100%) !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        .stApp {
-            background: radial-gradient(ellipse at top left, rgba(232,123,74,0.15) 0%, transparent 50%),
-                        radial-gradient(ellipse at bottom right, rgba(196,86,42,0.12) 0%, transparent 50%),
-                        linear-gradient(135deg, #1A1210 0%, #0F0B0A 40%, #1A1210 100%) !important;
-        }
-    }
-
-    /* ============ OCULTAR TODO EL "AIRE" SUPERIOR DE STREAMLIT ============ */
-    header[data-testid="stHeader"] { display: none !important; height: 0 !important; }
-    [data-testid="stToolbar"] { display: none !important; }
-    [data-testid="stDecoration"] { display: none !important; }
-    [data-testid="collapsedControl"] { display: none !important; }
-    section[data-testid="stSidebar"] { display: none !important; }
-
-    .stApp > div[data-testid="stAppViewContainer"] > .main,
-    section.main,
-    [data-testid="stAppViewContainer"] > section {
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-    }
-    .block-container,
-    [data-testid="stAppViewContainer"] .block-container,
-    .main .block-container {
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        margin-top: 0 !important;
-        max-width: 100% !important;
-    }
-    [data-testid="stAppViewContainer"] > div:first-child,
-    [data-testid="stVerticalBlock"] > div:first-child {
-        margin-top: 0 !important;
-        padding-top: 0 !important;
-    }
-
-    /* ============ WRAPPER CENTRADO ============ */
-    .login-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        padding: 30px 20px;
-        box-sizing: border-box;
-    }
-
-    /* ============ TARJETA ============ */
-    .login-card {
-        background: #FFFFFF;
-        border-radius: 24px;
-        box-shadow:
-            0 25px 60px -15px rgba(196, 86, 42, 0.25),
-            0 0 0 1px rgba(232, 123, 74, 0.12),
-            inset 0 1px 0 rgba(255,255,255,0.9);
-        padding: 48px 44px 36px 44px;
-        max-width: 420px;
-        width: 100%;
-        position: relative;
-        overflow: hidden;
-        animation: loginFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    @keyframes loginFadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-    @media (prefers-color-scheme: dark) {
-        .login-card {
-            background: #1E1613;
-            box-shadow:
-                0 25px 60px -15px rgba(0, 0, 0, 0.6),
-                0 0 0 1px rgba(232, 123, 74, 0.20);
-        }
-    }
-    .login-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 5px;
-        background: linear-gradient(90deg, #E87B4A 0%, #C4562A 50%, #E87B4A 100%);
-    }
-
-    /* ============ LOGO ============ */
-    .login-logo {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 20px;
-    }
-    .login-logo img {
-        width: 84px; height: 84px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 12px rgba(232,123,74,0.3));
-    }
-    .login-logo .logo-fallback {
-        width: 84px; height: 84px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
-        display: flex; align-items: center; justify-content: center;
-        color: white; font-size: 36px; font-weight: 900;
-        box-shadow: 0 8px 20px rgba(232,123,74,0.35);
-    }
-
-    /* ============ TÍTULOS ============ */
-    .login-title {
-        text-align: center;
-        font-size: 28px;
-        font-weight: 800;
-        color: #C4562A;
-        letter-spacing: -0.5px;
-        margin-bottom: 4px;
-    }
-    .login-subtitle {
-        text-align: center;
-        font-size: 13px;
-        font-weight: 600;
-        color: #8A7568;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        margin-bottom: 28px;
-    }
-    @media (prefers-color-scheme: dark) {
-        .login-title { color: #F5A582; }
-        .login-subtitle { color: #A89890; }
-    }
-
-    /* ============ FORMULARIO (continuación de la tarjeta) ============ */
-    div[data-testid="stForm"] {
-        background: #FFFFFF !important;
-        border-radius: 0 0 24px 24px !important;
-        padding: 8px 44px 36px 44px !important;
-        box-shadow: 0 25px 60px -15px rgba(196, 86, 42, 0.25),
-                    0 0 0 1px rgba(232, 123, 74, 0.12) !important;
-        border: none !important;
-        max-width: 420px !important;
-        margin: 0 auto !important;
-        border-top: none !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        div[data-testid="stForm"] {
-            background: #1E1613 !important;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6),
-                        0 0 0 1px rgba(232, 123, 74, 0.20) !important;
-        }
-    }
-
-    /* Cabecera como continuación de la tarjeta */
-    .login-header-card {
-        background: #FFFFFF;
-        border-radius: 24px 24px 0 0;
-        padding: 44px 44px 8px 44px;
-        box-shadow: 0 25px 60px -15px rgba(196, 86, 42, 0.25),
-                    0 0 0 1px rgba(232, 123, 74, 0.12);
-        max-width: 420px;
-        margin: 0 auto;
-        position: relative;
-        overflow: hidden;
-        border-bottom: none;
-    }
-    @media (prefers-color-scheme: dark) {
-        .login-header-card {
-            background: #1E1613;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6),
-                        0 0 0 1px rgba(232, 123, 74, 0.20);
-        }
-    }
-
-    /* ============ BOTÓN ============ */
-    .login-card .stFormSubmitButton > button,
-    div[data-testid="stForm"] .stFormSubmitButton > button {
-        background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
-        font-size: 15px !important;
-        letter-spacing: 0.06em !important;
-        text-transform: uppercase !important;
-        padding: 14px !important;
-        border-radius: 12px !important;
-        box-shadow: 0 8px 20px rgba(196, 86, 42, 0.30) !important;
-        transition: all 0.25s ease !important;
-        margin-top: 8px;
-    }
-    .login-card .stFormSubmitButton > button:hover,
-    div[data-testid="stForm"] .stFormSubmitButton > button:hover {
-        background: linear-gradient(135deg, #F08A5C 0%, #D66535 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 12px 28px rgba(196, 86, 42, 0.40) !important;
-    }
-
-    /* ============ INPUTS ============ */
-    div[data-testid="stForm"] .stTextInput input {
-        border-radius: 12px !important;
-        border: 1.5px solid rgba(232, 123, 74, 0.25) !important;
-        padding: 12px 16px !important;
-        font-size: 15px !important;
-        background: rgba(255, 248, 243, 0.6) !important;
-        transition: all 0.2s ease !important;
-    }
-    div[data-testid="stForm"] .stTextInput input:focus {
-        border-color: #E87B4A !important;
-        background: #FFFFFF !important;
-        box-shadow: 0 0 0 4px rgba(232, 123, 74, 0.15) !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        div[data-testid="stForm"] .stTextInput input {
-            background: rgba(232, 123, 74, 0.08) !important;
-        }
-        div[data-testid="stForm"] .stTextInput input:focus {
-            background: rgba(232, 123, 74, 0.15) !important;
-        }
-    }
-    div[data-testid="stForm"] label {
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.08em !important;
-        color: #8A7568 !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        div[data-testid="stForm"] label { color: #A89890 !important; }
-    }
-
-    /* ============ FOOTER ============ */
-    .login-footer {
-        text-align: center;
-        margin-top: 24px;
-        padding-top: 20px;
-        border-top: 1px solid rgba(232, 123, 74, 0.15);
-        font-size: 11px;
-        color: #A89890;
-        letter-spacing: 0.05em;
-    }
-    .login-footer .powered {
-        font-weight: 700;
-        color: #C4562A;
-    }
-    .login-security {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        font-size: 10.5px;
-        color: #A89890;
-        margin-top: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-    }
-    .login-security .dot {
-        width: 6px; height: 6px; border-radius: 50%;
-        background: #43A047;
-        box-shadow: 0 0 0 3px rgba(67, 160, 71, 0.15);
-    }
-
-    /* ============ 📱 MÓVIL ============ */
-    @media (max-width: 768px) {
-        .login-wrapper {
-            min-height: 100vh;
-            padding: 20px 16px;
-            align-items: flex-start;
-            padding-top: 40px;
-        }
-        div[data-testid="stForm"] {
-            padding: 8px 28px 28px 28px !important;
-        }
-        .login-header-card {
-            padding: 36px 28px 8px 28px;
-        }
-        .login-title { font-size: 24px; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ============ RENDER ============
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
-
-    _, centro, _ = st.columns([1, 1.2, 1])
-    with centro:
-        logo_html = (
-            f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" /></div>'
-            if escudo_b64
-            else '<div class="login-logo"><div class="logo-fallback">Y</div></div>'
-        )
-
-        st.markdown(f"""
-        <div class="login-header-card">
-            {logo_html}
-            <div class="login-title">asisyarina</div>
-            <div class="login-subtitle">Sistema de Asistencia Escolar</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.form("login", clear_on_submit=False):
-            usuario = st.text_input("Usuario", placeholder="Ingresa tu usuario")
-            password = st.text_input("Contraseña", type="password",
-                                     placeholder="Ingresa tu contraseña")
-            enviado = st.form_submit_button("Ingresar al sistema",
-                                            type="primary",
-                                            width='stretch')
-            if enviado:
-                datos, err = autenticar(usuario, password)
-                if datos:
-                    st.session_state["user"] = datos
-                    auditar(datos["usuario"], "Login")
-                    st.query_params["sesion"] = datos["usuario"]
-                    st.query_params["ts"] = str(int(time.time()))
-                    st.rerun()
-                else:
-                    st.error(err or "Credenciales incorrectas")
-
-        st.markdown("""
-        <div class="login-footer">
-            <div class="login-security">
-                <span class="dot"></span>
-                <span>Conexión segura</span>
-            </div>
-            <div style="margin-top:10px;">
-                © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Formulario con estilo de tarjeta continuación
-        st.markdown("""
+    # --- CSS para el Login (Diseño Premium) ---
+    st.markdown(
+        """
         <style>
-        /* Continuación visual de la tarjeta para el formulario */
-        div[data-testid="stForm"] {
-            background: #FFFFFF !important;
-            border-radius: 0 0 24px 24px !important;
-            padding: 8px 44px 36px 44px !important;
-            box-shadow: 0 25px 60px -15px rgba(196, 86, 42, 0.25),
-                        0 0 0 1px rgba(232, 123, 74, 0.12) !important;
-            border: none !important;
-            max-width: 420px !important;
-            margin: 0 auto !important;
-            border-top: none !important;
+        /* Fondo general */
+        .stApp {
+            background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.08), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(196,86,42,0.08), transparent 25%),
+                        #F8F9FA !important;
         }
         @media (prefers-color-scheme: dark) {
-            div[data-testid="stForm"] {
-                background: #1E1613 !important;
-                box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6),
-                            0 0 0 1px rgba(232, 123, 74, 0.20) !important;
-            }
-            /* El bloque de cabecera en modo oscuro */
-            div[data-testid="stMarkdownContainer"] > div[style*="background: #FFFFFF"] {
-                background: #1E1613 !important;
+            .stApp {
+                background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.12), transparent 25%),
+                            radial-gradient(circle at 85% 30%, rgba(196,86,42,0.12), transparent 25%),
+                            #0E1117 !important;
             }
         }
-        </style>
-        """, unsafe_allow_html=True)
+
+        /* ELIMINAR ESPACIOS VACÍOS DE STREAMLIT */
+        header[data-testid="stHeader"] { display: none !important; height: 0 !important; }
+        [data-testid="stToolbar"] { display: none !important; }
+        [data-testid="stDecoration"] { display: none !important; }
+        [data-testid="collapsedControl"] { display: none !important; }
+        section[data-testid="stSidebar"] { display: none !important; }
         
-        with st.form("login", clear_on_submit=False):
-            usuario = st.text_input("👤  Usuario", placeholder="Ingresa tu usuario")
-            password = st.text_input("🔒  Contraseña", type="password",
-                                     placeholder="Ingresa tu contraseña")
-            enviado = st.form_submit_button("Ingresar al sistema",
-                                            type="primary",
-                                            width='stretch')
+        .block-container,
+        [data-testid="stAppViewContainer"] .block-container,
+        .main .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            max-width: 100% !important;
+        }
+        [data-testid="stAppViewContainer"] > div:first-child,
+        [data-testid="stVerticalBlock"] > div:first-child {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        /* Centrado vertical */
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Tarjeta contenedora */
+        .login-card {
+            background: #FFFFFF;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1),
+                        0 0 0 1px rgba(0,0,0,0.03);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @media (prefers-color-scheme: dark) {
+            .login-card {
+                background: #1E1E1E;
+                box-shadow: 0 20px 40px -10px rgba(0,0,0,0.4),
+                            0 0 0 1px rgba(255,255,255,0.05);
+            }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo y Títulos */
+        .login-logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 4px 6px rgba(232,123,74,0.2));
+        }
+        .login-logo-fallback {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
+            color: white;
+            font-size: 40px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px auto;
+            box-shadow: 0 8px 16px rgba(232,123,74,0.3);
+        }
+        .login-title {
+            font-size: 26px;
+            font-weight: 800;
+            color: #C4562A;
+            margin: 0 0 5px 0;
+            letter-spacing: -0.5px;
+        }
+        .login-subtitle {
+            font-size: 13px;
+            font-weight: 600;
+            color: #888888;
+            margin: 0 0 25px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        @media (prefers-color-scheme: dark) {
+            .login-title { color: #F5A582; }
+            .login-subtitle { color: #A0A0A0; }
+        }
+
+        /* Formulario (integrado en la tarjeta) */
+        div[data-testid="stForm"] {
+            border: none !important;
+            padding: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        
+        /* Inputs */
+        .stTextInput input {
+            border-radius: 10px !important;
+            border: 1.5px solid rgba(128, 128, 128, 0.2) !important;
+            padding: 12px 16px !important;
+            font-size: 15px !important;
+            background: transparent !important;
+            transition: all 0.2s ease !important;
+        }
+        .stTextInput input:focus {
+            border-color: #E87B4A !important;
+            box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.15) !important;
+        }
+        div[data-testid="stForm"] label {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+            color: #666666 !important;
+        }
+
+        /* Botón */
+        div[data-testid="stForm"] .stFormSubmitButton > button {
+            background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 15px !important;
+            padding: 12px !important;
+            border-radius: 10px !important;
+            border: none !important;
+            margin-top: 15px !important;
+            box-shadow: 0 4px 12px rgba(232, 123, 74, 0.3) !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stForm"] .stFormSubmitButton > button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 16px rgba(232, 123, 74, 0.4) !important;
+        }
+
+        /* Footer */
+        .login-footer {
+            margin-top: 30px;
+            font-size: 11px;
+            color: #888888;
+            border-top: 1px solid rgba(128,128,128,0.1);
+            padding-top: 15px;
+        }
+        .login-footer .powered {
+            font-weight: 700;
+            color: #C4562A;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --- Renderizado HTML ---
+    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
+
+    # Columnas para centrar el contenido (Streamlit necesita al menos un elemento nativo)
+    _, col_centro, _ = st.columns([1, 1.2, 1])
+    
+    with col_centro:
+        # 1. Tarjeta visual superior
+        if escudo_b64:
+            logo_html = f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" alt="Logo"></div>'
+        else:
+            logo_html = '<div class="login-logo"><div class="login-logo-fallback">Y</div></div>'
+
+        st.markdown(
+            f"""
+            <div class="login-card">
+                {logo_html}
+                <h1 class="login-title">asisyarina</h1>
+                <p class="login-subtitle">Sistema de Asistencia</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # 2. Formulario funcional de Streamlit
+        with st.form("login_form", clear_on_submit=False):
+            usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
+            password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
+            
+            enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
+            
             if enviado:
                 datos, err = autenticar(usuario, password)
                 if datos:
@@ -7696,20 +7540,17 @@ def vista_login():
                     st.rerun()
                 else:
                     st.error(err or "Credenciales incorrectas")
-        
-        # Footer con marca de seguridad
-        st.markdown("""
-        <div class="login-footer">
-            <div class="login-security">
-                <span class="dot"></span>
-                <span>Conexión segura</span>
-            </div>
-            <div style="margin-top:10px;">
+
+        # 3. Footer
+        st.markdown(
+            """
+            <div class="login-footer">
                 © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 def vista_cambio_password_obligatorio():
