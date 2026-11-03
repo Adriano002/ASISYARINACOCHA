@@ -7320,10 +7320,35 @@ def vista_login():
         except Exception:
             escudo_b64 = ""
 
-    # --- CSS para el Login (Diseño Premium) ---
+    # --- CSS para el Login ---
     st.markdown(
         """
         <style>
+        /* 🚨 EL TRUCO MAESTRO: ELIMINAR EL ESPACIO EN BLANCO DE ARRIBA 🚨 */
+        header[data-testid="stHeader"] { 
+            display: none !important; 
+            height: 0 !important; 
+        }
+        [data-testid="stToolbar"] { display: none !important; }
+        [data-testid="stDecoration"] { display: none !important; }
+        [data-testid="collapsedControl"] { display: none !important; }
+        section[data-testid="stSidebar"] { display: none !important; }
+        
+        /* Atacar TODOS los contenedores posibles de Streamlit */
+        .block-container,
+        [data-testid="stAppViewBlockContainer"],
+        [data-testid="stAppViewContainer"] > section,
+        .main {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        /* Forzar la subida del contenido principal */
+        .main .block-container {
+            padding-top: 0rem !important;
+            margin-top: -4rem !important; /* Si aún sale abajo, aumenta a -6rem o -8rem */
+        }
+
         /* Fondo general */
         .stApp {
             background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.08), transparent 25%),
@@ -7338,33 +7363,12 @@ def vista_login():
             }
         }
 
-        /* ELIMINAR ESPACIOS VACÍOS DE STREAMLIT */
-        header[data-testid="stHeader"] { display: none !important; height: 0 !important; }
-        [data-testid="stToolbar"] { display: none !important; }
-        [data-testid="stDecoration"] { display: none !important; }
-        [data-testid="collapsedControl"] { display: none !important; }
-        section[data-testid="stSidebar"] { display: none !important; }
-        
-        .block-container,
-        [data-testid="stAppViewContainer"] .block-container,
-        .main .block-container {
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            margin-top: 0 !important;
-            max-width: 100% !important;
-        }
-        [data-testid="stAppViewContainer"] > div:first-child,
-        [data-testid="stVerticalBlock"] > div:first-child {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-
         /* Centrado vertical */
         .login-wrapper {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            min-height: 90vh; /* 90 para compensar la subida */
             padding: 20px;
             box-sizing: border-box;
         }
@@ -7435,7 +7439,7 @@ def vista_login():
             .login-subtitle { color: #A0A0A0; }
         }
 
-        /* Formulario (integrado en la tarjeta) */
+        /* Formulario */
         div[data-testid="stForm"] {
             border: none !important;
             padding: 0 !important;
@@ -7502,11 +7506,9 @@ def vista_login():
     # --- Renderizado HTML ---
     st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
 
-    # Columnas para centrar el contenido (Streamlit necesita al menos un elemento nativo)
     _, col_centro, _ = st.columns([1, 1.2, 1])
     
     with col_centro:
-        # 1. Tarjeta visual superior
         if escudo_b64:
             logo_html = f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" alt="Logo"></div>'
         else:
@@ -7523,7 +7525,6 @@ def vista_login():
             unsafe_allow_html=True,
         )
 
-        # 2. Formulario funcional de Streamlit
         with st.form("login_form", clear_on_submit=False):
             usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
             password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
@@ -7541,7 +7542,6 @@ def vista_login():
                 else:
                     st.error(err or "Credenciales incorrectas")
 
-        # 3. Footer
         st.markdown(
             """
             <div class="login-footer">
@@ -7552,7 +7552,6 @@ def vista_login():
         )
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
