@@ -7324,33 +7324,28 @@ def vista_login():
     st.markdown(
         """
         <style>
-        /* 🚨 EL TRUCO MAESTRO: ELIMINAR EL ESPACIO EN BLANCO DE ARRIBA 🚨 */
-        header[data-testid="stHeader"] { 
-            display: none !important; 
-            height: 0 !important; 
-        }
+        /* 1. MATAR TODOS LOS ESPACIOS EN BLANCO DE STREAMLIT */
+        header[data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
         
-        /* Atacar TODOS los contenedores posibles de Streamlit */
-        .block-container,
-        [data-testid="stAppViewBlockContainer"],
-        [data-testid="stAppViewContainer"] > section,
-        .main {
+        .stApp > header, .stApp > div:first-child,
+        [data-testid="stAppViewContainer"], [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"],
+        .block-container {
             padding-top: 0 !important;
             margin-top: 0 !important;
         }
 
-        /* Forzar la subida del contenido principal */
-        .main .block-container {
-            padding-top: 0rem !important;
-            margin-top: -4rem !important; /* Si aún sale abajo, aumenta a -6rem o -8rem */
-        }
-
-        /* Fondo general */
+        /* 2. FORZAR A LA PANTALLA A CENTRAR EL LOGIN */
         .stApp {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 100vh !important;
+            overflow: hidden !important; /* Evita scroll */
             background: radial-gradient(circle at 15% 50%, rgba(232,123,74,0.08), transparent 25%),
                         radial-gradient(circle at 85% 30%, rgba(196,86,42,0.08), transparent 25%),
                         #F8F9FA !important;
@@ -7363,35 +7358,27 @@ def vista_login():
             }
         }
 
-        /* Centrado vertical */
-        .login-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 90vh; /* 90 para compensar la subida */
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        /* Tarjeta contenedora */
-        .login-card {
+        /* 3. CONTENEDOR DEL LOGIN */
+        .login-box {
             background: #FFFFFF;
             border-radius: 20px;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1),
-                        0 0 0 1px rgba(0,0,0,0.03);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.03);
             padding: 40px;
             width: 100%;
             max-width: 400px;
             text-align: center;
             animation: fadeIn 0.5s ease-out;
+            /* 🚨 SI AÚN SE VE MUY ABAJO, AQUÍ ESTÁ EL NÚMERO 🚨 */
+            /* Cambia el -10px por -30px, -50px, etc. */
+            margin-top: -10px !important; 
         }
         @media (prefers-color-scheme: dark) {
-            .login-card {
+            .login-box {
                 background: #1E1E1E;
-                box-shadow: 0 20px 40px -10px rgba(0,0,0,0.4),
-                            0 0 0 1px rgba(255,255,255,0.05);
+                box-shadow: 0 20px 40px -10px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
             }
         }
+        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
@@ -7399,159 +7386,55 @@ def vista_login():
 
         /* Logo y Títulos */
         .login-logo img {
-            width: 90px;
-            height: 90px;
-            object-fit: contain;
-            margin-bottom: 15px;
+            width: 90px; height: 90px; object-fit: contain; margin-bottom: 15px;
             filter: drop-shadow(0 4px 6px rgba(232,123,74,0.2));
         }
         .login-logo-fallback {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
+            width: 90px; height: 90px; border-radius: 50%;
             background: linear-gradient(135deg, #E87B4A 0%, #C4562A 100%);
-            color: white;
-            font-size: 40px;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px auto;
-            box-shadow: 0 8px 16px rgba(232,123,74,0.3);
+            color: white; font-size: 40px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px auto; box-shadow: 0 8px 16px rgba(232,123,74,0.3);
         }
-        .login-title {
-            font-size: 26px;
-            font-weight: 800;
-            color: #C4562A;
-            margin: 0 0 5px 0;
-            letter-spacing: -0.5px;
-        }
-        .login-subtitle {
-            font-size: 13px;
-            font-weight: 600;
-            color: #888888;
-            margin: 0 0 25px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+        .login-title { font-size: 26px; font-weight: 800; color: #C4562A; margin: 0 0 5px 0; letter-spacing: -0.5px; }
+        .login-subtitle { font-size: 13px; font-weight: 600; color: #888888; margin: 0 0 25px 0; text-transform: uppercase; letter-spacing: 0.05em; }
         @media (prefers-color-scheme: dark) {
             .login-title { color: #F5A582; }
             .login-subtitle { color: #A0A0A0; }
         }
 
-        /* Formulario */
-        div[data-testid="stForm"] {
-            border: none !important;
-            padding: 0 !important;
-            background: transparent !important;
-            box-shadow: none !important;
-        }
-        
-        /* Inputs */
+        /* Formulario e Inputs */
+        div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; }
         .stTextInput input {
-            border-radius: 10px !important;
-            border: 1.5px solid rgba(128, 128, 128, 0.2) !important;
-            padding: 12px 16px !important;
-            font-size: 15px !important;
-            background: transparent !important;
+            border-radius: 10px !important; border: 1.5px solid rgba(128, 128, 128, 0.2) !important;
+            padding: 12px 16px !important; font-size: 15px !important; background: transparent !important;
             transition: all 0.2s ease !important;
         }
-        .stTextInput input:focus {
-            border-color: #E87B4A !important;
-            box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.15) !important;
-        }
-        div[data-testid="stForm"] label {
-            font-size: 11px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.08em !important;
-            color: #666666 !important;
-        }
+        .stTextInput input:focus { border-color: #E87B4A !important; box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.15) !important; }
+        div[data-testid="stForm"] label { font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #666666 !important; }
 
         /* Botón */
         div[data-testid="stForm"] .stFormSubmitButton > button {
             background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
-            color: #FFFFFF !important;
-            font-weight: 700 !important;
-            font-size: 15px !important;
-            padding: 12px !important;
-            border-radius: 10px !important;
-            border: none !important;
-            margin-top: 15px !important;
-            box-shadow: 0 4px 12px rgba(232, 123, 74, 0.3) !important;
+            color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important;
+            padding: 12px !important; border-radius: 10px !important; border: none !important;
+            margin-top: 15px !important; box-shadow: 0 4px 12px rgba(232, 123, 74, 0.3) !important;
             transition: all 0.2s ease !important;
         }
-        div[data-testid="stForm"] .stFormSubmitButton > button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 6px 16px rgba(232, 123, 74, 0.4) !important;
-        }
+        div[data-testid="stForm"] .stFormSubmitButton > button:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(232, 123, 74, 0.4) !important; }
 
         /* Footer */
-        .login-footer {
-            margin-top: 30px;
-            font-size: 11px;
-            color: #888888;
-            border-top: 1px solid rgba(128,128,128,0.1);
-            padding-top: 15px;
-        }
-        .login-footer .powered {
-            font-weight: 700;
-            color: #C4562A;
+        .login-footer { margin-top: 30px; font-size: 11px; color: #888888; border-top: 1px solid rgba(128,128,128,0.1); padding-top: 15px; }
+        .login-footer .powered { font-weight: 700; color: #C4562A; }
+        
+        /* Ajuste especial para celular */
+        @media (max-width: 768px) {
+            .login-box { padding: 30px 20px; margin-top: 0 !important; }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
-    # --- Renderizado HTML ---
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
-
-    _, col_centro, _ = st.columns([1, 1.2, 1])
-    
-    with col_centro:
-        if escudo_b64:
-            logo_html = f'<div class="login-logo"><img src="data:image/png;base64,{escudo_b64}" alt="Logo"></div>'
-        else:
-            logo_html = '<div class="login-logo"><div class="login-logo-fallback">Y</div></div>'
-
-        st.markdown(
-            f"""
-            <div class="login-card">
-                {logo_html}
-                <h1 class="login-title">asisyarina</h1>
-                <p class="login-subtitle">Sistema de Asistencia</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        with st.form("login_form", clear_on_submit=False):
-            usuario = st.text_input("Usuario", placeholder="Escribe tu usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Escribe tu contraseña")
-            
-            enviado = st.form_submit_button("Ingresar al sistema", type="primary", use_container_width=True)
-            
-            if enviado:
-                datos, err = autenticar(usuario, password)
-                if datos:
-                    st.session_state["user"] = datos
-                    auditar(datos["usuario"], "Login")
-                    st.query_params["sesion"] = datos["usuario"]
-                    st.query_params["ts"] = str(int(time.time()))
-                    st.rerun()
-                else:
-                    st.error(err or "Credenciales incorrectas")
-
-        st.markdown(
-            """
-            <div class="login-footer">
-                © 2026 <span class="powered">I.E. Yarinacocha</span> · Todos los derechos reservados
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown('</div>', unsafe_allow_html=True)
 def vista_cambio_password_obligatorio():
     usuario = st.session_state["user"]
     st.title("Cambio obligatorio de contraseña")
