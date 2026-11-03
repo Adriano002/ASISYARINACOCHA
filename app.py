@@ -1347,6 +1347,7 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
 
 #REGISTRAR ENTRADA
 #REGISTRAR ENTRADA
+#REGISTRAR ENTRADA
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
@@ -1357,17 +1358,15 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
     bloq = alumno_bloqueado(al["id"])
     if bloq:
-        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni,
-                tb="bloqueos", rid=al["id"])
-        return False, "BLOQUEADO", (
-            _nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"
-        ), {"alumno": al, "motivo": bloq["motivo"]}
+        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni, tb="bloqueos", rid=al["id"])
+        return False, "BLOQUEADO", (_nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"), {"alumno": al, "motivo": bloq["motivo"]}
 
     # 🆕 FLUJO DE PSICOLOGÍA (SOLO turno Mañana y SOLO después de las 08:00)
     es_turno_manana = (al["turno"] == "Mañana")
     hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
     hora_8 = datetime.strptime("08:00", "%H:%M").time()
 
+    # Validar si viene de psicología
     if es_turno_manana and hora_actual_dt >= hora_8:
         if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
             # Ya respondió (SÍ o NO)
@@ -1376,14 +1375,13 @@ def registrar_entrada(dni, usuario, origen="qr"):
             estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
             st.session_state["_psico_afirmativo"] = False
         else:
-            # Vamos a preguntar
+            # Vamos a preguntar (AQUÍ ESTÁ EL TRUCO PARA QUE APAREZCA)
             st.session_state["_psico_preguntar"] = True
             st.session_state["_psico_dni"] = dni
+            st.session_state["_psico_timestamp"] = time.time()
             return False, "PREGUNTA_PSICO", "", {"alumno": al}
     else:
-        # Turno Tarde o antes de las 08:00 → flujo normal
         estado_forzado = None
-        # 🧹 Limpieza defensiva por si quedó basura de una pregunta anterior
         st.session_state.pop("_psico_preguntar", None)
         st.session_state.pop("_psico_dni", None)
         st.session_state.pop("_psico_afirmativo", None)
@@ -1394,15 +1392,9 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
     if n_previas >= limite:
         if not bloq:
-            crear_bloqueo(al["id"],
-                          f"{n_previas} tardanza(s) acumulada(s) - reincidente={reincidente}",
-                          usuario, "automatico")
-        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni,
-                tb="bloqueos", rid=al["id"])
-        return False, "BLOQUEADO", (
-            _nombre_completo(al) +
-            " | BLOQUEADO (alcanzó el limite de tardanzas) - retener"
-        ), {"alumno": al, "motivo": "limite alcanzado"}
+            crear_bloqueo(al["id"], f"{n_previas} tardanza(s) acumulada(s) - reincidente={reincidente}", usuario, "automatico")
+        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni, tb="bloqueos", rid=al["id"])
+        return False, "BLOQUEADO", (_nombre_completo(al) + " | BLOQUEADO (alcanzó el limite de tardanzas) - retener"), {"alumno": al, "motivo": "limite alcanzado"}
 
     fecha_str = hoy_str()
     fecha_d = hoy_date()
@@ -1411,16 +1403,14 @@ def registrar_entrada(dni, usuario, origen="qr"):
     pid = per["id"] if per else None
 
     with cursor() as (con, cur):
-        cur.execute("SELECT id FROM dias_especiales WHERE fecha=? AND activo=1 "
-                    "AND tipo='feriado' LIMIT 1", (fecha_d,))
+        cur.execute("SELECT id FROM dias_especiales WHERE fecha=? AND activo=1 AND tipo='feriado' LIMIT 1", (fecha_d,))
         if cur.fetchone():
             return False, "ERROR", "Hoy es feriado, no se registra", {}
 
     v = ventana_activa_para_alumno(al["turno_id"], fecha_str, al["seccion_id"])
     if not v:
-        return False, "ERROR", (
-            _nombre_completo(al) + " | Sin ventana activa (" + ha + ")"
-        ), {"alumno": al}
+        # 🆕 MENSAJE MEJORADO: Si la ventana ya cerró, avisarle al de la puerta
+        return False, "ERROR", (_nombre_completo(al) + f" | Fuera de horario ({ha}). Ventana cerrada."), {"alumno": al}
 
     permiso = hay_permiso_activo(al["id"], fecha_str)
     tipo_real = v["tipo"]
@@ -1430,61 +1420,39 @@ def registrar_entrada(dni, usuario, origen="qr"):
     ev_nombre = v.get("evento_nombre")
 
     with cursor() as (con, cur):
-        cur.execute("SELECT id,estado FROM asistencias "
-                    "WHERE alumno_id=? AND fecha=? AND tipo=?",
-                    (al["id"], fecha_d, tipo_real))
+        cur.execute("SELECT id,estado FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo=?", (al["id"], fecha_d, tipo_real))
         ex = cur.fetchone()
         if ex:
-            return False, "ERROR", (
-                _nombre_completo(al) + f" ya registro {tipo_real} hoy ({ex['estado']})"
-            ), {}
+            return False, "ERROR", (_nombre_completo(al) + f" ya registro {tipo_real} hoy ({ex['estado']})"), {}
 
         if v["tipo"] == VENT_REF:
             try:
                 cur.execute("""
-                    INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,
-                        estado,justificada,origen,periodo_id,dia_especial_id)
+                    INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
                     VALUES(?,?,?,'reforzamiento',?,?,?,?,?,?)
-                """, (al["id"], fecha_d, v["id"], ha, REF_ASISTIO,
-                      1 if permiso else 0, origen, pid, dia_id))
+                """, (al["id"], fecha_d, v["id"], ha, REF_ASISTIO, 1 if permiso else 0, origen, pid, dia_id))
                 if al["turno"] == "Tarde":
-                    cur.execute("SELECT id FROM asistencias WHERE alumno_id=? "
-                                "AND fecha=? AND tipo='clases'",
-                                (al["id"], fecha_d))
+                    cur.execute("SELECT id FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo='clases'", (al["id"], fecha_d))
                     if not cur.fetchone():
                         cur.execute("""
-                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,
-                                tipo,hora,estado,justificada,origen,periodo_id,
-                                dia_especial_id)
+                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
                             VALUES(?,?,NULL,'clases',?,'Puntual',?,?,?,?)
-                        """, (al["id"], fecha_d, ha, 1 if permiso else 0,
-                              origen, pid, dia_id))
+                        """, (al["id"], fecha_d, ha, 1 if permiso else 0, origen, pid, dia_id))
             except Exception as e:
                 if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                    return False, "ERROR", (
-                        _nombre_completo(al) + " ya registro reforzamiento hoy"
-                    ), {}
+                    return False, "ERROR", (_nombre_completo(al) + " ya registro reforzamiento hoy"), {}
                 raise
             
-            msg = (_nombre_completo(al) + " | " + al["grado"] + " " +
-                   al["seccion"] + " | Reforzamiento + Clases Puntual " + ha
-                   if al["turno"] == "Tarde" else
-                   _nombre_completo(al) + " | " + al["grado"] + " " +
-                   al["seccion"] + " | Asistio a reforzamiento " + ha)
+            msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | Reforzamiento + Clases Puntual " + ha if al["turno"] == "Tarde" else _nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | Asistio a reforzamiento " + ha)
             return True, "REFORZAMIENTO", msg, {"alumno": al, "evento_nombre": None}
 
         if al["turno"] == "Tarde":
-            cur.execute("SELECT id,estado,hora FROM asistencias "
-                        "WHERE alumno_id=? AND fecha=? AND tipo IN ('clases','evento')",
-                        (al["id"], fecha_d))
+            cur.execute("SELECT id,estado,hora FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo IN ('clases','evento')", (al["id"], fecha_d))
             if cur.fetchone():
-                return False, "ERROR", (
-                    _nombre_completo(al) + " ya tiene registro hoy."
-                ), {}
+                return False, "ERROR", (_nombre_completo(al) + " ya tiene registro hoy."), {}
 
         lim = v["hora_limite_efectiva"]
         
-        # 🆕 LÓGICA DE ESTADO: Si viene de psicología, es puntual. Si no, se calcula normal.
         if estado_forzado == "Puntual":
             est = PUNTUAL
         else:
@@ -1494,16 +1462,12 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
         try:
             cur.execute("""
-                INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,
-                    estado,justificada,origen,periodo_id,dia_especial_id)
+                INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
                 VALUES(?,?,?,?,?,?,?,?,?,?)
-            """, (al["id"], fecha_d, v["id"], tipo_real, ha, est,
-                  just_final, origen, pid, dia_id))
+            """, (al["id"], fecha_d, v["id"], tipo_real, ha, est, just_final, origen, pid, dia_id))
         except Exception as e:
             if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                return False, "ERROR", (
-                    _nombre_completo(al) + " ya registro hoy (carrera)"
-                ), {}
+                return False, "ERROR", (_nombre_completo(al) + " ya registro hoy (carrera)"), {}
             raise
 
         n = 0
@@ -1513,11 +1477,9 @@ def registrar_entrada(dni, usuario, origen="qr"):
             acc = ACC_PERDONADO if n < limite else ACC_DERIVADO
             try:
                 cur.execute("""
-                    INSERT INTO tardanzas(alumno_id,fecha,hora,numero,accion,
-                        justificada,origen,registrado_por,"timestamp",periodo_id)
+                    INSERT INTO tardanzas(alumno_id,fecha,hora,numero,accion,justificada,origen,registrado_por,"timestamp",periodo_id)
                     VALUES(?,?,?,?,?,?,?,?,?,?)
-                """, (al["id"], fecha_d, ha, n, acc, just_final, origen,
-                      usuario["usuario"], timestamp_str(), pid))
+                """, (al["id"], fecha_d, ha, n, acc, just_final, origen, usuario["usuario"], timestamp_str(), pid))
             except Exception as e:
                 if "unique" not in str(e).lower() and "duplicate" not in str(e).lower():
                     log.warning("tardanza: %s", e)
@@ -1525,27 +1487,16 @@ def registrar_entrada(dni, usuario, origen="qr"):
     if est == TARDANZA:
         alcanzo_limite = (n >= limite)
         ultima_oport = (n == limite - 1) and not alcanzo_limite
-
         sufijo = " [JUSTIFICADA]" if just_final else ""
-        msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] +
-               f" | Tardanza {n}a ({acc}){sufijo} {ha}")
+        msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + f" | Tardanza {n}a ({acc}){sufijo} {ha}")
         if alcanzo_limite:
             msg += " MAÑANA NO PODRA ESCANEAR"
         elif ultima_oport:
             msg += " Ultima oportunidad"
 
-        return True, "TARDANZA", msg, {
-            "alumno": al, "numero": n, "accion": acc,
-            "evento_nombre": ev_nombre,
-            "alcanzo_limite": alcanzo_limite,
-            "ultima_oportunidad": ultima_oport,
-        }
+        return True, "TARDANZA", msg, {"alumno": al, "numero": n, "accion": acc, "evento_nombre": ev_nombre, "alcanzo_limite": alcanzo_limite, "ultima_oportunidad": ultima_oport}
 
-    return True, "PUNTUAL", (
-        _nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] +
-        " | " + tipo_real.upper() + " Puntual " + ha
-    ), {"alumno": al, "evento_nombre": ev_nombre}
-
+    return True, "PUNTUAL", (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | " + tipo_real.upper() + " Puntual " + ha), {"alumno": al, "evento_nombre": ev_nombre}
 
 # MARCAR FALTAS AL CIERRE 
 # MARCAR FALTAS AL CIERRE 
@@ -1672,12 +1623,18 @@ def _procesar_escaneo(dni):
     u = st.session_state.get("user")
     if not u:
         return
+        
+    # 🛑 FRENO DE MANO: Si la pregunta está abierta, ignorar escaneos de la cámara
+    if st.session_state.get("_psico_preguntar"):
+        return
+
     ok, tipo, msg, extra = registrar_entrada(dni, u, origen="qr")
 
-    es_duplicado = (not ok and tipo == "ERROR" and
-                    ("ya registro" in msg or "ya tiene" in msg))
-
-    if es_duplicado:
+    es_duplicado = (not ok and tipo == "ERROR" and ("ya registro" in msg or "ya tiene" in msg))
+    
+    if tipo == "PREGUNTA_PSICO":
+        sonido = "error"  # O el sonido que uses para alertas
+    elif es_duplicado:
         sonido = "duplicado"
     elif not ok and tipo == "ERROR":
         sonido = "error"
@@ -1694,7 +1651,6 @@ def _procesar_escaneo(dni):
     st.session_state["_qr_mensajes"].insert(0, {
         "dni": dni, "tipo": tipo, "mensaje": msg, "extra": extra, "ts": time.time()})
     
-    # 🆕 LIMPIEZA 1: Solo guardar los últimos 3 mensajes en pantalla
     st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][:3] 
     
     contador = st.session_state.get("_qr_sonido_contador", 0) + 1
@@ -1702,7 +1658,6 @@ def _procesar_escaneo(dni):
     st.session_state["_qr_sonido_pendiente"] = {
         "kind": sonido, "nonce": contador, "ts": time.time()}
 
-    # 🆕 LIMPIEZA 2: Si la pregunta de psicología quedó colgada por más de 1 minuto, se borra
     if time.time() - st.session_state.get("_psico_timestamp", 0) > 60:
         st.session_state.pop("_psico_preguntar", None)
         st.session_state.pop("_psico_dni", None)
@@ -1770,34 +1725,46 @@ def escaner_qr_continuo(key="qr_scanner"):
     ult_scan = st.session_state.get("_ultimo_qr_scan", {})
     if ult_scan and (time.time() - ult_scan.get("ts", 0)) > 10:
         st.session_state.pop("_ultimo_qr_scan", None)
+
 def _render_mensaje_qr(msg):
     tipo = msg["tipo"]
     mensaje = msg["mensaje"]
     extra = msg.get("extra") or {}
     alumno = extra.get("alumno") or {}
     ev = extra.get("evento_nombre")
+    dni = alumno.get("dni")
 
-    # 🆕 PREGUNTA DE PSICOLOGÍA
+    # 🆕 PREGUNTA DE PSICOLOGÍA (CON FRENO ANTI-BUCLE)
     if tipo == "PREGUNTA_PSICO":
         nombre = (alumno.get("apellido_paterno", "") + " " +
                   (alumno.get("apellido_materno") or "") + ", " +
                   alumno.get("nombres", "")).strip(", ")
         st.warning(f"El alumno **{nombre}** está llegando después de las 8:00 AM.")
         st.info("¿Este alumno viene de cita psicológica?")
+        
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("Sí, es de psicología", type="primary", use_container_width=True):
+            if st.button("Sí, es de psicología", type="primary", width='stretch', key=f"psico_si_{dni}"):
+                # 🛑 BLOQUEAMOS el escáner temporalmente
+                st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
                 st.session_state["_psico_afirmativo"] = True
-                _procesar_escaneo(alumno.get("dni"))
-                st.rerun()
-        with c2:
-            if st.button("No, marcar tardanza", use_container_width=True):
                 st.session_state["_psico_preguntar"] = False
+                # Volvemos a llamar a registrar_entrada, pero ahora SÍ guardará
+                _procesar_escaneo(dni)
+                st.rerun()
+                
+        with c2:
+            if st.button("No, marcar tardanza", width='stretch', key=f"psico_no_{dni}"):
+                # 🛑 BLOQUEAMOS el escáner temporalmente
+                st.session_state["_ultimo_qr_scan"] = {"dni": dni, "ts": time.time()}
                 st.session_state["_psico_afirmativo"] = False
-                _procesar_escaneo(alumno.get("dni"))
+                st.session_state["_psico_preguntar"] = False
+                # Volvemos a llamar a registrar_entrada, pero ahora SÍ guardará
+                _procesar_escaneo(dni)
                 st.rerun()
         return
 
+    # (El resto de tu función para mostrar los mensajes de Puntual, Tardanza, etc. queda igual)
     clase = {"PUNTUAL": "qr-puntual", "TARDANZA": "qr-tardanza",
              "REFORZAMIENTO": "qr-refuerzo", "BLOQUEADO": "qr-bloqueado",
              "INFO": "qr-info", "ERROR": "qr-error"}.get(tipo, "qr-error")
@@ -1825,15 +1792,11 @@ def _render_mensaje_qr(msg):
 
     if tipo == "BLOQUEADO" and alumno and alumno.get("id"):
         alumno_id = alumno.get("id")
-        dni = alumno.get("dni")
         st.warning("¿Deseas desbloquear a este estudiante ahora?")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("Si, desbloquear", key=f"desbloq_si_{alumno_id}",
-                         type="primary", width='stretch'):
-                liberar_bloqueo(alumno_id,
-                                st.session_state["user"],
-                                "Desbloqueo inmediato desde escaneo QR")
+            if st.button("Si, desbloquear", key=f"desbloq_si_{alumno_id}", type="primary", width='stretch'):
+                liberar_bloqueo(alumno_id, st.session_state["user"], "Desbloqueo inmediato desde escaneo QR")
                 st.session_state["_qr_desbloqueo_exitoso"] = {
                     "dni": dni,
                     "nombre": (alumno.get("apellido_paterno", "") + " " +
@@ -1843,12 +1806,9 @@ def _render_mensaje_qr(msg):
                 st.session_state.pop("_qr_mensajes", None)
                 st.rerun()
         with c2:
-            if st.button("No, dejarlo bloqueado",
-                         key=f"desbloq_no_{alumno_id}",
-                         width='stretch'):
+            if st.button("No, dejarlo bloqueado", key=f"desbloq_no_{alumno_id}", width='stretch'):
                 if st.session_state.get("_qr_mensajes"):
-                    st.session_state["_qr_mensajes"] = \
-                        st.session_state["_qr_mensajes"][1:]
+                    st.session_state["_qr_mensajes"] = st.session_state["_qr_mensajes"][1:]
                 st.rerun()
 #PERFIL ALUMNO
 def perfil_alumno_datos(idal):
