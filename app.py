@@ -7374,7 +7374,18 @@ def _verificar_backup_por_tiempo():
             
     except Exception as e:
         log.warning(f"Error verificando backup automático: {e}")
-
+def aplicar_estilos():
+    from pathlib import Path
+    css_path = Path(__file__).resolve().parent / "styles.css"
+    if css_path.exists():
+        try:
+            with open(css_path, "r", encoding="utf-8") as f:
+                css = f.read()
+            st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+        except Exception as e:
+            log.error(f"No se pudo cargar styles.css: {e}")
+    else:
+        log.warning("styles.css no encontrado, usando estilos por defecto")
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
