@@ -1,478 +1,141 @@
-/* ========================================================= */
-/* 🏫 DISEÑO INSTITUCIONAL - I.E. YARINACOCHA                */
-/* ========================================================= */
+def aplicar_estilos():
 
-:root{
-    --primario:       #E87B4A;
-    --primario-dark:  #D66535;
-    --primario-soft:  rgba(232,123,74,.15);
-    --primario-borde: rgba(232,123,74,.35);
-    --acento:         #F5B896;
-    --acento-soft:    rgba(245,184,150,.25);
-    --texto-btn:      #FFFFFF;
-    --texto-titulo:   #C4562A;
-    --texto-suave:    #4A4A4A;
-    --radius:         12px;
-    --radius-sm:      8px;
-    --sombra:         0 2px 8px rgba(0,0,0,.06);
-    --fs-base:        16px;
-    --fs-small:       14px;
-    --fs-titulo:      30px;
-    --fs-h2:          22px;
-    --fuente:         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark){
     :root{
-        --primario:       #F08A5C;
-        --primario-dark:  #E87B4A;
-        --primario-soft:  rgba(240,138,92,.20);
-        --primario-borde: rgba(240,138,92,.45);
-        --acento:         #F5B896;
-        --acento-soft:    rgba(245,184,150,.20);
-        --texto-btn:      #FFFFFF;
-        --texto-titulo:   #F5A582;
-        --texto-suave:    #B8B8B8;
-        --sombra:         0 2px 8px rgba(0,0,0,.30);
-    }
-}
-
-/* Tipografía Global */
-html, body, [class*="css"], .stApp,
-.stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
-.stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
-.stNumberInput, .stRadio, .stCheckbox, .stSlider,
-.stTabs, .stExpander, div[data-testid="stSidebar"],
-div[data-testid="stMetric"], button, input, textarea, select,
-h1, h2, h3, h4, h5, h6, p, span, a, label, div{
-    font-family: var(--fuente) !important;
-}
-
-html, body, [class*="css"], .stApp{
-    font-size: var(--fs-base);
-}
-
-/* Títulos */
-h1{
-    font-size: var(--fs-titulo) !important;
-    font-weight: 800 !important;
-    color: var(--texto-titulo) !important;
-    letter-spacing: -0.5px;
-}
-h2{
-    font-size: var(--fs-h2) !important;
-    font-weight: 700 !important;
-    color: var(--texto-titulo) !important;
-}
-h3{
-    font-size: 19px !important;
-    font-weight: 700 !important;
-    color: var(--texto-titulo) !important;
-}
-
-.stCaption, small, div[data-testid="stCaptionContainer"]{
-    font-size: var(--fs-small) !important;
-    opacity: 0.75;
-}
-
-/* Sidebar y Menú */
-section[data-testid="stSidebar"] {
-    border-right: 1px solid var(--primario-borde);
-}
-
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-    display: none !important; 
-}
-
-section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    border-radius: var(--radius-sm) !important;
-    padding: 12px 16px !important;
-    font-weight: 700 !important;
-    font-size: var(--fs-small) !important;
-    margin: 4px 8px !important; 
-    cursor: pointer;
-    border-left: 4px solid transparent; 
-    transition: all .2s ease;
-}
-
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    background: var(--primario-soft) !important;
-}
-
-section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background: var(--primario-soft) !important;
-    border-left: 4px solid var(--primario) !important;
-    color: var(--primario) !important;
-}
-
-/* Tarjeta del Usuario en Sidebar */
-.encabezado-sidebar {
-    background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
-    padding: 15px 10px !important;
-    margin: 10px 12px 20px 12px !important;
-    border-radius: var(--radius) !important;
-    text-align: center;
-    color: #FFF;
-    box-shadow: 0 4px 10px rgba(232,123,74,0.2);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.encabezado-sidebar .nombre {
-    font-size: 15px !important; 
-    font-weight: 800 !important; 
-    color: #FFF !important;
-    margin-bottom: 4px;
-    line-height: 1.1;
-}
-
-.encabezado-sidebar .rol {
-    display: inline-block; 
-    padding: 3px 10px;
-    background: rgba(255,255,255,.25); 
-    border-radius: 12px;
-    font-size: 9px !important; 
-    font-weight: 900 !important; 
-    text-transform: uppercase;
-    letter-spacing: .10em; 
-    color: #FFF !important;
-}
-
-/* Inputs */
-.stTextInput input, .stNumberInput input, .stDateInput input,
-.stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
-    border-radius: var(--radius-sm) !important;
-    min-height: 46px;
-    font-size: var(--fs-base) !important;
-    border: 2px solid var(--primario-borde) !important;
-}
-.stTextInput input:focus, .stTextArea textarea:focus{
-    border-color: var(--primario) !important;
-    box-shadow: 0 0 0 3px var(--primario-soft) !important;
-}
-
-/* Botones */
-.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button{
-    background: var(--primario) !important;
-    color: #FFFFFF !important;
-    border-radius: var(--radius-sm) !important;
-    font-weight: 700 !important;
-    border: none !important;
-    padding: 12px 22px !important;
-    font-size: var(--fs-small) !important;
-    min-height: 46px;
-    box-shadow: 0 2px 6px rgba(232,123,74,.25);
-    transition: all .15s ease;
-}
-.stButton > button p,
-.stFormSubmitButton > button p,
-.stDownloadButton > button p{
-    color: #FFFFFF !important;
-}
-.stButton > button:hover, .stFormSubmitButton > button:hover,
-.stDownloadButton > button:hover{
-    background: var(--primario-dark) !important;
-    transform: translateY(-1px);
-}
-
-/* Métricas */
-div[data-testid="stMetric"]{
-    background: var(--primario-soft);
-    border: 1px solid var(--primario-borde);
-    border-radius: var(--radius);
-    padding: 20px 22px !important;
-}
-div[data-testid="stMetric"] label{
-    font-size: 12px !important; font-weight: 800 !important;
-    text-transform: uppercase; letter-spacing: .08em !important;
-}
-div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
-    font-size: 32px !important; font-weight: 800 !important;
-    color: var(--texto-titulo) !important;
-}
-
-/* Tabs */
-.stTabs [data-baseweb="tab-list"]{
-    gap: 4px;
-    border-bottom: 2px solid var(--primario-borde);
-}
-.stTabs [data-baseweb="tab"]{
-    font-weight: 700 !important;
-    padding: 12px 18px !important;
-    font-size: var(--fs-small) !important;
-    opacity: 0.7;
-}
-.stTabs [aria-selected="true"]{
-    font-weight: 800 !important;
-    color: var(--texto-titulo) !important;
-    border-bottom: 3px solid var(--primario) !important;
-    opacity: 1;
-}
-
-/* Expanders */
-.streamlit-expanderHeader, details summary{
-    border: 1px solid var(--primario-borde) !important;
-    border-radius: var(--radius-sm) !important;
-    font-weight: 700 !important;
-    padding: 14px 16px !important;
-    font-size: var(--fs-base) !important;
-}
-.streamlit-expanderHeader:hover{
-    border-color: var(--primario) !important;
-}
-
-/* Perfil del Alumno */
-.perfil-hero{
-    background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
-    border-radius: 14px;
-    padding: 26px 30px;
-    margin-bottom: 22px;
-    display: flex;
-    align-items: center;
-    gap: 22px;
-    flex-wrap: wrap;
-    color: #FFF;
-    box-shadow: 0 4px 16px rgba(232,123,74,.20);
-}
-.perfil-hero .hero-avatar{
-    width: 84px; height: 84px; border-radius: 50%;
-    background: rgba(255,255,255,.20);
-    border: 2px solid rgba(255,255,255,.45);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 34px; font-weight: 800; color: #FFF;
-    flex-shrink: 0;
-}
-.perfil-hero .hero-info{ flex: 1; min-width: 240px; }
-.perfil-hero .hero-nombre{
-    font-size: 24px; font-weight: 800; color: #FFF !important;
-    margin-bottom: 4px;
-}
-.perfil-hero .hero-meta{
-    font-size: 14px; opacity: .95; color: #FFF !important;
-    line-height: 1.5;
-}
-.perfil-hero .hero-badge{
-    display: inline-block; margin-top: 10px;
-    padding: 4px 14px; border-radius: 20px;
-    font-size: 10px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .12em;
-    background: rgba(255,255,255,.25);
-    border: 1px solid rgba(255,255,255,.45);
-    color: #FFF !important;
-}
-.perfil-bloque{
-    background: var(--secondary-background-color);
-    border: 1px solid var(--primario-borde);
-    border-radius: var(--radius);
-    padding: 20px 22px;
-    margin-bottom: 20px;
-    box-shadow: var(--sombra);
-}
-.perfil-bloque .titulo-seccion{
-    font-size: 12px; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .12em; color: var(--texto-titulo);
-    margin-bottom: 14px; padding-bottom: 8px;
-    border-bottom: 1px solid var(--primario-borde);
-}
-.info-linea{
-    display: flex; padding: 6px 0;
-    font-size: 14px;
-    border-bottom: 1px solid var(--primario-soft);
-}
-.info-linea:last-child{ border-bottom: none; }
-.info-label{
-    font-size: 12px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .05em;
-    opacity: 0.65;
-    min-width: 130px;
-}
-.info-valor{ font-weight: 600; }
-
-/* Grid de KPIs */
-.kpi-grid{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 14px;
-}
-.kpi-card{
-    background: var(--primario-soft);
-    border: 1px solid var(--primario-borde);
-    border-radius: 10px;
-    padding: 16px 12px;
-    text-align: center;
-    transition: all .15s ease;
-}
-.kpi-card:hover{
-    border-color: var(--primario);
-    box-shadow: var(--sombra);
-}
-.kpi-card .kpi-num{
-    font-size: 30px; font-weight: 800; color: var(--texto-titulo);
-    line-height: 1; margin-bottom: 6px;
-}
-.kpi-card .kpi-lbl{
-    font-size: 11px; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .08em; line-height: 1.3;
-    opacity: 0.75;
-}
-.kpi-card .kpi-lbl-alerta{ color: #C62828; opacity: 1; }
-@media (prefers-color-scheme: dark){
-    .kpi-card .kpi-lbl-alerta{ color: #FC8181; }
-}
-
-/* Mensajes del escáner QR */
-.scan-ultimos{
-    font-size: 11px; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .12em; margin: 24px 0 12px 0; padding-bottom: 8px;
-    border-bottom: 2px solid var(--primario-borde); color: var(--texto-titulo);
-}
-.qr-msg{
-    background: var(--secondary-background-color);
-    padding: 16px 20px;
-    border-radius: var(--radius-sm);
-    margin: 10px 0;
-    border: 1px solid rgba(128,128,128,.15);
-    border-left: 5px solid #808080;
-    font-size: 15px;
-}
-.qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
-.qr-texto{ font-size: 15px; font-weight: 600; line-height: 1.4; }
-.qr-evento{
-    font-size: 12px; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .10em; margin-bottom: 5px;
-    color: var(--texto-titulo); display: inline-block;
-    padding: 3px 10px; background: var(--primario-soft); border-radius: 6px;
-}
-.qr-puntual   { border-left-color:#22C55E; background: rgba(34,197,94,.06); }
-.qr-tardanza  { border-left-color:#F59E0B; background: rgba(245,158,11,.06); }
-.qr-derivado  { border-left-color:#FF9800; background: rgba(255,152,0,.08); }
-.qr-retenido  { border-left-color:#FF7043; font-weight:700; background: rgba(255,112,67,.08); }
-.qr-refuerzo  { border-left-color:#42A5F5; background: rgba(66,165,245,.06); }
-.qr-bloqueado { border-left-color:#EF4444; border:2px solid #EF4444; font-weight:800; background: rgba(239,68,68,.10); }
-.qr-ultima    { border-left-color:#E87B4A; font-weight:800; background: var(--acento-soft); }
-.qr-error     { border-left-color:#888888; }
-
-@media (prefers-color-scheme: dark){
-    .qr-puntual   { background: rgba(34,197,94,.10); }
-    .qr-tardanza  { background: rgba(245,158,11,.10); }
-    .qr-derivado  { background: rgba(255,152,0,.12); }
-    .qr-retenido  { background: rgba(255,112,67,.12); }
-    .qr-refuerzo  { background: rgba(66,165,245,.10); }
-    .qr-bloqueado { background: rgba(239,68,68,.15); }
-}
-
-/* Botón de selección */
-.btn-sel .stButton > button{
-    background: #43A047 !important;
-    color: #FFF !important;
-}
-.btn-sel .stButton > button p{
-    color: #FFF !important;
-}
-
-/* Separadores */
-hr{
-    border: none;
-    height: 1px;
-    background: var(--primario-borde);
-    margin: 20px 0;
-}
-
-/* Tarjetas Gigantes (Por si acaso las vuelves a usar) */
-.tarjeta-menu .stButton > button {
-    background: var(--secondary-background-color) !important;
-    border: 2px solid var(--primario-borde) !important;
-    border-radius: var(--radius) !important;
-    height: 140px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    box-shadow: var(--sombra) !important;
-    transition: all .2s ease !important;
-}
-.tarjeta-menu .stButton > button:hover {
-    border-color: var(--primario) !important;
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(232,123,74,0.2) !important;
-}
-.tarjeta-menu .stButton > button p {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    color: var(--texto-titulo) !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-}
-
-/* RESPONSIVE - CELULAR */
-@media (max-width: 768px){
-    h1{ font-size: 1.5rem !important; }
-    h2{ font-size: 1.2rem !important; }
-    .stButton > button{ width: 100% !important; }
-    .perfil-hero{ padding: 20px; gap: 16px; }
-    .perfil-hero .hero-avatar{ width: 64px; height: 64px; font-size: 26px; }
-    .perfil-hero .hero-nombre{ font-size: 19px; }
-    .kpi-grid{ grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .kpi-card .kpi-num{ font-size: 24px; }
-    .info-linea{ flex-direction: column; }
-    .info-label{ min-width: auto; margin-bottom: 2px; }
-
-    section[data-testid="stSidebar"] {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        height: 100vh !important;
-        z-index: 999999 !important;
-        box-shadow: 4px 0 15px rgba(0,0,0,0.3) !important;
-        transition: transform 0.3s ease !important;
-        min-width: 260px !important;
-        max-width: 260px !important;
+        --primario:       #E87B4A;
+        --primario-dark:  #D66535;
+        --primario-soft:  rgba(232,123,74,.15);
+        --primario-borde: rgba(232,123,74,.35);
+        --texto-titulo:   #C4562A;
+        --radius:         12px;
+        --radius-sm:      8px;
+        --fuente:         'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    section[data-testid="stSidebar"][aria-expanded="false"] {
-        transform: translateX(-100%) !important;
+    /* 1. Tipografía general */
+    html, body, [class*="css"], .stApp, button, input, textarea, select,
+    h1, h2, h3, h4, h5, h6, p, span, a, label, div{
+        font-family: var(--fuente);
     }
 
-    section[data-testid="stSidebar"][aria-expanded="true"] {
-        transform: translateX(0) !important;
+    h1{ font-size: 30px !important; font-weight: 800 !important;
+        color: var(--texto-titulo) !important; }
+    h2{ font-size: 22px !important; font-weight: 700 !important;
+        color: var(--texto-titulo) !important; }
+    h3{ font-size: 19px !important; font-weight: 700 !important;
+        color: var(--texto-titulo) !important; }
+
+    /* 2. Sidebar (Menú lateral) */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        border-radius: var(--radius-sm) !important;
+        padding: 12px 16px !important;
+        font-weight: 700 !important;
+        margin: 4px 8px !important;
+        cursor: pointer;
+        border-left: 4px solid transparent;
+        transition: all .2s ease;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: var(--primario-soft) !important;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: var(--primario-soft) !important;
+        border-left: 4px solid var(--primario) !important;
+        color: var(--primario) !important;
     }
 
-    .stApp > header + div, .stApp > div[data-testid="stAppViewContainer"] {
-        margin-left: 0 !important;
-        width: 100% !important;
-        padding-left: 0 !important;
+    .encabezado-sidebar {
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        padding: 15px 10px !important;
+        margin: 10px 12px 20px 12px !important;
+        border-radius: var(--radius) !important;
+        text-align: center;
+        color: #FFF;
+        box-shadow: 0 4px 10px rgba(232,123,74,0.2);
+    }
+    .encabezado-sidebar .nombre {
+        font-size: 15px !important;
+        font-weight: 800 !important;
+        color: #FFF !important;
+    }
+    .encabezado-sidebar .rol {
+        display: inline-block; padding: 3px 10px;
+        background: rgba(255,255,255,.25); border-radius: 12px;
+        font-size: 9px !important; font-weight: 900 !important;
+        text-transform: uppercase; letter-spacing: .1em;
+        color: #FFF !important; margin-top: 4px;
     }
 
-    [data-testid="collapsedControl"] {
+    /* 3. Botones */
+    .stButton > button, .stFormSubmitButton > button,
+    .stDownloadButton > button{
         background: var(--primario) !important;
-        color: white !important;
-        border-radius: 0 8px 8px 0 !important;
-        padding: 10px 5px !important;
-        z-index: 1000000 !important;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.2) !important;
+        color: #FFFFFF !important;
+        border-radius: var(--radius-sm) !important;
+        font-weight: 700 !important;
+        border: none !important;
+        padding: 12px 22px !important;
+        min-height: 46px;
     }
-/* 🆕 Arreglar los iconos nativos de Streamlit (flechas, menús, etc.) */
-span[data-testid="stIconMaterial"],
-span[data-testid="stIconMaterial"] *,
-.material-symbols-rounded,
-.material-symbols-rounded *,
-[class*="material-symbols"],
-[class*="material-icons"],
-[class*="MaterialIcon"] {
-    font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
-    font-weight: normal !important;
-    font-style: normal !important;
-    font-size: 24px !important;
-    line-height: 1 !important;
-    letter-spacing: normal !important;
-    text-transform: none !important;
-    display: inline-block !important;
-    white-space: nowrap !important;
-    word-wrap: normal !important;
-    direction: ltr !important;
-    -webkit-font-feature-settings: 'liga' !important;
-    -webkit-font-smoothing: antialiased !important;
-}
-}
+    .stButton > button p, .stFormSubmitButton > button p,
+    .stDownloadButton > button p{ color: #FFFFFF !important; }
+    .stButton > button:hover, .stFormSubmitButton > button:hover,
+    .stDownloadButton > button:hover{
+        background: var(--primario-dark) !important;
+    }
+
+    /* 4. Perfil del alumno (Tarjetas) */
+    .perfil-hero{
+        background: linear-gradient(135deg, var(--primario) 0%, var(--primario-dark) 100%);
+        border-radius: 14px; padding: 26px 30px; margin-bottom: 22px;
+        display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+        color: #FFF;
+    }
+    .perfil-hero .hero-avatar{
+        width: 84px; height: 84px; border-radius: 50%;
+        background: rgba(255,255,255,.20);
+        border: 2px solid rgba(255,255,255,.45);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 34px; font-weight: 800; color: #FFF;
+    }
+    .perfil-hero .hero-nombre{
+        font-size: 24px; font-weight: 800; color: #FFF !important;
+    }
+    .perfil-hero .hero-meta{ font-size: 14px; opacity: .95;
+        color: #FFF !important; line-height: 1.5; }
+
+    /* 5. Arreglo del Buscador (Expander) para que no se encime el texto */
+    details[data-testid="stExpander"] summary {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+    details[data-testid="stExpander"] summary p {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+        font-weight: 600;
+    }
+
+    /* 6. Mensajes QR */
+    .qr-msg{
+        background: var(--secondary-background-color);
+        padding: 16px 20px;
+        border-radius: var(--radius-sm);
+        margin: 10px 0;
+        border: 1px solid rgba(128,128,128,.15);
+        border-left: 5px solid #808080;
+        font-size: 15px;
+    }
+    .qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+    .qr-texto{ font-size: 15px; font-weight: 600; line-height: 1.4; }
+    .qr-puntual   { border-left-color:#22C55E; background: rgba(34,197,94,.06); }
+    .qr-tardanza  { border-left-color:#F59E0B; background: rgba(245,158,11,.06); }
+    .qr-bloqueado { border-left-color:#EF4444; border:2px solid #EF4444;
+                    font-weight:800; background: rgba(239,68,68,.10); }
+    .qr-error     { border-left-color:#888888; }
+    
+    /* 7. Ocultar el menú de Streamlit y el footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+  
