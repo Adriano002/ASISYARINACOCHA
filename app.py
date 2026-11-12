@@ -3994,9 +3994,14 @@ def _puerta_manual_alumnos(idsec, usuario):
         sec = cur.fetchone()
     if not sec:
         st.warning("Seccion no encontrada.")
+        st.session_state.pop("pm_sel_idsec", None)
+        st.session_state.pop("pm_sel_grado", None)
+        st.rerun()
         return
+        
     if st.button("← Regresar a secciones", key="pm_volver_s"):
         st.session_state.pop("pm_sel_idsec", None)
+        st.session_state.pop("pm_sel_grado", None)
         st.rerun()
 
     st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
@@ -4016,8 +4021,14 @@ def _puerta_manual_alumnos(idsec, usuario):
         with c2:
             if st.button("Marcar", key=f"pm_marcar_{al['id']}",
                          width='stretch'):
-                _, _, msg, _ = registrar_entrada(
+                # 🛡️ BLINDAJE: Desempaquetamos las 4 variables
+                ok, tipo, msg, extra = registrar_entrada(
                     al["dni"], usuario, origen="manual")
+                
+                # Si el mensaje viene vacío o nulo, ponemos uno por defecto para que no falle
+                if not msg or not str(msg).strip():
+                    msg = "El alumno ya tiene un registro hoy."
+                    
                 st.toast(msg)
                 st.rerun()
 
@@ -4027,6 +4038,7 @@ def _puerta_manual(usuario, fecha):
     if not ok:
         (st.info if "Feriado" in msg else st.warning)(msg)
         return
+        
     ha = hora_corta()
     turnos_activos = []
     for t in listar_turnos():
@@ -4035,18 +4047,29 @@ def _puerta_manual(usuario, fecha):
                 turnos_activos.append({"turno_id": t["id"], "turno": t["nombre"],
                                         "ventana": v["nombre"]})
                 break
+                
     if not turnos_activos:
         st.info("No hay ventanas activas en este momento.")
         return
+        
     st.caption("Ventanas activas: " +
                " | ".join([f"{t['turno']} ({t['ventana']})"
                             for t in turnos_activos]))
     st.warning("El modo manual es solo para emergencias.")
 
     clave = "pm_sel"
+    
+    # 🛡️ LIMPIEZA: Si acabamos de entrar al modo manual, reseteamos el selector
+    if st.session_state.get("_ultimo_modo") != "Manual":
+        st.session_state.pop("pm_sel_idsec", None)
+        st.session_state.pop("pm_sel_grado", None)
+        st.session_state["_ultimo_modo"] = "Manual"
+        
     idsec = _selector_grado_seccion(clave, "Elige el grado")
+    
     if not idsec:
         return
+        
     _puerta_manual_alumnos(idsec, usuario)
 
 def _buscador_rapido_puerta():
