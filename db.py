@@ -1,4 +1,8 @@
-# db.py
+########################################################################
+
+#################################################################
+################################################################
+##############################################################3# db.py
 import os
 import sqlite3
 import threading
@@ -6,81 +10,72 @@ import logging
 from pathlib import Path
 from contextlib import contextmanager
 from datetime import datetime, date, time
-
 log = logging.getLogger("db")
-
 # Volvemos al nombre original para recuperar los datos
 DB_PATH = Path("data/asistencia.db")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 _local = threading.local()
-
+################################################################################
+##############################################################################
+##############################################################################
 def _q(sql: str) -> str:
     return sql.replace("%s", "?")
-
-
+#obtene coexiones 
 def obtener_conexion():
     con = getattr(_local, "con", None)
     if con is None:
         con = sqlite3.connect(
             str(DB_PATH),
-            timeout=60,                 # 🆕 Subimos a 60s
+            timeout=60,                 #60s de espera de cola --- importante no eliminar 
             check_same_thread=False,
-            isolation_level=None,       # Mantenemos autocommit
+            isolation_level=None,       # Mantenemos en utocommit
         )
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
-        cur.execute("PRAGMA busy_timeout=60000")   # 🆕 60s
+        cur.execute("PRAGMA busy_timeout=60000")   #60s otra vez
         cur.execute("PRAGMA foreign_keys=ON")
-        cur.execute("PRAGMA cache_size=-16000")    # 🆕 16MB de caché
+        cur.execute("PRAGMA cache_size=-16000")    #16MB de caché par ano osbtaculizar mi stremalit con gb minimo
         _local.con = con
     return con
-
+#para liberar conexiones despues 
 def liberar_conexion(con):
     try:
         if con.in_transaction:
             con.commit()
     except Exception:
         pass
-
-
+        ####################################################################################
+########################################################################################
+##########################################################################################
 class CursorWrapper:
     """Envuelve un sqlite3.Cursor traduciendo %s → ? en cada execute."""
     def __init__(self, cursor):
         self._cur = cursor
         self.lastrowid = None
         self.description = None
-
     def execute(self, sql, params=()):
         r = self._cur.execute(_q(sql), params)
         self.lastrowid = self._cur.lastrowid
         self.description = self._cur.description
         return r
-
     def executemany(self, sql, seq):
         r = self._cur.executemany(_q(sql), seq)
         self.lastrowid = self._cur.lastrowid
         self.description = self._cur.description
         return r
-
     def fetchone(self):
         return self._cur.fetchone()
-
     def fetchall(self):
         return self._cur.fetchall()
-
     def fetchmany(self, size=None):
         return self._cur.fetchmany(size) if size else self._cur.fetchmany()
-
     def close(self):
         return self._cur.close()
-
     def __iter__(self):
         return iter(self._cur)
-
-
 @contextmanager
 def cursor(dict_rows=True):
     con = obtener_conexion()
@@ -99,14 +94,10 @@ def cursor(dict_rows=True):
                 con.commit()
         except Exception:
             pass
-
-
 def escribir(sql, params=()):
     with cursor() as (con, cur):
         cur.execute(sql, params)
         con.commit()
-
-
 def leer_df(sql, params=(), con=None):
     import pandas as pd
     con_local = con or obtener_conexion()
@@ -117,8 +108,6 @@ def leer_df(sql, params=(), con=None):
         cols = [d[0] for d in cur.description] if cur.description else []
         return pd.DataFrame(columns=cols)
     return pd.DataFrame([dict(r) for r in filas])
-
-
 def to_time(v):
     if v is None or v == "":
         return None
@@ -127,8 +116,6 @@ def to_time(v):
     if isinstance(v, datetime):
         return v.strftime("%H:%M")
     return str(v)[:5]
-
-
 def to_date(v):
     if v is None or v == "":
         return None
@@ -137,16 +124,12 @@ def to_date(v):
     if isinstance(v, date):
         return v.strftime("%Y-%m-%d")
     return str(v)[:10]
-
-
 def to_ts(v):
     if v is None or v == "":
         return None
     if isinstance(v, datetime):
         return v.strftime("%Y-%m-%d %H:%M:%S")
     return str(v)[:19]
-
-
 def fmt_time(v, con_seg=False):
     if v is None:
         return ""
@@ -156,8 +139,6 @@ def fmt_time(v, con_seg=False):
         return v.strftime("%H:%M:%S" if con_seg else "%H:%M")
     s = str(v)
     return s[:8] if con_seg else (s[:5] if len(s) >= 5 else s)
-
-
 def fmt_date(v):
     if v is None:
         return ""
@@ -166,16 +147,12 @@ def fmt_date(v):
     if isinstance(v, date):
         return v.strftime("%Y-%m-%d")
     return str(v)[:10]
-
-
 def fmt_ts(v):
     if v is None:
         return ""
     if isinstance(v, datetime):
         return v.strftime("%Y-%m-%d %H:%M:%S")
     return str(v)[:19]
-
-
 def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
     out = dict(d)
     for k in campos_time:
@@ -188,8 +165,6 @@ def dict_fechas(d: dict, campos_time=(), campos_date=(), campos_ts=()) -> dict:
         if k in out:
             out[k] = fmt_ts(out[k])
     return out
-
-
 def ping():
     try:
         with cursor() as (con, cur):
@@ -204,8 +179,6 @@ def ping():
             return True
         except Exception:
             return False
-
-
 def reset_pool():
     con = getattr(_local, "con", None)
     if con is not None:
@@ -214,11 +187,11 @@ def reset_pool():
         except Exception:
             pass
         _local.con = None
-
-
-# ══════════════════════════════════════════════════════════════════
-# NOTA: La descarga/subida a R2 se maneja 100% en sync.py.
-# NO dupliques estas funciones aquí para evitar conflictos.
-# Usa:
-#   from sync import descargar_bd_si_no_existe, subir_bd
-# ══════════════════════════════════════════════════════════════════
+##################################################################
+    #########################################################
+        ##############################################
+            ##################################
+                #####################
+                    ###########
+                       ######
+                           #     
