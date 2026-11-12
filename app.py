@@ -1348,6 +1348,7 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
 #REGISTRAR ENTRADA
 #REGISTRAR ENTRADA
 #REGISTRAR ENTRADA
+
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
@@ -1366,8 +1367,8 @@ def registrar_entrada(dni, usuario, origen="qr"):
     hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
     hora_8 = datetime.strptime("08:00", "%H:%M").time()
 
-    # Validar si viene de psicología
-    if es_turno_manana and hora_actual_dt >= hora_8:
+    # 🛡️ CORRECCIÓN CLAVE: Si es modo manual, ignoramos la pregunta de psicología
+    if origen == "qr" and es_turno_manana and hora_actual_dt >= hora_8:
         if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
             # Ya respondió (SÍ o NO)
             st.session_state["_psico_preguntar"] = False
@@ -1375,16 +1376,18 @@ def registrar_entrada(dni, usuario, origen="qr"):
             estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
             st.session_state["_psico_afirmativo"] = False
         else:
-            # Vamos a preguntar (AQUÍ ESTÁ EL TRUCO PARA QUE APAREZCA)
+            # Vamos a preguntar
             st.session_state["_psico_preguntar"] = True
             st.session_state["_psico_dni"] = dni
             st.session_state["_psico_timestamp"] = time.time()
             return False, "PREGUNTA_PSICO", "", {"alumno": al}
     else:
         estado_forzado = None
-        st.session_state.pop("_psico_preguntar", None)
-        st.session_state.pop("_psico_dni", None)
-        st.session_state.pop("_psico_afirmativo", None)
+        # 🧹 LIMPIEZA: Si entramos por manual, limpiamos cualquier estado colgado de psicología
+        if origen == "manual":
+            st.session_state.pop("_psico_preguntar", None)
+            st.session_state.pop("_psico_dni", None)
+            st.session_state.pop("_psico_afirmativo", None)
 
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
@@ -1409,7 +1412,6 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
     v = ventana_activa_para_alumno(al["turno_id"], fecha_str, al["seccion_id"])
     if not v:
-        # 🆕 MENSAJE MEJORADO: Si la ventana ya cerró, avisarle al de la puerta
         return False, "ERROR", (_nombre_completo(al) + f" | Fuera de horario ({ha}). Ventana cerrada."), {"alumno": al}
 
     permiso = hay_permiso_activo(al["id"], fecha_str)
