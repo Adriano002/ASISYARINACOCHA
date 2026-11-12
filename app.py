@@ -4000,6 +4000,7 @@ def _puerta_manual_alumnos(idsec, usuario):
         st.rerun()
         return
         
+    # Botón para regresar a la lista de grados (limpia las variables)
     if st.button("← Regresar a secciones", key="pm_volver_s"):
         st.session_state.pop("pm_sel_idsec", None)
         st.session_state.pop("pm_sel_grado", None)
@@ -4022,27 +4023,27 @@ def _puerta_manual_alumnos(idsec, usuario):
                 unsafe_allow_html=True)
         with c2:
             if st.button("Marcar", key=f"pm_marcar_{al['id']}", width='stretch'):
-                # 🛡️ ESCUDO PROTECTOR: Atrapamos cualquier error
-                try:
-                    ok, tipo, msg, extra = registrar_entrada(al["dni"], usuario, origen="manual")
+                # 🛡️ LIMPIAMOS EL ESTADO DE PSICOLOGÍA PARA QUE NO INTERRUMPA EN MODO MANUAL
+                st.session_state["_psico_preguntar"] = False
+                st.session_state["_psico_dni"] = None
+                
+                # Ejecutamos el registro
+                ok, tipo, msg, extra = registrar_entrada(al["dni"], usuario, origen="manual")
+                
+                # Validación de seguridad (por si acaso)
+                if tipo == "PREGUNTA_PSICO" or not msg or not str(msg).strip():
+                    msg = "Registro procesado (no se pudo mostrar el detalle)."
+                
+                # Mostramos el mensaje correctamente
+                if ok:
+                    st.success(msg)
+                else:
+                    st.warning(msg)
                     
-                    # Si el mensaje viene nulo o vacío, le ponemos texto
-                    if not msg or not str(msg).strip():
-                        msg = "Registro procesado (sin mensaje del sistema)."
-                        
-                    if ok:
-                        st.success(msg) # Usamos success en vez de toast
-                    else:
-                        st.warning(msg) # Usamos warning en vez de toast
-                        
-                    # Hacemos una pequeña pausa para que el usuario vea el mensaje antes de que se recargue
-                    import time
-                    time.sleep(1.5) 
-                    st.rerun()
-                    
-                except Exception as e:
-                    # Si la base de datos falla, mostramos el error exacto sin romper la app
-                    st.error(f"Error al registrar: {e}")
+                # Pausa breve para que se lea el mensaje y recargamos
+                import time
+                time.sleep(1.5) 
+                st.rerun()
 
 
 def _puerta_manual(usuario, fecha):
@@ -4071,7 +4072,7 @@ def _puerta_manual(usuario, fecha):
 
     clave = "pm_sel"
     
-    # 🛡️ LIMPIEZA: Si acabamos de entrar al modo manual, reseteamos el selector
+    # 🛡️ LIMPIEZA AL ENTRAR AL MODO MANUAL
     if st.session_state.get("_ultimo_modo") != "Manual":
         st.session_state.pop("pm_sel_idsec", None)
         st.session_state.pop("pm_sel_grado", None)
