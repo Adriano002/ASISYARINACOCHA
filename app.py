@@ -3992,6 +3992,7 @@ def _puerta_manual_alumnos(idsec, usuario):
                        JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
                     (idsec,))
         sec = cur.fetchone()
+        
     if not sec:
         st.warning("Seccion no encontrada.")
         st.session_state.pop("pm_sel_idsec", None)
@@ -4011,6 +4012,7 @@ def _puerta_manual_alumnos(idsec, usuario):
         return
 
     st.caption(f"{len(df)} alumnos. Aprieta MARCAR en cada uno que llegue.")
+    
     for _, al in df.iterrows():
         c1, c2 = st.columns([5, 1])
         with c1:
@@ -4019,18 +4021,28 @@ def _puerta_manual_alumnos(idsec, usuario):
                 f"{al['nombre_completo']}</div>",
                 unsafe_allow_html=True)
         with c2:
-            if st.button("Marcar", key=f"pm_marcar_{al['id']}",
-                         width='stretch'):
-                # 🛡️ BLINDAJE: Desempaquetamos las 4 variables
-                ok, tipo, msg, extra = registrar_entrada(
-                    al["dni"], usuario, origen="manual")
-                
-                # Si el mensaje viene vacío o nulo, ponemos uno por defecto para que no falle
-                if not msg or not str(msg).strip():
-                    msg = "El alumno ya tiene un registro hoy."
+            if st.button("Marcar", key=f"pm_marcar_{al['id']}", width='stretch'):
+                # 🛡️ ESCUDO PROTECTOR: Atrapamos cualquier error
+                try:
+                    ok, tipo, msg, extra = registrar_entrada(al["dni"], usuario, origen="manual")
                     
-                st.toast(msg)
-                st.rerun()
+                    # Si el mensaje viene nulo o vacío, le ponemos texto
+                    if not msg or not str(msg).strip():
+                        msg = "Registro procesado (sin mensaje del sistema)."
+                        
+                    if ok:
+                        st.success(msg) # Usamos success en vez de toast
+                    else:
+                        st.warning(msg) # Usamos warning en vez de toast
+                        
+                    # Hacemos una pequeña pausa para que el usuario vea el mensaje antes de que se recargue
+                    import time
+                    time.sleep(1.5) 
+                    st.rerun()
+                    
+                except Exception as e:
+                    # Si la base de datos falla, mostramos el error exacto sin romper la app
+                    st.error(f"Error al registrar: {e}")
 
 
 def _puerta_manual(usuario, fecha):
