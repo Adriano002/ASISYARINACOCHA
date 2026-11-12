@@ -2,23 +2,37 @@
 import boto3
 import os
 import sqlite3
+import streamlit as st
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+from botocore.config import Config
 
 # ══════════════════════════════════════════════════════════════════
-# CONFIGURACIÓN DIRECTA (Tus datos hardcodeados)
+# CREDENCIALES
+# Se leen de st.secrets (donde Streamlit esté corriendo: Cloud, VPS, etc.)
+# NO están escritas acá. Si faltan, la app avisa claro.
 # ══════════════════════════════════════════════════════════════════
-R2_ENDPOINT = "https://00a60225d4827f47d407b4e2357b9e73.r2.cloudflarestorage.com"
-R2_ACCESS_KEY = "6510e1ad498b1879e4747acd846a3fbd"
-R2_SECRET_KEY = "46bccd0959c4104b7e728267de533fe17f1baa0605028eb4b1960db0394cc1a7"
-BUCKET_NAME = "asisyarina"
+try:
+    R2_ENDPOINT   = st.secrets["r2"]["endpoint"]
+    R2_ACCESS_KEY = st.secrets["r2"]["access_key"]
+    R2_SECRET_KEY = st.secrets["r2"]["secret_key"]
+    BUCKET_NAME   = st.secrets["r2"]["bucket"]
+except Exception as e:
+    raise RuntimeError(
+        "Faltan las credenciales de R2 en st.secrets. "
+        "Configurá [r2] con endpoint, access_key, secret_key y bucket "
+        "en el panel de Secrets de Streamlit Cloud (o en .streamlit/secrets.toml si es local)."
+    ) from e
 
 
 def _get_r2_client():
+    # Reintentos automáticos por si R2 tiene un hipo de red o rate limit
     return boto3.client(
         's3',
         endpoint_url=R2_ENDPOINT,
         aws_access_key_id=R2_ACCESS_KEY,
-        aws_secret_access_key=R2_SECRET_KEY
+        aws_secret_access_key=R2_SECRET_KEY,
+        config=Config(retries={'max_attempts': 3, 'mode': 'standard'})
     )
 
 
@@ -45,10 +59,12 @@ def subir_bd(ruta_local):
 
         s3 = _get_r2_client()
 
-        fecha_str = (datetime.now(timezone.utc) - timedelta(hours=5)).strftime("%Y-%m-%d_%H-%M")
+        # Hora de Perú explícita (no restar 5 a mano)
+        fecha_str = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d_%H-%M")
         nombre_archivo_fecha = f"asistencia_{fecha_str}.db"
         s3.upload_file(ruta_local, BUCKET_NAME, nombre_archivo_fecha)
 
+        # Copia "última versión" siempre con el mismo nombre
         s3.upload_file(ruta_local, BUCKET_NAME, "asistencia.db")
 
         print(f"Backup exitoso: {nombre_archivo_fecha} y asistencia.db")
@@ -59,17 +75,16 @@ def subir_bd(ruta_local):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 2. LISTAR BACKUPS EN R2
+# 2. LISTAR BACKUPS EN R2 (paginado: no se corta en 1000)
 # ══════════════════════════════════════════════════════════════════
 def listar_backups_r2():
     try:
         s3 = _get_r2_client()
 
-        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="asistencia_")
-
         backups = []
-        if 'Contents' in response:
-            for obj in response['Contents']:
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix="asistencia_"):
+            for obj in page.get('Contents', []):
                 key = obj['Key']
                 if key.startswith("asistencia_") and key.endswith(".db") and key != "asistencia.db":
                     fecha_str = key.replace("asistencia_", "").replace(".db", "")
@@ -103,19 +118,18 @@ def descargar_bd_especifica(key, ruta_local):
 
 
 # ══════════════════════════════════════════════════════════════════
-# 4. LIMPIAR BACKUPS ANTIGUOS EN R2
+# 4. LIMPIAR BACKUPS ANTIGUOS EN R2 (paginado también)
 # ══════════════════════════════════════════════════════════════════
 def limpiar_backups_antiguos_r2(meses_a_mantener):
     try:
         s3 = _get_r2_client()
 
         fecha_limite = datetime.now(timezone.utc) - timedelta(days=meses_a_mantener * 30)
-
-        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="asistencia_")
         borrados = 0
 
-        if 'Contents' in response:
-            for obj in response['Contents']:
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix="asistencia_"):
+            for obj in page.get('Contents', []):
                 key = obj['Key']
                 if key.startswith("asistencia_") and key.endswith(".db") and key != "asistencia.db":
                     fecha_str = key.replace("asistencia_", "").replace(".db", "")
@@ -140,6 +154,7 @@ def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
     """
     Al arrancar descarga R2 SOLO si el local NO es más reciente.
     Nunca sobrescribe datos nuevos con datos viejos.
+    Si la BD descargada está corrupta, restaura el .bak y avisa.
     """
     ruta_local = str(ruta_local)
     try:
@@ -153,7 +168,7 @@ def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
                 mtime_r2 = obj["LastModified"].timestamp()
 
                 if mtime_local > mtime_r2:
-                    print(f"✅ Local más reciente que R2. NO descargar (protección activa).")
+                    print("✅ Local más reciente que R2. NO descargar (protección activa).")
                     return True
             except Exception as e:
                 print(f"No se pudo comparar fechas: {e}")
@@ -172,6 +187,24 @@ def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
         s3.download_file(BUCKET_NAME, "asistencia.db", ruta_local)
         print(f"✅ BD descargada de R2 a {ruta_local}")
 
+        # 🛡️ Verificar que lo descargado no esté corrupto
+        try:
+            con = sqlite3.connect(ruta_local, timeout=10)
+            ok = con.execute("PRAGMA integrity_check;").fetchone()[0]
+            con.close()
+            if ok != "ok":
+                raise Exception(f"BD descargada falló integrity_check: {ok}")
+        except Exception as e:
+            print(f"⚠️ {e}. Restaurando .bak...")
+            if os.path.exists(ruta_local + ".bak"):
+                try:
+                    os.replace(ruta_local + ".bak", ruta_local)
+                    print("↩️ Restaurado backup local como fallback.")
+                except Exception:
+                    pass
+            return False
+
+        # Todo bien: borramos el .bak
         try:
             if os.path.exists(ruta_local + ".bak"):
                 os.remove(ruta_local + ".bak")
