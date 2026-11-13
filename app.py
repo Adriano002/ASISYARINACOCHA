@@ -8,6 +8,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
+from disciplina import vista_disciplina, obtener_sancion_activa
 import plotly.express as px
 import pandas as pd
 import streamlit as st
@@ -1357,47 +1358,75 @@ def registrar_entrada(dni, usuario, origen="qr"):
     if not al:
         return False, "ERROR", "DNI no encontrado", {}
 
+    # ── BLOQUEO POR TARDANZAS ────────────────────────────────────
     bloq = alumno_bloqueado(al["id"])
     if bloq:
-        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni, tb="bloqueos", rid=al["id"])
-        return False, "BLOQUEADO", (_nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"), {"alumno": al, "motivo": bloq["motivo"]}
+        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni,
+                tb="bloqueos", rid=al["id"])
+        return (False, "BLOQUEADO",
+                (_nombre_completo(al) + " | BLOQUEADO - retener y llevar a Direccion"),
+                {"alumno": al, "motivo": bloq["motivo"]})
 
-    # 🆕 FLUJO DE PSICOLOGÍA (SOLO turno Mañana y SOLO después de las 08:00)
+    # ── 🆕 BLOQUEO POR SANCIÓN DISCIPLINARIA ACTIVA ─────────────
+    try:
+        sancion = obtener_sancion_activa(al["id"])
+        if sancion:
+            auditar(usuario["usuario"],
+                    f"Intento escaneo con sanción activa DNI {dni}",
+                    tb="medidas_sancionadoras", rid=al["id"])
+            tipo_txt = sancion["tipo"].replace("_", " ").title()
+            rango = f"{sancion['fecha_inicio']} → {sancion.get('fecha_fin') or 'sin fin'}"
+            return (False, "SANCIONADO",
+                    (_nombre_completo(al) +
+                     f" | {tipo_txt.upper()} ({rango}) - NO puede ingresar | "
+                     f"Motivo: {sancion.get('motivo') or '-'}"),
+                    {"alumno": al, "sancion": sancion})
+    except Exception as e:
+        log.warning(f"Error verificando sanción: {e}")
+    # ────────────────────────────────────────────────────────────
+
+    # ── FLUJO DE PSICOLOGÍA (solo turno Mañana y después de 08:00)
     es_turno_manana = (al["turno"] == "Mañana")
     hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
     hora_8 = datetime.strptime("08:00", "%H:%M").time()
 
-    # 🛡️ CORRECCIÓN CLAVE: Si es modo manual, ignoramos la pregunta de psicología
     if origen == "qr" and es_turno_manana and hora_actual_dt >= hora_8:
-        if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
-            # Ya respondió (SÍ o NO)
+        if st.session_state.get("_psico_preguntar") and \
+           st.session_state.get("_psico_dni") == dni:
             st.session_state["_psico_preguntar"] = False
             st.session_state["_psico_dni"] = None
             estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
             st.session_state["_psico_afirmativo"] = False
         else:
-            # Vamos a preguntar
             st.session_state["_psico_preguntar"] = True
             st.session_state["_psico_dni"] = dni
             st.session_state["_psico_timestamp"] = time.time()
             return False, "PREGUNTA_PSICO", "", {"alumno": al}
     else:
         estado_forzado = None
-        # 🧹 LIMPIEZA: Si entramos por manual, limpiamos cualquier estado colgado de psicología
         if origen == "manual":
             st.session_state.pop("_psico_preguntar", None)
             st.session_state.pop("_psico_dni", None)
             st.session_state.pop("_psico_afirmativo", None)
 
+    # ── CONTROL DE TARDANZAS ─────────────────────────────────────
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
     n_previas = contar_tardanzas_desde_ultimo_desbloqueo(al["id"])
 
     if n_previas >= limite:
         if not bloq:
-            crear_bloqueo(al["id"], f"{n_previas} tardanza(s) acumulada(s) - reincidente={reincidente}", usuario, "automatico")
-        auditar(usuario["usuario"], "Intento escaneo bloqueado DNI " + dni, tb="bloqueos", rid=al["id"])
-        return False, "BLOQUEADO", (_nombre_completo(al) + " | BLOQUEADO (alcanzó el limite de tardanzas) - retener"), {"alumno": al, "motivo": "limite alcanzado"}
+            crear_bloqueo(
+                al["id"],
+                f"{n_previas} tardanza(s) acumulada(s) - reincidente={reincidente}",
+                usuario, "automatico")
+        auditar(usuario["usuario"],
+                "Intento escaneo bloqueado DNI " + dni,
+                tb="bloqueos", rid=al["id"])
+        return (False, "BLOQUEADO",
+                (_nombre_completo(al) +
+                 " | BLOQUEADO (alcanzó el limite de tardanzas) - retener"),
+                {"alumno": al, "motivo": "limite alcanzado"})
 
     fecha_str = hoy_str()
     fecha_d = hoy_date()
@@ -1405,14 +1434,20 @@ def registrar_entrada(dni, usuario, origen="qr"):
     per = obtener_periodo_activo()
     pid = per["id"] if per else None
 
+    # ── VERIFICAR FERIADO ────────────────────────────────────────
     with cursor() as (con, cur):
-        cur.execute("SELECT id FROM dias_especiales WHERE fecha=? AND activo=1 AND tipo='feriado' LIMIT 1", (fecha_d,))
+        cur.execute("SELECT id FROM dias_especiales "
+                    "WHERE fecha=? AND activo=1 AND tipo='feriado' LIMIT 1",
+                    (fecha_d,))
         if cur.fetchone():
             return False, "ERROR", "Hoy es feriado, no se registra", {}
 
+    # ── VENTANA ACTIVA ───────────────────────────────────────────
     v = ventana_activa_para_alumno(al["turno_id"], fecha_str, al["seccion_id"])
     if not v:
-        return False, "ERROR", (_nombre_completo(al) + f" | Fuera de horario ({ha}). Ventana cerrada."), {"alumno": al}
+        return (False, "ERROR",
+                (_nombre_completo(al) + f" | Fuera de horario ({ha}). Ventana cerrada."),
+                {"alumno": al})
 
     permiso = hay_permiso_activo(al["id"], fecha_str)
     tipo_real = v["tipo"]
@@ -1422,56 +1457,87 @@ def registrar_entrada(dni, usuario, origen="qr"):
     ev_nombre = v.get("evento_nombre")
 
     with cursor() as (con, cur):
-        cur.execute("SELECT id,estado FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo=?", (al["id"], fecha_d, tipo_real))
+        cur.execute("SELECT id,estado FROM asistencias "
+                    "WHERE alumno_id=? AND fecha=? AND tipo=?",
+                    (al["id"], fecha_d, tipo_real))
         ex = cur.fetchone()
         if ex:
-            return False, "ERROR", (_nombre_completo(al) + f" ya registro {tipo_real} hoy ({ex['estado']})"), {}
+            return (False, "ERROR",
+                    (_nombre_completo(al) +
+                     f" ya registro {tipo_real} hoy ({ex['estado']})"),
+                    {})
 
+        # ── REFORZAMIENTO ────────────────────────────────────────
         if v["tipo"] == VENT_REF:
             try:
                 cur.execute("""
-                    INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
+                    INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,
+                        hora,estado,justificada,origen,periodo_id,dia_especial_id)
                     VALUES(?,?,?,'reforzamiento',?,?,?,?,?,?)
-                """, (al["id"], fecha_d, v["id"], ha, REF_ASISTIO, 1 if permiso else 0, origen, pid, dia_id))
+                """, (al["id"], fecha_d, v["id"], ha, REF_ASISTIO,
+                      1 if permiso else 0, origen, pid, dia_id))
                 if al["turno"] == "Tarde":
-                    cur.execute("SELECT id FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo='clases'", (al["id"], fecha_d))
+                    cur.execute("SELECT id FROM asistencias "
+                                "WHERE alumno_id=? AND fecha=? AND tipo='clases'",
+                                (al["id"], fecha_d))
                     if not cur.fetchone():
                         cur.execute("""
-                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
+                            INSERT INTO asistencias(alumno_id,fecha,ventana_id,
+                                tipo,hora,estado,justificada,origen,periodo_id,
+                                dia_especial_id)
                             VALUES(?,?,NULL,'clases',?,'Puntual',?,?,?,?)
-                        """, (al["id"], fecha_d, ha, 1 if permiso else 0, origen, pid, dia_id))
+                        """, (al["id"], fecha_d, ha,
+                              1 if permiso else 0, origen, pid, dia_id))
             except Exception as e:
                 if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                    return False, "ERROR", (_nombre_completo(al) + " ya registro reforzamiento hoy"), {}
+                    return (False, "ERROR",
+                            (_nombre_completo(al) +
+                             " ya registro reforzamiento hoy"), {})
                 raise
-            
-            msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | Reforzamiento + Clases Puntual " + ha if al["turno"] == "Tarde" else _nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | Asistio a reforzamiento " + ha)
+
+            if al["turno"] == "Tarde":
+                msg = (_nombre_completo(al) + " | " + al["grado"] + " " +
+                       al["seccion"] + " | Reforzamiento + Clases Puntual " + ha)
+            else:
+                msg = (_nombre_completo(al) + " | " + al["grado"] + " " +
+                       al["seccion"] + " | Asistio a reforzamiento " + ha)
             return True, "REFORZAMIENTO", msg, {"alumno": al, "evento_nombre": None}
 
+        # ── VALIDAR TURNO TARDE ──────────────────────────────────
         if al["turno"] == "Tarde":
-            cur.execute("SELECT id,estado,hora FROM asistencias WHERE alumno_id=? AND fecha=? AND tipo IN ('clases','evento')", (al["id"], fecha_d))
+            cur.execute("SELECT id,estado,hora FROM asistencias "
+                        "WHERE alumno_id=? AND fecha=? "
+                        "AND tipo IN ('clases','evento')",
+                        (al["id"], fecha_d))
             if cur.fetchone():
-                return False, "ERROR", (_nombre_completo(al) + " ya tiene registro hoy."), {}
+                return (False, "ERROR",
+                        (_nombre_completo(al) + " ya tiene registro hoy."),
+                        {})
 
         lim = v["hora_limite_efectiva"]
-        
+
         if estado_forzado == "Puntual":
             est = PUNTUAL
         else:
             est = PUNTUAL if ha <= lim else TARDANZA
-            
+
         just_final = 1 if permiso else 0
 
         try:
             cur.execute("""
-                INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,origen,periodo_id,dia_especial_id)
+                INSERT INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,
+                    estado,justificada,origen,periodo_id,dia_especial_id)
                 VALUES(?,?,?,?,?,?,?,?,?,?)
-            """, (al["id"], fecha_d, v["id"], tipo_real, ha, est, just_final, origen, pid, dia_id))
+            """, (al["id"], fecha_d, v["id"], tipo_real, ha, est,
+                  just_final, origen, pid, dia_id))
         except Exception as e:
             if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                return False, "ERROR", (_nombre_completo(al) + " ya registro hoy (carrera)"), {}
+                return (False, "ERROR",
+                        (_nombre_completo(al) + " ya registro hoy (carrera)"),
+                        {})
             raise
 
+        # ── REGISTRO DE TARDANZA ─────────────────────────────────
         n = 0
         acc = None
         if est == TARDANZA:
@@ -1479,26 +1545,38 @@ def registrar_entrada(dni, usuario, origen="qr"):
             acc = ACC_PERDONADO if n < limite else ACC_DERIVADO
             try:
                 cur.execute("""
-                    INSERT INTO tardanzas(alumno_id,fecha,hora,numero,accion,justificada,origen,registrado_por,"timestamp",periodo_id)
+                    INSERT INTO tardanzas(alumno_id,fecha,hora,numero,accion,
+                        justificada,origen,registrado_por,"timestamp",periodo_id)
                     VALUES(?,?,?,?,?,?,?,?,?,?)
-                """, (al["id"], fecha_d, ha, n, acc, just_final, origen, usuario["usuario"], timestamp_str(), pid))
+                """, (al["id"], fecha_d, ha, n, acc, just_final, origen,
+                      usuario["usuario"], timestamp_str(), pid))
             except Exception as e:
-                if "unique" not in str(e).lower() and "duplicate" not in str(e).lower():
+                if "unique" not in str(e).lower() and \
+                   "duplicate" not in str(e).lower():
                     log.warning("tardanza: %s", e)
 
+    # ── MENSAJES DE SALIDA ───────────────────────────────────────
     if est == TARDANZA:
         alcanzo_limite = (n >= limite)
         ultima_oport = (n == limite - 1) and not alcanzo_limite
         sufijo = " [JUSTIFICADA]" if just_final else ""
-        msg = (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + f" | Tardanza {n}a ({acc}){sufijo} {ha}")
+        msg = (_nombre_completo(al) + " | " + al["grado"] + " " +
+               al["seccion"] + f" | Tardanza {n}a ({acc}){sufijo} {ha}")
         if alcanzo_limite:
             msg += " MAÑANA NO PODRA ESCANEAR"
         elif ultima_oport:
             msg += " Ultima oportunidad"
 
-        return True, "TARDANZA", msg, {"alumno": al, "numero": n, "accion": acc, "evento_nombre": ev_nombre, "alcanzo_limite": alcanzo_limite, "ultima_oportunidad": ultima_oport}
+        return (True, "TARDANZA", msg,
+                {"alumno": al, "numero": n, "accion": acc,
+                 "evento_nombre": ev_nombre,
+                 "alcanzo_limite": alcanzo_limite,
+                 "ultima_oportunidad": ultima_oport})
 
-    return True, "PUNTUAL", (_nombre_completo(al) + " | " + al["grado"] + " " + al["seccion"] + " | " + tipo_real.upper() + " Puntual " + ha), {"alumno": al, "evento_nombre": ev_nombre}
+    return (True, "PUNTUAL",
+            (_nombre_completo(al) + " | " + al["grado"] + " " +
+             al["seccion"] + " | " + tipo_real.upper() + " Puntual " + ha),
+            {"alumno": al, "evento_nombre": ev_nombre})
 
 # MARCAR FALTAS AL CIERRE 
 # MARCAR FALTAS AL CIERRE 
@@ -7215,15 +7293,20 @@ def obtener_opciones_por_rol(usuario):
     if rol == "Admin":
         return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
-                "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
+                "Justificaciones y Permisos", "Disciplina",  # 🆕
+                "Mantenimiento Datos", "Usuarios", 
                 "Backup", "Auditoria", "Mi cuenta"]
         
     if rol == "Direccion":
         return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
-                "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
+                "Dias especiales", "Justificaciones y Permisos",
+                "Disciplina",  # 🆕
+                "Mi cuenta"]
         
     if rol == "Auxiliar":
-        return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
+        return ["Puerta", "Bloqueados", "Justificaciones y Permisos",
+                "Reportes", "Disciplina",  # 🆕
+                "Mi cuenta"]
         
     return ["Mi cuenta"]
 
@@ -7238,6 +7321,7 @@ RUTAS = {
     "Dias especiales": vista_dias_especiales,
     "Ventanas": vista_ventanas,
     "Usuarios": vista_usuarios,
+    "Disciplina": vista_disciplina,
     "Backup": vista_backup,
     "Auditoria": vista_auditoria,
     "Mi cuenta": vista_mi_cuenta,
