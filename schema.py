@@ -303,16 +303,18 @@ INDICES = [
 ]
 
 
+
+
+
+
 def aplicar_schema():
     """Ejecuta todo el schema (idempotente)."""
-    # Abrimos una sola conexión/transacción para todas las tablas e índices.
-    # cursor() es un context manager definido en db.py que nos da (con, cur).
     with cursor() as (con, cur):
-        # Primero creamos las tablas (en el orden de la lista, para que
-        # las referencias a otras tablas ya existan).
         for sql in TABLAS:
             cur.execute(sql)
-        # Después los índices (ya existen todas las tablas).
         for sql in INDICES:
             cur.execute(sql)
+    # ── 🆕 SCHEMA DE DISCIPLINA (D.S. 021-2026-MINEDU) ──
+    from disciplina import aplicar_schema_disciplina
+    aplicar_schema_disciplina()
     log.info("schema aplicado (SQLite)")
