@@ -1348,7 +1348,6 @@ def reactivar_justificacion_previa(id_just, usuario, motivo_nuevo=""):
 #REGISTRAR ENTRADA
 #REGISTRAR ENTRADA
 #REGISTRAR ENTRADA
-
 def registrar_entrada(dni, usuario, origen="qr"):
     dni = (dni or "").strip()
     if not re.fullmatch(r"\d{8}", dni):
@@ -1367,8 +1366,8 @@ def registrar_entrada(dni, usuario, origen="qr"):
     hora_actual_dt = datetime.strptime(hora_corta(), "%H:%M").time()
     hora_8 = datetime.strptime("08:00", "%H:%M").time()
 
-    # 🛡️ CORRECCIÓN CLAVE: Si es modo manual, ignoramos la pregunta de psicología
-    if origen == "qr" and es_turno_manana and hora_actual_dt >= hora_8:
+    # Validar si viene de psicología
+    if es_turno_manana and hora_actual_dt >= hora_8:
         if st.session_state.get("_psico_preguntar") and st.session_state.get("_psico_dni") == dni:
             # Ya respondió (SÍ o NO)
             st.session_state["_psico_preguntar"] = False
@@ -1376,18 +1375,16 @@ def registrar_entrada(dni, usuario, origen="qr"):
             estado_forzado = "Puntual" if st.session_state.get("_psico_afirmativo") else None
             st.session_state["_psico_afirmativo"] = False
         else:
-            # Vamos a preguntar
+            # Vamos a preguntar (AQUÍ ESTÁ EL TRUCO PARA QUE APAREZCA)
             st.session_state["_psico_preguntar"] = True
             st.session_state["_psico_dni"] = dni
             st.session_state["_psico_timestamp"] = time.time()
             return False, "PREGUNTA_PSICO", "", {"alumno": al}
     else:
         estado_forzado = None
-        # 🧹 LIMPIEZA: Si entramos por manual, limpiamos cualquier estado colgado de psicología
-        if origen == "manual":
-            st.session_state.pop("_psico_preguntar", None)
-            st.session_state.pop("_psico_dni", None)
-            st.session_state.pop("_psico_afirmativo", None)
+        st.session_state.pop("_psico_preguntar", None)
+        st.session_state.pop("_psico_dni", None)
+        st.session_state.pop("_psico_afirmativo", None)
 
     reincidente = _es_reincidente(al["id"])
     limite = calcular_limite(reincidente)
@@ -1412,6 +1409,7 @@ def registrar_entrada(dni, usuario, origen="qr"):
 
     v = ventana_activa_para_alumno(al["turno_id"], fecha_str, al["seccion_id"])
     if not v:
+        # 🆕 MENSAJE MEJORADO: Si la ventana ya cerró, avisarle al de la puerta
         return False, "ERROR", (_nombre_completo(al) + f" | Fuera de horario ({ha}). Ventana cerrada."), {"alumno": al}
 
     permiso = hay_permiso_activo(al["id"], fecha_str)
@@ -3994,18 +3992,11 @@ def _puerta_manual_alumnos(idsec, usuario):
                        JOIN turnos t ON s.turno_id=t.id WHERE s.id=?""",
                     (idsec,))
         sec = cur.fetchone()
-        
     if not sec:
         st.warning("Seccion no encontrada.")
-        st.session_state.pop("pm_sel_idsec", None)
-        st.session_state.pop("pm_sel_grado", None)
-        st.rerun()
         return
-        
-    # Botón para regresar a la lista de grados (limpia las variables)
     if st.button("← Regresar a secciones", key="pm_volver_s"):
         st.session_state.pop("pm_sel_idsec", None)
-        st.session_state.pop("pm_sel_grado", None)
         st.rerun()
 
     st.markdown(f"### {sec['grado']} {sec['seccion']} - Turno {sec['turno']}")
@@ -4015,7 +4006,6 @@ def _puerta_manual_alumnos(idsec, usuario):
         return
 
     st.caption(f"{len(df)} alumnos. Aprieta MARCAR en cada uno que llegue.")
-    
     for _, al in df.iterrows():
         c1, c2 = st.columns([5, 1])
         with c1:
@@ -4024,27 +4014,11 @@ def _puerta_manual_alumnos(idsec, usuario):
                 f"{al['nombre_completo']}</div>",
                 unsafe_allow_html=True)
         with c2:
-            if st.button("Marcar", key=f"pm_marcar_{al['id']}", width='stretch'):
-                # 🛡️ LIMPIAMOS EL ESTADO DE PSICOLOGÍA PARA QUE NO INTERRUMPA EN MODO MANUAL
-                st.session_state["_psico_preguntar"] = False
-                st.session_state["_psico_dni"] = None
-                
-                # Ejecutamos el registro
-                ok, tipo, msg, extra = registrar_entrada(al["dni"], usuario, origen="manual")
-                
-                # Validación de seguridad (por si acaso)
-                if tipo == "PREGUNTA_PSICO" or not msg or not str(msg).strip():
-                    msg = "Registro procesado (no se pudo mostrar el detalle)."
-                
-                # Mostramos el mensaje correctamente
-                if ok:
-                    st.success(msg)
-                else:
-                    st.warning(msg)
-                    
-                # Pausa breve para que se lea el mensaje y recargamos
-                import time
-                time.sleep(1.5) 
+            if st.button("Marcar", key=f"pm_marcar_{al['id']}",
+                         width='stretch'):
+                _, _, msg, _ = registrar_entrada(
+                    al["dni"], usuario, origen="manual")
+                st.toast(msg)
                 st.rerun()
 
 
@@ -4053,7 +4027,6 @@ def _puerta_manual(usuario, fecha):
     if not ok:
         (st.info if "Feriado" in msg else st.warning)(msg)
         return
-        
     ha = hora_corta()
     turnos_activos = []
     for t in listar_turnos():
@@ -4062,29 +4035,18 @@ def _puerta_manual(usuario, fecha):
                 turnos_activos.append({"turno_id": t["id"], "turno": t["nombre"],
                                         "ventana": v["nombre"]})
                 break
-                
     if not turnos_activos:
         st.info("No hay ventanas activas en este momento.")
         return
-        
     st.caption("Ventanas activas: " +
                " | ".join([f"{t['turno']} ({t['ventana']})"
                             for t in turnos_activos]))
     st.warning("El modo manual es solo para emergencias.")
 
     clave = "pm_sel"
-    
-    # 🛡️ LIMPIEZA AL ENTRAR AL MODO MANUAL
-    if st.session_state.get("_ultimo_modo") != "Manual":
-        st.session_state.pop("pm_sel_idsec", None)
-        st.session_state.pop("pm_sel_grado", None)
-        st.session_state["_ultimo_modo"] = "Manual"
-        
     idsec = _selector_grado_seccion(clave, "Elige el grado")
-    
     if not idsec:
         return
-        
     _puerta_manual_alumnos(idsec, usuario)
 
 def _buscador_rapido_puerta():
