@@ -37,13 +37,8 @@
     }
 }
 
-/* Box-sizing global: evita que padding sume ancho y rompa grids */
-*, *::before, *::after{
-    box-sizing: border-box;
-}
-
-/* Tipografía base (NO excluye íconos: abajo los corregimos) */
-html, body, .stApp,
+/* Tipografía Global (Excluyendo íconos) */
+html, body, [class*="css"], .stApp,
 .stMarkdown, .stText, .stButton, .stTextInput, .stTextArea,
 .stSelectbox, .stMultiSelect, .stDateInput, .stTimeInput,
 .stNumberInput, .stRadio, .stCheckbox, .stSlider,
@@ -54,8 +49,6 @@ h1, h2, h3, h4, h5, h6, p, a, label, div{
 }
 
 /* 🛠️ ARREGLO DEFINITIVO PARA ÍCONOS EN STREAMLIT 1.66+ */
-/* Importante: NO fijamos font-size a 24px (rompía tamaños chicos).
-   Dejamos que hereden el tamaño del contexto. */
 [data-testid="stIconMaterial"],
 [data-testid="stIconMaterial"] *,
 .material-symbols-rounded,
@@ -68,7 +61,7 @@ span[aria-hidden="true"] {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
     font-weight: normal !important;
     font-style: normal !important;
-    font-size: inherit !important;
+    font-size: 24px !important;
     line-height: 1 !important;
     letter-spacing: normal !important;
     text-transform: none !important;
@@ -80,7 +73,7 @@ span[aria-hidden="true"] {
     -webkit-font-smoothing: antialiased !important;
 }
 
-html, body, .stApp{
+html, body, [class*="css"], .stApp{
     font-size: var(--fs-base);
 }
 
@@ -174,25 +167,13 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)
 
 /* Inputs */
 .stTextInput input, .stNumberInput input, .stDateInput input,
-.stTimeInput input, .stTextArea textarea{
+.stTimeInput input, .stTextArea textarea, .stSelectbox > div > div{
     border-radius: var(--radius-sm) !important;
     min-height: 46px;
     font-size: var(--fs-base) !important;
     border: 2px solid var(--primario-borde) !important;
 }
 .stTextInput input:focus, .stTextArea textarea:focus{
-    border-color: var(--primario) !important;
-    box-shadow: 0 0 0 3px var(--primario-soft) !important;
-}
-
-/* Selectbox: apuntamos al control interno para no romper el popover */
-.stSelectbox [data-baseweb="select"] > div{
-    border-radius: var(--radius-sm) !important;
-    min-height: 46px;
-    font-size: var(--fs-base) !important;
-    border: 2px solid var(--primario-borde) !important;
-}
-.stSelectbox [data-baseweb="select"] > div:focus-within{
     border-color: var(--primario) !important;
     box-shadow: 0 0 0 3px var(--primario-soft) !important;
 }
@@ -219,14 +200,6 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked)
 .stDownloadButton > button:hover{
     background: var(--primario-dark) !important;
     transform: translateY(-1px);
-}
-
-/* Foco visible en botones (accesibilidad) */
-.stButton > button:focus-visible,
-.stFormSubmitButton > button:focus-visible,
-.stDownloadButton > button:focus-visible{
-    outline: 3px solid var(--primario) !important;
-    outline-offset: 2px !important;
 }
 
 /* Métricas */
@@ -263,8 +236,10 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"]{
     opacity: 1;
 }
 
-/* Expanders (sin forzar display:flex para no romper el chevron) */
+/* Expanders (Arreglado para que no se encime el ícono) */
 details[data-testid="stExpander"] summary {
+    display: flex !important;
+    align-items: center !important;
     border: 1px solid var(--primario-borde) !important;
     border-radius: var(--radius-sm) !important;
     font-weight: 700 !important;
@@ -273,6 +248,7 @@ details[data-testid="stExpander"] summary {
     padding-left: 16px !important;
     padding-right: 16px !important;
     font-size: var(--fs-base) !important;
+    gap: 10px !important;
 }
 details[data-testid="stExpander"] summary p {
     margin-top: 0px !important;
@@ -395,11 +371,6 @@ details[data-testid="stExpander"] summary:hover {
     border: 1px solid rgba(128,128,128,.15);
     border-left: 5px solid #808080;
     font-size: 15px;
-    animation: qrFadeIn .2s ease;
-}
-@keyframes qrFadeIn{
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: none; }
 }
 .qr-nombre{ font-size: 17px; font-weight: 800; margin-bottom: 4px; }
 .qr-texto{ font-size: 15px; font-weight: 600; line-height: 1.4; }
@@ -509,45 +480,12 @@ hr{
         padding-left: 0 !important;
     }
 
-    /* --- FLECHA PARA CERRAR EL MENÚ (VISIBLE Y GRANDE) --- */
-    [data-testid="stSidebarCollapseButton"],
-    button[data-testid="stSidebarCollapseButton"],
     [data-testid="collapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 9999999 !important;
         background: var(--primario) !important;
         color: white !important;
-        border-radius: 50% !important;
-        border: 2px solid white !important;
-        width: 45px !important;
-        height: 45px !important;
-        min-width: 45px !important;
-        min-height: 45px !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
-        position: fixed !important;
-        top: 10px !important;
-        right: 10px !important;
+        border-radius: 0 8px 8px 0 !important;
+        padding: 10px 5px !important;
+        z-index: 1000000 !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.2) !important;
     }
-
-    [data-testid="stSidebarCollapseButton"] svg,
-    [data-testid="collapsedControl"] svg {
-        fill: white !important;
-        width: 24px !important;
-        height: 24px !important;
-    }
-}
-
-/* Accesibilidad: respetar "reducir movimiento" del sistema */
-@media (prefers-reduced-motion: reduce){
-    *, *::before, *::after{
-        transition: none !important;
-        animation: none !important;
-        transform: none !important;
-        scroll-behavior: auto !important;
-    }
-    .qr-msg{ animation: none !important; }
 }
