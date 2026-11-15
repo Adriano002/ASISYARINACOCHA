@@ -347,51 +347,7 @@ def _seed():
             log.warning("admin creado, pass temporal: %s", pwd)
 
 
-def _fix_sidebar_movil():
-    st.markdown("""
-    <style>
-    /* ── SOLUCIÓN PARA CELULAR ── */
-    @media (max-width: 768px) {
-        /* Fijar el botón de cerrar (la flecha «) para que no se mueva */
-        [data-testid="stSidebarCollapseButton"],
-        button[data-testid="stSidebarCollapseButton"],
-        [data-testid="stSidebar"] button[aria-label*="sidebar"],
-        [data-testid="stSidebar"] button[aria-label*="Sidebar"] {
-            position: fixed !important;
-            top: 10px !important;
-            right: 10px !important;
-            z-index: 9999999 !important;
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            background-color: #B85C38 !important; /* Naranja de tu app */
-            border: 2px solid white !important;
-            border-radius: 50% !important;
-            width: 50px !important;
-            height: 50px !important;
-            min-width: 50px !important;
-            min-height: 50px !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
-        }
-        
-        /* Hacer la flecha más grande y blanca */
-        [data-testid="stSidebarCollapseButton"] svg,
-        [data-testid="stSidebar"] button[aria-label*="sidebar"] svg {
-            fill: white !important;
-            color: white !important;
-            width: 28px !important;
-            height: 28px !important;
-        }
 
-        /* Evitar que el menú ocupe toda la pantalla y tape el botón */
-        [data-testid="stSidebar"] {
-            max-width: 85vw !important;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 def modo_mantenimiento():
     with cursor() as (con, cur):
@@ -7424,9 +7380,8 @@ def aplicar_estilos():
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
-                       initial_sidebar_state="auto")
+                       initial_sidebar_state="collapsed")
 
-    _fix_sidebar_movil()
     try:
         # 🛡️ LLAMADA GLOBAL: La magia ocurre aquí. Se descarga solo 1 vez.
         inicializar_bd()
