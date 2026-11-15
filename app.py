@@ -348,34 +348,44 @@ def _seed():
 
 
 def _fix_sidebar_movil():
-    """Fuerza que el botón de colapsar el sidebar sea visible y tocable en celular."""
     st.markdown("""
     <style>
+    /* ── SOLUCIÓN PARA CELULAR ── */
     @media (max-width: 768px) {
+        /* Fijar el botón de cerrar (la flecha «) para que no se mueva */
         [data-testid="stSidebarCollapseButton"],
-        button[kind="header"][aria-label*="sidebar"],
-        [data-testid="collapsedControl"] {
+        button[data-testid="stSidebarCollapseButton"],
+        [data-testid="stSidebar"] button[aria-label*="sidebar"],
+        [data-testid="stSidebar"] button[aria-label*="Sidebar"] {
+            position: fixed !important;
+            top: 10px !important;
+            right: 10px !important;
+            z-index: 9999999 !important;
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
-            z-index: 2147483647 !important;
-            position: fixed !important;
-            top: 8px !important;
-            right: 8px !important;
-            min-width: 48px !important;
-            min-height: 48px !important;
-            background: #B85C38 !important;
-            border-radius: 10px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
+            background-color: #B85C38 !important; /* Naranja de tu app */
+            border: 2px solid white !important;
+            border-radius: 50% !important;
+            width: 50px !important;
+            height: 50px !important;
+            min-width: 50px !important;
+            min-height: 50px !important;
             align-items: center !important;
             justify-content: center !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
         }
+        
+        /* Hacer la flecha más grande y blanca */
         [data-testid="stSidebarCollapseButton"] svg,
-        [data-testid="collapsedControl"] svg {
-            fill: #fff !important;
-            width: 30px !important;
-            height: 30px !important;
+        [data-testid="stSidebar"] button[aria-label*="sidebar"] svg {
+            fill: white !important;
+            color: white !important;
+            width: 28px !important;
+            height: 28px !important;
         }
+
+        /* Evitar que el menú ocupe toda la pantalla y tape el botón */
         [data-testid="stSidebar"] {
             max-width: 85vw !important;
         }
