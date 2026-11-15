@@ -346,6 +346,43 @@ def _seed():
                 ("admin", hashear_password(pwd)))
             log.warning("admin creado, pass temporal: %s", pwd)
 
+
+def _fix_sidebar_movil():
+    """Fuerza que el botón de colapsar el sidebar sea visible y tocable en celular."""
+    st.markdown("""
+    <style>
+    @media (max-width: 768px) {
+        [data-testid="stSidebarCollapseButton"],
+        button[kind="header"][aria-label*="sidebar"],
+        [data-testid="collapsedControl"] {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 2147483647 !important;
+            position: fixed !important;
+            top: 8px !important;
+            right: 8px !important;
+            min-width: 48px !important;
+            min-height: 48px !important;
+            background: #B85C38 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        [data-testid="stSidebarCollapseButton"] svg,
+        [data-testid="collapsedControl"] svg {
+            fill: #fff !important;
+            width: 30px !important;
+            height: 30px !important;
+        }
+        [data-testid="stSidebar"] {
+            max-width: 85vw !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 def modo_mantenimiento():
     with cursor() as (con, cur):
         cur.execute("SELECT valor FROM config WHERE clave=?", ("mantenimiento",))
@@ -7377,7 +7414,9 @@ def aplicar_estilos():
 def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
-                       initial_sidebar_state="expanded")
+                       initial_sidebar_state="auto")
+
+    _fix_sidebar_movil()
     try:
         # 🛡️ LLAMADA GLOBAL: La magia ocurre aquí. Se descarga solo 1 vez.
         inicializar_bd()
