@@ -7288,6 +7288,12 @@ def menu_lateral():
         if st.button("Cerrar sesion", use_container_width=True):
             cerrar_sesion()
             st.rerun()
+        
+        # --- BOTÓN DE EMERGENCIA PARA CERRAR MENÚ EN CELULAR ---
+        st.markdown("---")
+        if st.button("🔙 CERRAR MENÚ", use_container_width=True, type="primary"):
+            st.session_state["_cerrar_menu"] = True
+            st.rerun()
             
     return op
 def _enrutar(op, usuario):
@@ -7381,6 +7387,21 @@ def main():
     st.set_page_config(page_title="Asistencia I.E. Yarinacocha",
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="collapsed")
+
+    # ==========================================================
+    # TRUCO PARA CERRAR EL MENÚ EN CELULAR (JAVASCRIPT)
+    # ==========================================================
+    if st.session_state.get("_cerrar_menu"):
+        st.session_state["_cerrar_menu"] = False
+        st.components.v1.html("""
+            <script>
+                // Buscamos el botón nativo de Streamlit y le hacemos clic
+                var btn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"]');
+                if (!btn) { btn = window.parent.document.querySelector('[data-testid="collapsedControl"]'); }
+                if (btn) { btn.click(); }
+            </script>
+        """, height=0)
+    # ==========================================================
 
     try:
         # 🛡️ LLAMADA GLOBAL: La magia ocurre aquí. Se descarga solo 1 vez.
