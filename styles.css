@@ -509,13 +509,35 @@ hr{
         padding-left: 0 !important;
     }
 
+    /* --- FLECHA PARA CERRAR EL MENÚ (VISIBLE Y GRANDE) --- */
+    [data-testid="stSidebarCollapseButton"],
+    button[data-testid="stSidebarCollapseButton"],
     [data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 9999999 !important;
         background: var(--primario) !important;
         color: white !important;
-        border-radius: 0 8px 8px 0 !important;
-        padding: 10px 5px !important;
-        z-index: 1000000 !important;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.2) !important;
+        border-radius: 50% !important;
+        border: 2px solid white !important;
+        width: 45px !important;
+        height: 45px !important;
+        min-width: 45px !important;
+        min-height: 45px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
+        position: fixed !important;
+        top: 10px !important;
+        right: 10px !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"] svg,
+    [data-testid="collapsedControl"] svg {
+        fill: white !important;
+        width: 24px !important;
+        height: 24px !important;
     }
 }
 
