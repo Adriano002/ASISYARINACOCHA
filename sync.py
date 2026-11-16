@@ -6,12 +6,6 @@ import streamlit as st
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from botocore.config import Config
-
-# ══════════════════════════════════════════════════════════════════
-# CREDENCIALES
-# Se leen de st.secrets (donde Streamlit esté corriendo: Cloud, VPS, etc.)
-# NO están escritas acá. Si faltan, la app avisa claro.
-# ══════════════════════════════════════════════════════════════════
 try:
     R2_ENDPOINT   = st.secrets["r2"]["endpoint"]
     R2_ACCESS_KEY = st.secrets["r2"]["access_key"]
@@ -34,11 +28,6 @@ def _get_r2_client():
         aws_secret_access_key=R2_SECRET_KEY,
         config=Config(retries={'max_attempts': 3, 'mode': 'standard'})
     )
-
-
-# ══════════════════════════════════════════════════════════════════
-# FORZAR CHECKPOINT DEL WAL ANTES DE SUBIR (PASSIVE = NO bloquea)
-# ══════════════════════════════════════════════════════════════════
 def _forzar_checkpoint(ruta_local):
     try:
         con = sqlite3.connect(str(ruta_local), timeout=10)
@@ -48,10 +37,6 @@ def _forzar_checkpoint(ruta_local):
     except Exception as e:
         print(f"Advertencia checkpoint WAL: {e}")
 
-
-# ══════════════════════════════════════════════════════════════════
-# 1. SUBIR BACKUP A R2
-# ══════════════════════════════════════════════════════════════════
 def subir_bd(ruta_local):
     ruta_local = str(ruta_local)
     try:
@@ -73,10 +58,6 @@ def subir_bd(ruta_local):
         print(f"Error subiendo a R2: {e}")
         raise e
 
-
-# ══════════════════════════════════════════════════════════════════
-# 2. LISTAR BACKUPS EN R2 (paginado: no se corta en 1000)
-# ══════════════════════════════════════════════════════════════════
 def listar_backups_r2():
     try:
         s3 = _get_r2_client()
@@ -101,10 +82,6 @@ def listar_backups_r2():
         print(f"Error listando backups: {e}")
         return []
 
-
-# ══════════════════════════════════════════════════════════════════
-# 3. DESCARGAR UN BACKUP ESPECÍFICO
-# ══════════════════════════════════════════════════════════════════
 def descargar_bd_especifica(key, ruta_local):
     ruta_local = str(ruta_local)
     try:
@@ -116,10 +93,6 @@ def descargar_bd_especifica(key, ruta_local):
         print(f"Error descargando backup: {e}")
         return False
 
-
-# ══════════════════════════════════════════════════════════════════
-# 4. LIMPIAR BACKUPS ANTIGUOS EN R2 (paginado también)
-# ══════════════════════════════════════════════════════════════════
 def limpiar_backups_antiguos_r2(meses_a_mantener):
     try:
         s3 = _get_r2_client()
@@ -146,10 +119,6 @@ def limpiar_backups_antiguos_r2(meses_a_mantener):
         print(f"Error limpiando backups: {e}")
         return -1
 
-
-# ══════════════════════════════════════════════════════════════════
-# 5. DESCARGAR LA BD AL INICIAR (PROTEGIDO contra sobrescrituras)
-# ══════════════════════════════════════════════════════════════════
 def descargar_bd_si_no_existe(ruta_local="data/asistencia.db"):
     """
     Al arrancar descarga R2 SOLO si el local NO es más reciente.
