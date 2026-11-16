@@ -1,17 +1,7 @@
 # schema.py
-"""Schema SQLite. Idempotente: se puede ejecutar siempre."""
 import logging
-
 from db import cursor
-
 log = logging.getLogger("asistencia.schema")
-
-
-# ─────────────────────────────────────────────────────────────
-# Lista de CREATE TABLE IF NOT EXISTS. Cada string es una tabla.
-# Como usamos "IF NOT EXISTS", correr esto mil veces no rompe nada:
-# si la tabla ya existe, se ignora; si no, se crea.
-# ─────────────────────────────────────────────────────────────
 TABLAS = [
     # ── Periodos académicos (años/bimestres). Se pueden cerrar. ──
     """
