@@ -1,11 +1,4 @@
 import streamlit as st
-
-# ─────────────────────────────────────────────────────────────
-# Componente de escáner QR hecho a mano para Streamlit.
-# Usa html5-qrcode (cargado desde CDN) dentro de un iframe
-# aislado, y devuelve el DNI leído (8 dígitos) a Python
-# mediante setTriggerValue("qr_dni", dni).
-# ─────────────────────────────────────────────────────────────
 QR_SCANNER_COMPONENT = st.components.v2.component(
     name="mi_qr_scanner_v18",
     isolate_styles=False,
