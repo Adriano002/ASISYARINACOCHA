@@ -541,10 +541,64 @@ def render_disciplina():
     with tab4:
         vista_medidas()
 
+def vista_registrar_falta():
+    st.markdown("### ➕ Registrar falta")
 
+    # 1. El Radio Button para elegir el método (Igual que en tu Puerta)
+    metodo = st.radio("Método de entrada:", ["Escribir DNI", "Escanear QR con cámara"], horizontal=True)
+
+    if "disc_dni_escaneado" not in st.session_state:
+        st.session_state.disc_dni_escaneado = ""
+
+    # 2. Si elige cámara, mostramos el escáner
+    if metodo == "Escanear QR con cámara":
+        def _on_qr_scan():
+            dni_qr = st.session_state.get("qr_dni")
+            if dni_qr:
+                st.session_state.disc_dni_escaneado = dni_qr
+                st.rerun() # Refresca para que el DNI baje al formulario
+
+        qr_scanner(key="disciplina_qr", on_scan=_on_qr_scan)
+        st.info("Apunta el QR a la cámara. El DNI se llenará automáticamente abajo.")
+
+    # 3. El Formulario (se llena solo si escaneaste)
+    with st.form("form_falta", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        dni = c1.text_input("DNI del estudiante", value=st.session_state.disc_dni_escaneado)
+        registrado_por = c2.text_input("Registrado por (docente/auxiliar)")
+
+        grupo = st.radio("Gravedad", ["Leve", "Grave", "Muy grave"], horizontal=True)
+        if grupo == "Leve":
+            opciones = FALTAS_LEVES
+        elif grupo == "Grave":
+            opciones = FALTAS_GRAVES
+        else:
+            opciones = FALTAS_MUY_GRAVES
+
+        categoria = st.selectbox(
+            "Categoría",
+            options=list(opciones.keys()),
+            format_func=lambda k: f"{k} — {opciones[k]}",
+        )
+        descripcion = st.text_area("Descripción de los hechos")
+        ok = st.form_submit_button("Registrar falta", type="primary")
+
+    if ok:
+        if not dni or not registrado_por:
+            st.error("Completa DNI y quién registra.")
+        else:
+            falta_id, tipo = db_registrar_falta(dni, categoria, descripcion, registrado_por)
+            st.success(f"✅ Falta registrada (ID {falta_id}) · Gravedad: **{tipo.upper()}**")
+            if tipo != "leve":
+                st.warning("⚠️ **Art. 6.3:** Comunicar de inmediato a Dirección.")
+            st.session_state.disc_dni_escaneado = ""
 # ============================================================
 # MAIN
 # ============================================================
+
+
+
+
 if __name__ == "__main__":
     st.set_page_config(page_title="Disciplina Escolar", page_icon="📋", layout="wide")
     render_disciplina()
