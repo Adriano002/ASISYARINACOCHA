@@ -7178,7 +7178,7 @@ def obtener_opciones_por_rol(usuario):
         return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
                 "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
-                "Backup", "Auditoria", "Mi cuenta"]
+                "Backup", "Auditoria","Disciplina" "Mi cuenta"]
         
     if rol == "Direccion":
         return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
