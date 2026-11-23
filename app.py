@@ -234,91 +234,7 @@ def _bloqueado(u):
         return ahora() < bh
     except (ValueError, TypeError):
         return False
-# ============================================================
-# LÓGICA DE DISCIPLINA ESCOLAR (D.S. 8801855-2026-MINEDU)
-# ============================================================
-CAT_FALTAS_LEVES = {
-    "incumplir_normas": "Incumplir normas de convivencia del RI",
-    "higiene_presentacion": "Falta de higiene/presentación (Art. 6.7)",
-    "tardanza_menor_3": "Tardanza injustificada (< 3 por bimestre)",
-}
 
-CAT_FALTAS_GRAVES = {
-    "danio_propiedad_escolar": "Deteriorar mobiliario/materiales",
-    "uso_indebido_celulares": "Uso de celular/dispositivos sin autorización",
-    "agresion_fisica_leve": "Empujones/forcejeos sin lesión",
-    "agresion_psicologica": "Cualquier agresión psicológica",
-    "sustancias_prohibidas": "Posesión/consumo sin comercialización",
-    "vulnera_intimidad": "Amenazas, humillación, divulgación de datos",
-}
-
-CAT_FALTAS_MUY_GRAVES = {
-    "odio_apologia": "Símbolos/discursos de odio o apología",
-    "acoso_escolar": "Bullying/ciberbullying con afectación",
-    "connotacion_sexual": "Acoso o violencia sexual",
-    "portar_armas": "Armas u objetos punzocortantes",
-    "artefactos_explosivos": "Bombas molotov, fuegos artificiales",
-}
-
-def render_incidencia_puerta():
-    """Formulario que se muestra en la Puerta cuando eligen 'Incidencias'."""
-    st.markdown("### 📋 Registrar Incidencia / Disciplina")
-    st.info("Registra aquí faltas leves, graves o muy graves según el Lineamiento.")
-
-    with st.form("form_incidencia_puerta", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        dni_inc = c1.text_input("DNI del estudiante")
-        registrado_por = c2.text_input("Registrado por", value=st.session_state.get("user", {}).get("usuario", ""))
-
-        gravedad = st.radio("Gravedad", ["Leve", "Grave", "Muy grave"], horizontal=True)
-        
-        if gravedad == "Leve":
-            categorias = CAT_FALTAS_LEVES
-        elif gravedad == "Grave":
-            categorias = CAT_FALTAS_GRAVES
-        else:
-            categorias = CAT_FALTAS_MUY_GRAVES
-            
-        cat_sel = st.selectbox("Categoría", list(categorias.keys()), format_func=lambda k: categorias[k])
-        descripcion = st.text_area("Descripción de los hechos")
-        
-        if st.form_submit_button("Registrar Incidencia", type="primary"):
-            if not dni_inc.strip():
-                st.error("El DNI es obligatorio.")
-            else:
-                # Buscar si el alumno existe en tu BD
-                with cursor() as (con, cur):
-                    cur.execute("SELECT id FROM alumnos WHERE dni=? AND activo=1", (dni_inc.strip(),))
-                    al = cur.fetchone()
-
-                if not al:
-                    st.error("Alumno no encontrado en la base de datos.")
-                else:
-                    tipo = "leve" if gravedad == "Leve" else ("grave" if gravedad == "Grave" else "muy_grave")
-                    
-                    # 1. GUARDAMOS LA FALTA EN LA BD (Tabla faltas)
-                    try:
-                        escribir("""INSERT INTO faltas (dni_estudiante, tipo, categoria, descripcion, registrado_por) 
-                                    VALUES (?,?,?,?,?)""", 
-                                 (dni_inc.strip(), tipo, cat_sel, descripcion, registrado_por))
-                    except Exception as e:
-                        st.error(f"Error al guardar falta: {e}")
-                        return
-
-                    # 2. SI ES GRAVE O MUY GRAVE, LO BLOQUEAMOS AUTOMÁTICAMENTE
-                    if tipo in ("grave", "muy_grave"):
-                        hoy_str = ahora().strftime("%Y-%m-%d")
-                        try:
-                            escribir("""INSERT INTO bloqueos(alumno_id, motivo, activo, fecha_inicio, creado_por, origen) 
-                                        VALUES (?, ?, 1, ?, ?, 'manual')""", 
-                                     (al["id"], f"Disciplina: {categorias[cat_sel]}", hoy_str, registrado_por))
-                            st.success(f"✅ Incidencia {tipo.upper()} registrada y alumno BLOQUEADO en la puerta.")
-                        except Exception as e:
-                            st.warning(f"Falta guardada, pero hubo error al bloquear: {e}")
-                    else:
-                        st.success(f"✅ Incidencia {tipo.upper()} registrada correctamente.")
-                    
-                    auditar(registrado_por, f"Registró incidencia {tipo} a DNI {dni_inc}", tb="faltas")
 def autenticar(nombre_usuario, password):
     nombre_usuario = (nombre_usuario or "").strip().lower()
     with cursor() as (con, cur):
@@ -4212,7 +4128,7 @@ def vista_puerta():
     if "puerta_modo" not in st.session_state:
         st.session_state["puerta_modo"] = "Escanear QR"
         
-    modo = st.radio("Modo", ["Escanear QR", "Manual", "Incidencias"], key="puerta_modo",
+    modo = st.radio("Modo", ["Escanear QR", "Manual"], key="puerta_modo",
                     horizontal=True, label_visibility="collapsed")
                     
     if modo == "Escanear QR":
@@ -4221,11 +4137,6 @@ def vista_puerta():
             st.session_state["_ultimo_modo"] = "Escanear QR"
             
         _puerta_escanear(usuario, fecha)
-
-    elif modo == "Incidencias":
-        st.session_state["_ultimo_modo"] = "Incidencias" # Buena práctica para que no se quede pegado
-        render_incidencia_puerta()  # <--- AQUÍ ESTÁ LA SANGRÍA CORREGIDA
-        
     else:
         st.session_state["_ultimo_modo"] = "Manual"
         _puerta_manual(usuario, fecha)
