@@ -15,7 +15,7 @@ from db import (escribir, leer_df, cursor, to_time, to_date, to_ts,
                 fmt_time, fmt_date, fmt_ts)
 from schema import aplicar_schema
 from qr_scanner_component import qr_scanner
-from disciplina import render_disciplina
+
 try:
     from streamlit_autorefresh import st_autorefresh
 except ImportError:
@@ -7178,7 +7178,7 @@ def obtener_opciones_por_rol(usuario):
         return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
                 "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
-                "Backup", "Auditoria","Disciplina", "Mi cuenta"]
+                "Backup", "Auditoria", "Mi cuenta"]
         
     if rol == "Direccion":
         return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
@@ -7205,7 +7205,6 @@ RUTAS = {
     "Mi cuenta": vista_mi_cuenta,
     "Justificaciones y Permisos": vista_justificaciones_permisos,
     "Mantenimiento Datos": vista_mantenimiento_datos, 
-    "Disciplina" : render_disciplina,
 }
 
 
