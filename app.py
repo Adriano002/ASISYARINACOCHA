@@ -7205,7 +7205,7 @@ RUTAS = {
     "Mi cuenta": vista_mi_cuenta,
     "Justificaciones y Permisos": vista_justificaciones_permisos,
     "Mantenimiento Datos": vista_mantenimiento_datos, 
-    "Disciplina" : render:disciplina,
+    "Disciplina" : render_disciplina,
 }
 
 
