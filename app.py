@@ -6138,7 +6138,6 @@ def vista_auditoria():
                     st.rerun()
                 else:
                     st.error(msg)
-
         st.markdown("---")
         st.markdown("Cierres anteriores:")
         dfc = listar_cierres_anuales()
@@ -6148,9 +6147,6 @@ def vista_auditoria():
         dfp = listar_periodos_cerrados()
         if not dfp.empty:
             st.dataframe(dfp, width='stretch')
-
-
-#DÍAS ESPECIALES
 def vista_dias_especiales():
     st.title("Dias especiales")
     usuario = st.session_state["user"]
@@ -6165,7 +6161,6 @@ def vista_dias_especiales():
             st.session_state["dia_tipo"] = "Evento"
         tipo = st.radio("Tipo", ["Evento", "Feriado"], key="dia_tipo",
                         horizontal=True)
-
         c1, c2 = st.columns(2)
         with c1:
             fecha = st.date_input("Fecha", min_value=ahora().date(),
@@ -6187,20 +6182,17 @@ def vista_dias_especiales():
                 t_lbl = "Ambos"
                 hora = "00:00"
                 st.info("Los feriados no tienen horario ni turno.")
-
         contar_como_clases = False
         if tipo == "Evento":
             contar_como_clases = st.checkbox(
                 "Contar como CLASES NORMALES (no como evento)",
                 value=False, key="dia_contar_clases")
-
         alcance = "Todo el colegio"
         if tipo == "Evento":
             alcance = st.radio(
                 "Aplica a:",
                 ["Todo el colegio", "Solo algunas secciones"],
                 key="dia_alcance", horizontal=True)
-
         keys_actuales = set()
         selecciones_secciones = []
         if tipo == "Evento" and alcance == "Solo algunas secciones":
@@ -6218,9 +6210,7 @@ def vista_dias_especiales():
                         if st.checkbox(f"   {g['nombre']} {s['nombre']}",
                                        key=k_sec):
                             selecciones_secciones.append(s["id"])
-
         st.session_state["_dia_keys_actuales"] = keys_actuales
-
         if confirmar_accion("dia_crear", "Crear evento",
                              "¿Estas seguro de crear este dia especial?"):
             if not desc.strip():
@@ -6259,7 +6249,6 @@ def vista_dias_especiales():
                 st.session_state["_aviso_usuarios"] = {
                     "tipo": "ok", "msg": "Evento creado."}
                 st.rerun()
-
     with tabs[1]:
         df = leer_df("""
             SELECT d.id, d.fecha, d.descripcion,
@@ -6297,20 +6286,16 @@ def vista_dias_especiales():
                 st.session_state["_aviso_usuarios"] = {
                     "tipo": "ok", "msg": "Dia especial eliminado."}
                 st.rerun()
-
-#JUSTIFICACIONES PREVIAS 
 def _frag_justificacion_previa(usuario):
     st.subheader("Justificacion previa")
-    tabs = st.tabs(["Historial global", "Registrar"]) # 🆕 Quitamos el caption
+    tabs = st.tabs(["Historial global", "Registrar"]) 
     with tabs[0]:
         _render_historial_global_jp(usuario)
     with tabs[1]:
         _render_registrar_jp(usuario)
-
 def _render_registrar_jp(usuario):
     clave = "jp_sel"
     al_sel_id = st.session_state.get("jp_al_sel_id")
-    
     if not al_sel_id:
         idsec = _selector_grado_seccion(clave, "Elige el grado")
         if not idsec:
@@ -6322,9 +6307,7 @@ def _render_registrar_jp(usuario):
             on_click_key="jp_al_sel_id")
         if not al:
             return
-    
     else:
-        # Traemos los datos del alumno seleccionado
         with cursor() as (con, cur):
             cur.execute("""
                 SELECT a.id, a.dni, a.nombres, a.apellido_paterno, a.apellido_materno,
@@ -6341,23 +6324,17 @@ def _render_registrar_jp(usuario):
             st.rerun()
             return
         al = dict(al_row)
-
     bloq = alumno_bloqueado(al["id"])
     if bloq:
         st.error("Este alumno esta BLOQUEADO: " + (bloq.get("motivo") or ""))
-        
     nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
     st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} {al['seccion']} | Turno {al['turno']}", unsafe_allow_html=True)
-    
     if al.get("nombre_apoderado"):
         st.caption("Apoderado: " + al["nombre_apoderado"] + (" - Tel: " + al["telefono_apoderado"] if al.get("telefono_apoderado") else ""))
-
-    # Botón para regresar y buscar a otro alumno
     if st.button("← Buscar otro alumno", key="jp_volver_buscar"):
         st.session_state.pop("jp_al_sel_id", None)
         _reset_selector(clave)
         st.rerun()
-
     try:
         df_prev = leer_df("""
             SELECT id, fecha_objetivo AS "Fecha objetivo", motivo AS Motivo,
@@ -6371,13 +6348,11 @@ def _render_registrar_jp(usuario):
     except Exception as e:
         log.warning("hist just previas fallo: %s", e)
         df_prev = pd.DataFrame()
-
     if not df_prev.empty:
         st.markdown("**Justificaciones previas de este alumno**")
         st.dataframe(df_prev, width='stretch', hide_index=True)
     else:
         st.info("Sin justificaciones previas para este alumno.")
-
     st.markdown("---")
     st.markdown("**Registrar nueva justificacion previa (FALTA)**")
     hoy = ahora().date()
@@ -6404,12 +6379,10 @@ def _render_registrar_jp(usuario):
                 st.rerun()
             else:
                 st.error(msg)
-
 def _render_historial_global_jp(usuario):
     st.markdown("**Justificaciones previas de HOY / mañana / PASADO mañana**")
     hoy_s = hoy_str()
     pasado_s = (ahora().date() + timedelta(days=2)).strftime("%Y-%m-%d")
-    
     try:
         df_vig = leer_df("""
             SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
@@ -6429,16 +6402,12 @@ def _render_historial_global_jp(usuario):
     except Exception as e:
         log.warning("jp vigentes fallo: %s", e)
         df_vig = pd.DataFrame()
-
     if df_vig.empty:
         st.info("Sin justificaciones previas para hoy, mañana o pasado mañana.")
     else:
         st.dataframe(df_vig, width='stretch', hide_index=True)
-
     st.markdown("---")
     st.markdown("**Buscar en todos los tiempos**")
-    
-    #FILTROS Y BÚSQUEDA
     c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
@@ -6448,15 +6417,12 @@ def _render_historial_global_jp(usuario):
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="jp_filtro_texto",
                                       placeholder="Ej: 12345678 o Quispe")
-    
-    if st.button("🔍 Buscar Justificaciones", type="primary", width='stretch'):
+    if st.button( "Buscar Justificaciones", type="primary", width='stretch'):
         st.session_state["_buscar_jp_hist"] = True
-
     if st.session_state.get("_buscar_jp_hist"):
         if filtro_estado == "Todas" and not filtro_texto.strip():
             st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
             return
-
         q = ("""SELECT jp.fecha_objetivo AS Fecha, a.dni AS DNI,
              a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
              g.nombre AS Grado, s.nombre AS Seccion, t.nombre AS Turno,
@@ -6482,22 +6448,18 @@ def _render_historial_global_jp(usuario):
             pat = "%" + filtro_texto.strip() + "%"
             params += [pat, pat, pat]
         q += " ORDER BY jp.fecha_objetivo DESC, a.apellido_paterno LIMIT 500"
-
         try:
             df_all = leer_df(q, params)
         except Exception as e:
             log.warning("jp todas fallo: %s", e)
             st.error(f"Error consultando justificaciones: {e}")
             df_all = pd.DataFrame()
-
         if df_all.empty:
             st.info("Sin justificaciones previas con esos filtros.")
         else:
             st.write(f"{len(df_all)} justificaciones encontradas")
             # SOLO DATAFRAME (Cero RAM en CSS)
             st.dataframe(df_all, width='stretch', hide_index=True)
-
-#PERMISOS
 def _frag_permisos(usuario):
     st.subheader("Permisos de inasistencia")
     st.caption(f"Permisos para dias FUTUROS (desde mañana, maximo "
@@ -6507,13 +6469,9 @@ def _frag_permisos(usuario):
         _render_historial_global_perm(usuario)
     with tabs[1]:
         _render_registrar_perm(usuario)
-
 def _render_registrar_perm(usuario):
     clave = "perm_sel"
-    
-    # Lógica mejorada: Si ya hay alumno seleccionado, mostramos el formulario directo
     al_sel_id = st.session_state.get("perm_al_sel_id")
-    
     if not al_sel_id:
         idsec = _selector_grado_seccion(clave, "Elige el grado")
         if not idsec:
@@ -6542,19 +6500,15 @@ def _render_registrar_perm(usuario):
             st.rerun()
             return
         al = dict(al_row)
-
     bloq = alumno_bloqueado(al["id"])
     if bloq:
         st.error("Este alumno esta BLOQUEADO: " + (bloq.get("motivo") or ""))
-        
     nombre = (al['apellido_paterno'] + " " + (al['apellido_materno'] or "") + ", " + al['nombres']).strip(", ")
     st.markdown(f"**{nombre}** | DNI {al['dni']} | {al['grado']} {al['seccion']}", unsafe_allow_html=True)
-
     if st.button("← Buscar otro alumno", key="perm_volver_buscar"):
         st.session_state.pop("perm_al_sel_id", None)
         _reset_selector(clave)
         st.rerun()
-
     try:
         df_perm = leer_df("""
             SELECT id, fecha_inicio AS Inicio, fecha_fin AS Fin,
@@ -6566,13 +6520,11 @@ def _render_registrar_perm(usuario):
     except Exception as e:
         log.warning("hist permisos fallo: %s", e)
         df_perm = pd.DataFrame()
-
     if not df_perm.empty:
         st.markdown("**Permisos de este alumno**")
         st.dataframe(df_perm, width='stretch', hide_index=True)
     else:
         st.info("Sin permisos para este alumno.")
-
     st.markdown("---")
     st.markdown("**Registrar nuevo permiso**")
     manana = ahora().date() + timedelta(days=1)
@@ -6603,11 +6555,9 @@ def _render_registrar_perm(usuario):
                 st.rerun()
             else:
                 st.error(msg)
-
 def _render_historial_global_perm(usuario):
     st.markdown("**Permisos vigentes HOY**")
     hoy_s = hoy_str()
-    
     try:
         df_hoy = leer_df("""
             SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin, a.dni AS DNI,
@@ -6624,16 +6574,12 @@ def _render_historial_global_perm(usuario):
     except Exception as e:
         log.warning("perm hoy fallo: %s", e)
         df_hoy = pd.DataFrame()
-
     if df_hoy.empty:
         st.info("Sin permisos vigentes hoy.")
     else:
         st.dataframe(df_hoy, width='stretch', hide_index=True)
-
     st.markdown("---")
     st.markdown("**Buscar en todos los tiempos**")
-    
-    #FILTROS Y BÚSQUEDA
     c1, c2 = st.columns([1, 2])
     with c1:
         filtro_estado = st.selectbox("Filtrar por estado",
@@ -6642,16 +6588,13 @@ def _render_historial_global_perm(usuario):
     with c2:
         filtro_texto = st.text_input("Buscar por DNI o apellido",
                                       key="perm_filtro_texto",
-                                      placeholder="Ej: 12345678")
-                                      
+                                      placeholder="Ej: 12345678")                       
     if st.button("Buscar Permisos", type="primary", width='stretch'):
         st.session_state["_buscar_perm_hist"] = True
-
     if st.session_state.get("_buscar_perm_hist"):
         if filtro_estado == "Todos" and not filtro_texto.strip():
             st.info("Selecciona un estado o escribe un nombre/DNI para buscar.")
             return
-
         q = ("""SELECT p.fecha_inicio AS Inicio, p.fecha_fin AS Fin,
              a.dni AS DNI,
              a.apellido_paterno||' '||COALESCE(a.apellido_materno,'')||', '||a.nombres AS Alumno,
@@ -6673,21 +6616,17 @@ def _render_historial_global_perm(usuario):
             pat = "%" + filtro_texto.strip() + "%"
             params += [pat, pat, pat]
         q += " ORDER BY p.fecha_inicio DESC, a.apellido_paterno LIMIT 500"
-
         try:
             df_all = leer_df(q, params)
         except Exception as e:
             log.warning("perm todas fallo: %s", e)
             st.error(f"Error consultando permisos: {e}")
             df_all = pd.DataFrame()
-
         if df_all.empty:
             st.info("Sin permisos con esos filtros.")
         else:
             st.write(f"{len(df_all)} permisos encontrados")
             st.dataframe(df_all, width='stretch', hide_index=True)
-
-
 def vista_justificaciones_permisos():
     st.title("Justificaciones y Permisos")
     usuario = st.session_state["user"]
@@ -6696,17 +6635,13 @@ def vista_justificaciones_permisos():
         _frag_justificacion_previa(usuario)
     with tabs[1]:
         _frag_permisos(usuario)
-
-#BACKUP
 def vista_backup():
     st.title("Backup y Respaldo")
     usuario = st.session_state["user"]
-    
     import os
     archivo_log = "historial_backups.txt"
     st.subheader("Historial de Resguardos Automáticos")
     st.caption("El sistema respalda automáticamente a las 09:00 AM y 03:00 PM (Hora de Perú).")
-    
     if os.path.exists(archivo_log):
         with open(archivo_log, "r") as f:
             lineas = f.readlines()
@@ -6722,27 +6657,19 @@ def vista_backup():
                 st.info(texto_limpio)
     else:
         st.warning("Aún no se ha registrado ningún respaldo en este servidor.")
-    
     st.markdown("---")
-
     st.subheader("Acciones de Administrador")
     st.warning("Por seguridad, estas acciones están bloqueadas. Ingresa la clave para continuar.")
-    
     CLAVE_MAESTRA = "Yarinacocha2026"
-    
     clave_ingresada = st.text_input("Ingresa la clave de administrador:", 
                                     type="password",
                                     placeholder="Clave secreta...")
-    
     if clave_ingresada != CLAVE_MAESTRA:
         st.info("Zona bloqueada. El botón de subir y descargar está deshabilitado.")
         return 
-        
     st.success("Clave correcta. Acceso concedido.")
     st.markdown("---")
-    
     c1, c2 = st.columns(2)
-    
     with c1:
         st.markdown("### Forzar Respaldo a R2")
         st.caption("Súbelo a la nube si el automático falló.")
@@ -6760,8 +6687,7 @@ def vista_backup():
                 except Exception as e:
                     with open(archivo_log, "a") as f:
                         f.write(f"[{ahora().strftime('%Y-%m-%d %H:%M')}] ERROR: Fallo en backup MANUAL: {e}\n")
-                    st.error(f"Error al subir: {e}")
-                    
+                    st.error(f"Error al subir: {e}")            
     with c2:
         st.markdown("### Descargar Copia Local (.db)")
         st.caption("Descarga el archivo a tu PC por seguridad.")
@@ -6777,17 +6703,13 @@ def vista_backup():
                 )
         except Exception as e:
             st.error(f"No se pudo leer el archivo: {e}")
-
     st.markdown("---")
-    
     st.subheader("Restaurar")
     st.warning(" La app se reiniciará.")
-    
     if st.button("Buscar"):
         with st.spinner("Buscando..."):
             from sync import listar_backups_r2
             st.session_state["_backups_r2"] = listar_backups_r2()
-            
     if st.session_state.get("_backups_r2") is not None:
         backups = st.session_state["_backups_r2"]
         if not backups:
@@ -6795,33 +6717,25 @@ def vista_backup():
         else:
             ops = {f"{b['fecha'].strftime('%Y-%m-%d %H:%M')}": b['key'] for b in backups}
             sel = st.selectbox("Selecciona:", list(ops.keys()))
-            
             if confirmar_accion("restaurar_bd", "Restaurar Backup", "¿Estás seguro?"):
                 with st.spinner("Descargando y restaurando..."):
                     from sync import descargar_bd_especifica
                     from db import DB_PATH
                     key = ops[sel]
-                    
                     exito = descargar_bd_especifica(key, DB_PATH)
-                    
                     if exito:
                         st.success("¡Base de datos restaurada con éxito! Reiniciando la app...")
                         time.sleep(2)
                         st.rerun()
                     else:
-                        st.error("Error al restaurar. Revisa los logs.")
-                        
+                        st.error("Error al restaurar. Revisa los logs.")    
     st.markdown("---")
-    
     st.subheader("Limpiar Backups Antiguos en R2")
     st.caption("Elimina de la nube los respaldos que ya no necesitas para no llenar el almacenamiento.")
-    
     with st.container(border=True):
         meses_r2 = st.slider("Eliminar backups de más de (meses):", 
                              min_value=3, max_value=24, value=6, key="slider_meses_r2")
-        
         check_r2 = st.checkbox("Entiendo que esto borrará los archivos de R2 permanentemente.", key="check_limpiar_r2")
-        
         if st.button("Eliminar Backups Antiguos de R2", 
                      type="primary", 
                      use_container_width=True, 
@@ -6830,7 +6744,6 @@ def vista_backup():
             with st.spinner("Buscando y eliminando backups antiguos en R2..."):
                 from sync import limpiar_backups_antiguos_r2
                 borrados = limpiar_backups_antiguos_r2(meses_r2)
-                
                 if borrados == -1:
                     st.error("Ocurrió un error al limpiar los backups. Revisa la consola.")
                 elif borrados == 0:
@@ -6839,8 +6752,6 @@ def vista_backup():
                     st.success(f"¡Limpieza exitosa! Se eliminaron {borrados} backups antiguos de R2.")
                     time.sleep(1)
                     st.rerun()
-#ESTILOS CSS 
-
 def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
     grados = listar_grados()
     c1, c2, c3 = st.columns([2, 2, 3])
@@ -6858,31 +6769,22 @@ def filtros_grado_seccion_nombre(clave, placeholder="Buscar"):
     return (g["id"] if g else None,
             s["id"] if (g and g["id"] and s) else None,
             t.strip())
-
-
-#LOGIN / CAMBIO PASSWORD / MI CUENTA
 def vista_login():
-    # --- CSS LIQUID GLASS OPTIMIZADO (CENTRADO Y SIN CORONA) ---
     st.markdown(
         """
         <style>
-        /* 1. LIMPIEZA TOTAL DE STREAMLIT */
         header[data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
-        
-        /* 🆕 MATAR LA CORONA DE STREAMLIT (TODAS LAS VERSIONES) */
         #MainMenu { visibility: hidden !important; display: none !important; }
         footer { visibility: hidden !important; display: none !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
         div[class^="viewerBadge"] { display: none !important; }
         div[class*="viewerBadge"] { display: none !important; }
         a[href*="streamlit.io"] { display: none !important; }
-        iframe[title="streamlit_app"] { display: none !important; } /* Ocultar cualquier iframe de streamlit */
-
-        /* 🆕 ARREGLAR LOS ICONOS NATIVOS (flechas, ojos) */
+        iframe[title="streamlit_app"] { display: none !important; } 
         span[data-testid="stIconMaterial"],
         span[data-testid="stIconMaterial"] *,
         .material-symbols-rounded,
@@ -6904,8 +6806,6 @@ def vista_login():
             -webkit-font-feature-settings: 'liga' !important;
             -webkit-font-smoothing: antialiased !important;
         }
-
-        /* 2. FONDO CON LUCES */
         .stApp {
             background-color: #0f172a !important;
             background-image: 
@@ -6913,7 +6813,6 @@ def vista_login():
                 radial-gradient(circle at 85% 30%, rgba(196,86,42,0.15), transparent 40%),
                 radial-gradient(circle at 50% 90%, rgba(232,123,74,0.10), transparent 40%) !important;
         }
-        
         @media (prefers-color-scheme: light) {
             .stApp {
                 background-color: #F4F6F9 !important;
@@ -6922,8 +6821,6 @@ def vista_login():
                     radial-gradient(circle at 85% 30%, rgba(196,86,42,0.10), transparent 40%) !important;
             }
         }
-
-        /* 3. CENTRADO PERFECTO EN CELULAR (USANDO PADDING MÁGICO) */
         .block-container {
             padding: 0 !important;
             display: flex !important;
@@ -6932,16 +6829,13 @@ def vista_login():
             min-height: 100vh !important; 
             min-height: 100dvh !important; 
         }
-
         @media (max-width: 768px) {
             .block-container {
                 justify-content: center !important;
-                padding-top: 15vh !important; /* 🆕 Esto lo baja al centro exacto */
+                padding-top: 15vh !important; 
                 padding-bottom: 0 !important;
             }
         }
-
-        /* 4. EFECTO LIQUID GLASS (BLINDADO CONTRA MODO OSCURO) */
         div[data-testid="stForm"] { 
             background: rgba(255, 255, 255, 0.05) !important;
             background-color: rgba(255, 255, 255, 0.05) !important; 
@@ -6952,7 +6846,6 @@ def vista_login():
             padding: 40px !important;
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
         }
-        
         @media (prefers-color-scheme: light) {
             div[data-testid="stForm"] { 
                 background: rgba(255, 255, 255, 0.6) !important;
@@ -6961,8 +6854,6 @@ def vista_login():
                 box-shadow: 0 30px 60px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
             }
         }
-
-        /* 5. TEXTOS */
         .glass-title {
             text-align: center;
             font-size: 32px;
@@ -6976,12 +6867,9 @@ def vista_login():
             color: rgba(255, 255, 255, 0.6);
             margin-bottom: 30px;
         }
-        
         @media (prefers-color-scheme: light) {
             .glass-subtitle { color: #555; }
         }
-
-        /* 6. INPUTS */
         .stTextInput input {
             border-radius: 12px !important; 
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -6992,7 +6880,6 @@ def vista_login():
             transition: all 0.3s ease !important;
         }
         .stTextInput input::placeholder { color: rgba(255,255,255,0.3) !important; }
-        
         @media (prefers-color-scheme: light) {
             .stTextInput input {
                 background: rgba(255, 255, 255, 0.8) !important;
@@ -7001,12 +6888,10 @@ def vista_login():
             }
             .stTextInput input::placeholder { color: #999 !important; }
         }
-        
         .stTextInput input:focus { 
             border-color: #E87B4A !important; 
             box-shadow: 0 0 0 3px rgba(232, 123, 74, 0.3) !important; 
         }
-        
         div[data-testid="stForm"] label { 
             font-size: 12px !important; 
             font-weight: 700 !important; 
@@ -7018,7 +6903,6 @@ def vista_login():
         @media (prefers-color-scheme: light) {
             div[data-testid="stForm"] label { color: #333 !important; }
         }
-
         /* 7. BOTÓN */
         div[data-testid="stForm"] .stFormSubmitButton > button {
             background: linear-gradient(135deg, #E87B4A 0%, #D66535 100%) !important;
@@ -7040,14 +6924,9 @@ def vista_login():
         """,
         unsafe_allow_html=True,
     )
-
-    # --- RENDERIZADO DEL FORMULARIO ---
     _, col_centro, _ = st.columns([1, 1.2, 1])
-    
     with col_centro:
-        with st.form("login_form", clear_on_submit=False):
-            
-            # 🆕 Ajuste de color para el texto en modo oscuro/claro
+        with st.form("login_form", clear_on_submit=False)
             st.markdown(
                 """
                 <div class="glass-title">
@@ -7062,12 +6941,9 @@ def vista_login():
                 """,
                 unsafe_allow_html=True
             )
-            
             usuario = st.text_input("Usuario", placeholder="Ej: admin")
             password = st.text_input("Contraseña", type="password", placeholder="••••••••")
-            
             enviado = st.form_submit_button("Ingresar al sistema", use_container_width=True)
-            
             if enviado:
                 datos, err = autenticar(usuario, password)
                 if datos:
@@ -7101,7 +6977,6 @@ def vista_cambio_password_obligatorio():
                 st.session_state["user"]["password"] = nuevo_hash
                 auditar(usuario["usuario"], "Cambio pwd obligatorio")
                 st.rerun()
-
 def vista_mi_cuenta():
     st.title("Mi cuenta")
     usuario = st.session_state["user"]
@@ -7118,7 +6993,6 @@ def vista_mi_cuenta():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     if usuario["rol"] == "Auxiliar":
         df_secs = leer_df("""
             SELECT g.nombre AS grado, s.nombre AS seccion, t.nombre AS turno
@@ -7134,7 +7008,6 @@ def vista_mi_cuenta():
             st.warning("No tienes secciones asignadas.")
         else:
             st.dataframe(df_secs, width='stretch')
-
     st.markdown("---")
     st.subheader("Mi actividad reciente")
     df_act = leer_df("SELECT accion,fecha FROM auditoria WHERE usuario=? "
@@ -7143,7 +7016,6 @@ def vista_mi_cuenta():
         st.info("Sin actividad.")
     else:
         st.dataframe(df_act, width='stretch')
-
     st.markdown("---")
     st.subheader("Cambiar contraseña")
     with st.form("cambiar_mi_pwd"):
@@ -7164,31 +7036,23 @@ def vista_mi_cuenta():
                 st.session_state["user"]["password"] = nueva_hash
                 auditar(usuario["usuario"], "Cambio su contraseña")
                 st.success("Contraseña actualizada.")
-
     st.markdown("---")
     if st.button("Cerrar sesion"):
         cerrar_sesion()
         st.rerun()
-
-#MENÚ Y RUTAS 
 def obtener_opciones_por_rol(usuario):
     rol = usuario["rol"]
-    
     if rol == "Admin":
         return ["Puerta", "Bloqueados", "Panel Direccion", "Reportes", "Alumnos",
                 "Grados y Secciones", "Carnets", "Dias especiales", "Ventanas",
                 "Justificaciones y Permisos", "Mantenimiento Datos", "Usuarios", 
                 "Backup", "Auditoria", "Mi cuenta"]
-        
     if rol == "Direccion":
         return ["Panel Direccion", "Bloqueados", "Reportes", "Alumnos", "Carnets",
                 "Dias especiales", "Justificaciones y Permisos", "Mi cuenta"]
-        
     if rol == "Auxiliar":
         return ["Puerta", "Bloqueados", "Justificaciones y Permisos", "Reportes", "Mi cuenta"]
-        
     return ["Mi cuenta"]
-
 RUTAS = {
     "Puerta": vista_puerta,
     "Bloqueados": vista_bloqueados,
@@ -7206,30 +7070,22 @@ RUTAS = {
     "Justificaciones y Permisos": vista_justificaciones_permisos,
     "Mantenimiento Datos": vista_mantenimiento_datos, 
 }
-
-
 def vista_inicio(usuario):
     st.title(f"¡Hola, {usuario['nombres']}!")
     st.markdown("### ¿A dónde quieres ir hoy?")
-    
     opciones = [op for op in obtener_opciones_por_rol(usuario) if op != "Inicio" and op != "Mi cuenta"]
-    
-    # Creamos las tarjetas gigantes en columnas
     st.markdown('<div class="tarjeta-menu">', unsafe_allow_html=True)
-    cols = st.columns(min(len(opciones), 3)) # Máximo 3 por fila
-    
+    cols = st.columns(min(len(opciones), 3)) 
     for i, op in enumerate(opciones):
         with cols[i % 3]:
             if st.button(op, key=f"btn_inicio_{op}", use_container_width=True):
                 st.session_state["menu"] = op
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    
 def menu_lateral():
     usuario = st.session_state["user"]
     rol = usuario["rol"]
     opciones = obtener_opciones_por_rol(usuario)
-    
     with st.sidebar:
         inicial = (usuario["nombres"] or "?")[0].upper()
         st.markdown(
@@ -7237,17 +7093,13 @@ def menu_lateral():
             f'  <div class="nombre">{inicial}. {usuario["nombres"]}</div>'
             f'  <div class="rol">{rol}</div>'
             f'</div>', unsafe_allow_html=True)
-        
         if "menu" not in st.session_state or st.session_state["menu"] not in opciones:
             st.session_state["menu"] = opciones[0]
-            
         op = st.radio("Menu", opciones, key="menu", label_visibility="collapsed")
-        
         st.markdown("---")
         if st.button("Cerrar sesion", use_container_width=True):
             cerrar_sesion()
-            st.rerun()
-            
+            st.rerun()   
     return op
 def _enrutar(op, usuario):
     v = RUTAS.get(op)
@@ -7258,14 +7110,10 @@ def _enrutar(op, usuario):
         st.error("Sin permisos.")
         auditar(usuario["usuario"], "Intento acceso no autorizado a " + op)
         return
-        
     if op != "Reportes":
         st.session_state.pop("_rep_iniciado", None)
-        
-    # DESTRUIR CÁMARA AL SALIR DE PUERTA
     if op != "Puerta":
         st.session_state["_qr_mount_id"] = st.session_state.get("_qr_mount_id", 0) + 1
-
     op_anterior = st.session_state.get("_menu_anterior")
     if op_anterior and op_anterior != op:
         st.session_state.pop("perfil_alumno_id", None)
@@ -7274,10 +7122,8 @@ def _enrutar(op, usuario):
         st.session_state.pop("carn_grado_sel", None)
         st.session_state.pop("carn_sel_alumnos", None)
         st.session_state.pop("incidencia_ver_id", None)
-
     st.session_state["_menu_anterior"] = op
     v()
-
 def _control_faltas():
     ult = st.session_state.get("_ultimo_control_faltas")
     t = time.time()
@@ -7288,40 +7134,28 @@ def _control_faltas():
         procesar_faltas_parciales() #Llamada corregida
     except Exception as e:
         log.warning(f"No se pudieron procesar faltas al cierre: {e}")
-
 def _verificar_backup_por_tiempo():
-    """Revisa la fecha real del último backup en R2. Si pasaron más de 4 horas, lo sube."""
     try:
         from sync import _get_r2_client, subir_bd
         from db import DB_PATH
         from datetime import datetime, timezone, timedelta
         import os
-        
         s3 = _get_r2_client()
-        
-        # 1. Consultamos la fecha real del archivo en R2
         try:
             obj = s3.head_object(Bucket="asisyarina", Key="asistencia.db")
             mtime_r2 = obj["LastModified"].timestamp()
         except Exception:
-            # Si el archivo no existe en R2 (primera vez), forzamos backup
             mtime_r2 = 0
-            
         ahora_ts = time.time()
-        
-        # 2. Si pasaron más de 4 horas (14400 segundos), subimos
         if ahora_ts - mtime_r2 > (4 * 3600):
             log.info("Pasaron más de 4 horas desde el último backup en R2. Iniciando...")
-            
             def tarea_backup():
                 try:
                     subir_bd(DB_PATH)
                     log.info("Backup automático por tiempo completado.")
                 except Exception as e:
                     log.error(f"Fallo backup automático: {e}")
-                    
             threading.Thread(target=tarea_backup, daemon=True).start()
-            
     except Exception as e:
         log.warning(f"Error verificando backup automático: {e}")
 def aplicar_estilos():
@@ -7341,14 +7175,9 @@ def main():
                        page_icon="escudo.png", layout="wide",
                        initial_sidebar_state="expanded")
     try:
-        # 🛡️ LLAMADA GLOBAL: La magia ocurre aquí. Se descarga solo 1 vez.
         inicializar_bd()
         aplicar_estilos()
-
-        # 🛡️ BACKUP POR TIEMPO
         _verificar_backup_por_tiempo()
-
-        # RECUPERAR SESIÓN Y VALIDAR TIEMPO (5 MINUTOS)
         if not st.session_state.get("user"):
             token = st.query_params.get("sesion")
             ts_str = st.query_params.get("ts")
@@ -7373,26 +7202,20 @@ def main():
                                 st.query_params["ts"] = str(ahora_ts)
                 except Exception:
                     st.query_params.clear()
-
         if not st.session_state.get("user"):
             st.query_params.clear()
             vista_login()
             return
-
-        # VALIDACIONES DE SISTEMA
         if not _verificar_admin_activo():
             st.error("No hay Admin activo en el sistema.")
             st.info("Contacta al desarrollador para restaurar el acceso.")
             st.stop()
-
         if st.session_state["user"].get("debe_cambiar_password"):
             vista_cambio_password_obligatorio()
             return
-
         if modo_mantenimiento() and st.session_state["user"]["rol"] != "Admin":
             vista_mantenimiento()
             return
-
         if sistema_bloqueado():
             st.warning("El sistema no esta configurado. No hay periodo activo "
                        "con alumnos cargados.")
@@ -7404,15 +7227,11 @@ def main():
             else:
                 st.info("Contacta al Administrador.")
             return
-
-        # Menú y ruteo
         op = menu_lateral()
         if op:
             _enrutar(op, st.session_state["user"])
-
     except Exception as e:
         st.error(f"Error inesperado: {e}")
         log.exception("Error en main")
-        
 if __name__ == "__main__":
     main()
