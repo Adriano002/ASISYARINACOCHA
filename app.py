@@ -1345,7 +1345,7 @@ def justificar_asistencia(ida, obs, usuario):
             return False, msg
         if not obs or not obs.strip():
             return False, "La observacion es obligatoria."
-        cur.execute("UPDATE asistencias SET justificada=1,observacion=?,"
+        cur.execute("UPDATE asistencias SET justificada=1,observacion=?,")
                     "justificado_por=?,justificado_en=? WHERE id=?",
                     (obs.strip(), usuario["usuario"], timestamp_str(), ida)
     auditar(usuario["usuario"], f"Justifico falta id={ida} motivo: {obs}",
