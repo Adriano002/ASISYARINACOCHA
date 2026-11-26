@@ -6926,7 +6926,7 @@ def vista_login():
     )
     _, col_centro, _ = st.columns([1, 1.2, 1])
     with col_centro:
-        with st.form("login_form", clear_on_submit=False)
+        with st.form("login_form", clear_on_submit=False):
             st.markdown(
                 """
                 <div class="glass-title">
