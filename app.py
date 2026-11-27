@@ -1553,18 +1553,18 @@ def procesar_faltas_parciales():
                 """, (t["id"],))
 
                 for al in cur.fetchall():
-                    # 1. ¿Ya tiene registro de clases (Puntual/Tardanza/Permiso)? 
-                    # 🛡️ BLINDAJE: Buscamos en CUALQUIER tipo (clases o evento) para no duplicar
+                    # 1. ¿Ya tiene registro EN ESTA VENTANA? 
+                    # 🛡️ BLINDAJE CORREGIDO: Filtramos por ventana_id para no mezclar turnos
                     cur.execute("""
-                        SELECT id, estado FROM asistencias 
-                        WHERE alumno_id=? AND fecha=? 
-                          AND tipo IN ('clases', 'evento', 'reforzamiento')
-                    """, (al["id"], fecha_d))
+                        SELECT id FROM asistencias 
+                        WHERE alumno_id=? AND fecha=? AND ventana_id=?
+                    """, (al["id"], fecha_d, v["id"]))
                     
                     if cur.fetchone():
-                        continue # Si ya escaneó, lo dejamos en paz.
+                        continue # Si ya escaneó en esta ventana, lo dejamos en paz.
                         
                     # 2. ¿Tiene un permiso activo para hoy? -> Se guarda como PERMISO
+                    # (Asumimos que hay_permiso_activo internamente maneja bien los turnos o ventanas)
                     if hay_permiso_activo(al["id"], fecha_str):
                         cur.execute("""
                             INSERT OR IGNORE INTO asistencias(alumno_id,fecha,ventana_id,tipo,hora,estado,justificada,observacion,origen,periodo_id)
